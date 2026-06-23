@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html><head><title>JITM · Inventory</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head><body>
+{{sidebar|safe}}
+<div class="main">
+    <div class="topbar"><h2>Inventory</h2><div class="actions">
+        {% if role == 'manager' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ New Product</button> <button class="btn btn-sm" onclick="showRestock()">Restock Log</button>{% endif %}
+        <button class="btn btn-sm" onclick="showLow()">Low Stock</button> <button class="btn btn-sm" onclick="showBarcodes()">Barcodes</button>
+        <span class="text-muted">{{name}}</span>
+    </div></div>
+    <div class="content">
+        <div class="search"><input id="s" placeholder="Search products..." oninput="load()"></div>
+        <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th>Category</th><th class="text-right">Price</th><th class="text-right">Cost</th><th class="text-right">Stock</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+    </div>
+</div>
+<div class="modal" id="pm"><div class="mc"><button class="mx" onclick="cl('pm')">&times;</button><h2 id="ft">Product</h2>
+<form onsubmit="save(event)"><label>Name</label><input id="pn" required>
+<div class="form-row"><div><label>SKU</label><input id="ps" required></div><div><label>Barcode</label><input id="pb"></div></div>
+<div class="form-row"><div><label>Price ($)</label><input id="pp" type="number" step="0.01" required></div><div><label>Cost ($)</label><input id="pc" type="number" step="0.01" value="0"></div></div>
+<div class="form-row"><div><label>Category</label><input id="pcat"></div><div><label>Low Stock Alert</label><input id="pl" type="number" value="5"></div></div>
+<label><input type="checkbox" id="pv" onchange="document.getElementById('vs').style.display=this.checked?'block':'none'"> Has Variants (sizes/colors)</label>
+<div id="vs" style="display:none"><p class="text-muted" style="margin-top:4px">Add variants after creating</p></div>
+<label>Initial Stock (if no variants)</label><input id="pst" type="number" value="0">
+<button class="btn btn-p" type="submit">Save</button></form></div></div>
+<div class="modal" id="vm"><div class="mc"><button class="mx" onclick="cl('vm')">&times;</button><h2 id="vft">Add Variant</h2>
+<form onsubmit="saveV(event)"><div class="form-row"><div><label>Size</label><input id="vsz"></div><div><label>Color</label><input id="vcl"></div></div>
+<div class="form-row"><div><label>SKU</label><input id="vsk" required></div><div><label>Barcode</label><input id="vbc"></div></div>
+<div class="form-row"><div><label>Price Override ($)</label><input id="vpr" type="number" step="0.01" placeholder="Uses base if blank"></div><div><label>Stock</label><input id="vst" type="number" value="0"></div></div>
+<button class="btn btn-p" type="submit">Add Variant</button></form></div></div>
+<div class="modal" id="sm"><div class="mc"><button class="mx" onclick="cl('sm')">&times;</button><h3>Update Stock</h3>
+<label>New Quantity</label><input id="stq" type="number" min="0"><label>Cost per unit ($)</label><input id="stc" type="number" step="0.01" value="0"><label>Note</label><input id="stn">
+<button class="btn btn-p" onclick="saveStock()">Update</button></div></div>
+<div class="modal" id="lm"><div class="mc"><button class="mx" onclick="cl('lm')">&times;</button><h2>Low Stock</h2><div id="ll"></div></div></div>
+<div class="modal" id="bm"><div class="mc" style="max-width:640px"><button class="mx" onclick="cl('bm')">&times;</button><h2>Barcodes</h2><div id="bl"></div></div></div>
+<div class="modal" id="rml"><div class="mc" style="max-width:700px"><button class="mx" onclick="cl('rml')">&times;</button><h2>Restock Log</h2><div id="rl"></div></div></div>
+<script>
+var editing=null,avId=null,svId=null,all=[];
+load();
+function load(){const q=document.getElementById('s').value;fetch('/api/products?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{all=d;render(d);});}
+function render(l){document.getElementById('tb').innerHTML=l.map(p=>{
+let vh='';if(p.variants&&p.variants.length){vh='<tr><td colspan="7" style="padding:0 14px 8px;background:#fafafa">'+
+p.variants.map(v=>'<div style="display:flex;gap:12px;align-items:center;padding:3px 0;font-size:12px"><span style="width:120px">'+(v.size||'-')+' / '+(v.color||'-')+'</span><span style="width:120px;color:#6b7280">'+v.sku+'</span><span style="width:100px">'+(v.barcode?'<code>'+v.barcode+'</code>':'-')+'</span><span style="width:80px;font-weight:600;text-align:right">$'+(v.price||p.base_price).toFixed(2)+'</span><span style="width:60px;text-align:right" class="'+(v.stock<=p.low_stock?'bdg bdg-err':'')+'">'+v.stock+'</span>'+
+({{role|tojson}}=='manager'?'<button class="btn btn-xs" onclick="editStock('+v.id+')">Stock</button>':'')+'</div>').join('')+'</td></tr>';}
+return '<tr><td style="font-weight:600">'+p.name+'</td><td>'+p.sku+'</td><td>'+(p.category||'-')+'</td><td class="text-right">$'+p.base_price.toFixed(2)+'</td><td class="text-right">$'+p.cost_price.toFixed(2)+'</td>'+
+'<td class="text-right">'+p.total_stock+'</td><td>'+({{role|tojson}}=='manager'?'<button class="btn btn-xs btn-ghost" onclick="edit('+p.id+')">Edit</button> <button class="btn btn-xs" onclick="addV('+p.id+')">+ Variant</button>':'')+'</td></tr>'+vh;}).join('');}
+function showAdd(){editing=null;document.getElementById('ft').textContent='New Product';document.getElementById('pm').classList.add('show');}
+function edit(id){const p=all.find(x=>x.id===id);if(!p)return;editing=id;document.getElementById('ft').textContent='Edit '+p.name;
+document.getElementById('pn').value=p.name;document.getElementById('ps').value=p.sku;document.getElementById('pb').value=p.barcode||'';
+document.getElementById('pp').value=p.base_price;document.getElementById('pc').value=p.cost_price;document.getElementById('pcat').value=p.category;
+document.getElementById('pl').value=p.low_stock;document.getElementById('pv').checked=p.has_variants;document.getElementById('pst').value=0;
+document.getElementById('pm').classList.add('show');}
+function save(e){e.preventDefault();const data={name:document.getElementById('pn').value,sku:document.getElementById('ps').value,barcode:document.getElementById('pb').value||null,
+base_price:document.getElementById('pp').value,cost_price:document.getElementById('pc').value||0,category:document.getElementById('pcat').value,
+low_stock:document.getElementById('pl').value||5,has_variants:document.getElementById('pv').checked,stock:document.getElementById('pst').value||0};
+const url=editing?'/api/products/'+editing:'/api/products';fetch(url,{method:editing?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(r=>r.json()).then(d=>{if(d.error){alert(d.error);return;}cl('pm');load();});}
+function addV(id){avId=id;document.getElementById('vm').classList.add('show');}
+function saveV(e){e.preventDefault();const data={product_id:avId,size:document.getElementById('vsz').value,color:document.getElementById('vcl').value,
+sku:document.getElementById('vsk').value,barcode:document.getElementById('vbc').value||null,price:document.getElementById('vpr').value||null,stock:document.getElementById('vst').value||0};
+fetch('/api/variants',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(r=>r.json()).then(d=>{if(d.error){alert(d.error);return;}cl('vm');load();
+document.getElementById('vsz').value='';document.getElementById('vcl').value='';document.getElementById('vsk').value='';document.getElementById('vbc').value='';document.getElementById('vpr').value='';document.getElementById('vst').value='0';});}
+function editStock(id){svId=id;document.getElementById('stq').value='';document.getElementById('stc').value='0';document.getElementById('stn').value='';document.getElementById('sm').classList.add('show');}
+function saveStock(){const qty=parseInt(document.getElementById('stq').value);if(isNaN(qty)||qty<0){f('Enter valid stock','err');return;}
+fetch('/api/variants/'+svId+'/stock',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({stock:qty,cost:document.getElementById('stc').value||0,note:document.getElementById('stn').value})})
+.then(r=>r.json()).then(()=>{cl('sm');load();f('Stock updated','ok');});}
+function showLow(){fetch('/api/products/low-stock').then(r=>r.json()).then(d=>{let h='';if(!d.length)h='<div class="empty">All well-stocked!</div>';else d.forEach(p=>{h+='<h4 style="margin:8px 0 4px">'+p.product.name+'</h4>';p.variants.forEach(v=>{h+='<div style="font-size:13px;padding:2px 0"><span class="bdg bdg-err">'+v.stock+'</span> '+v.sku+' '+(v.size||'')+' '+(v.color||'')+'</div>';});});
+document.getElementById('ll').innerHTML=h;document.getElementById('lm').classList.add('show');});}
+function showBarcodes(){fetch('/api/barcodes').then(r=>r.json()).then(d=>{document.getElementById('bl').innerHTML=d.length?'<table><tr><th>Product</th><th>Variant</th><th>SKU</th><th>Barcode</th><th class="text-right">Price</th></tr>'+
+d.map(v=>'<tr><td>'+v.product_name+'</td><td>'+(v.size||'')+' '+(v.color||'')+'</td><td>'+v.sku+'</td><td><code>'+(v.barcode||'-')+'</code></td><td class="text-right">$'+(v.price||v.base_price).toFixed(2)+'</td></tr>').join('')+'</table>':'<div class="empty">No barcodes</div>';document.getElementById('bm').classList.add('show');});}
+function showRestock(){fetch('/api/restock-log').then(r=>r.json()).then(d=>{document.getElementById('rl').innerHTML=d.length?'<table><tr><th>Date</th><th>Product</th><th>SKU</th><th>Added</th><th class="text-right">Cost</th><th>Staff</th><th>Note</th></tr>'+
+d.map(r=>'<tr><td>'+(r.created_at||'').slice(0,10)+'</td><td>'+r.product_name+'</td><td>'+r.sku+'</td><td>'+r.qty_added+'</td><td class="text-right">$'+(r.cost||0).toFixed(2)+'</td><td>'+(r.staff_name||'')+'</td><td>'+(r.note||'')+'</td></tr>').join('')+'</table>':'<div class="empty">No restock history</div>';document.getElementById('rml').classList.add('show');});}
+function f(m,t){const e=document.getElementById('flash');e.innerHTML='<div class="fl fl-'+t+'">'+m+'</div>';setTimeout(()=>{const f=e.querySelector('.fl');if(f){f.style.opacity='0';setTimeout(()=>f.remove(),300);}},3000);}
+function cl(id){document.getElementById(id).classList.remove('show');}
+window.onclick=function(e){document.querySelectorAll('.modal').forEach(m=>{if(e.target===m)m.classList.remove('show');});};
+</script></body></html>

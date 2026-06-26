@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, session, jsonify
 from database import get_db
 from functools import wraps
+from werkzeug.security import check_password_hash, generate_password_hash
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -36,10 +37,10 @@ def login():
         data = request.form
         with get_db() as db:
             user = db.execute(
-                'SELECT * FROM users WHERE username=? AND password=? AND active=1',
-                (data['username'], data['password'])
+                'SELECT * FROM users WHERE username=? AND active=1',
+                (data['username'],)
             ).fetchone()
-        if user:
+        if user and check_password_hash(user['password'], data['password']):
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
@@ -69,7 +70,7 @@ def api_add_staff():
     with get_db() as db:
         try:
             db.execute('INSERT INTO users (username, password, role, name) VALUES (?,?,?,?)',
-                       (d['username'], d['password'], d.get('role', 'staff'), d['name']))
+                       (d['username'], generate_password_hash(d['password']), d.get('role', 'staff'), d['name']))
             return jsonify({'ok': True})
         except Exception as e:
             return jsonify({'error': str(e)}), 400
@@ -83,7 +84,7 @@ def api_update_staff(sid):
     with get_db() as db:
         if d.get('password'):
             db.execute('UPDATE users SET username=?, password=?, role=?, name=?, active=? WHERE id=?',
-                       (d['username'], d['password'], d.get('role', 'staff'), d['name'], int(d.get('active', 1)), sid))
+                       (d['username'], generate_password_hash(d['password']), d.get('role', 'staff'), d['name'], int(d.get('active', 1)), sid))
         else:
             db.execute('UPDATE users SET username=?, role=?, name=?, active=? WHERE id=?',
                        (d['username'], d.get('role', 'staff'), d['name'], int(d.get('active', 1)), sid))

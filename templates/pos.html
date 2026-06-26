@@ -21,15 +21,15 @@
                 <div class="card-body cart" id="cart"><div class="cart-empty">Add items to begin</div></div>
             </div>
             <div class="card"><div class="card-body totals">
-                <div class="tr"><span>Subtotal</span><span id="sub">$0.00</span></div>
+                <div class="tr"><span>Subtotal</span><span id="sub">Rs 0.00</span></div>
                 <div class="tr"><span>Discount</span><span><input id="disc" type="number" min="0" max="100" step="0.1" placeholder="%" oninput="calc()"> %</span></div>
-                <div class="tr"><span>Tax (8%)</span><span id="tax">$0.00</span></div>
-                <div class="tr gt"><span>TOTAL</span><span id="tot">$0.00</span></div>
+                <div class="tr"><span>Tax (8%)</span><span id="tax">Rs 0.00</span></div>
+                <div class="tr gt"><span>TOTAL</span><span id="tot">Rs 0.00</span></div>
             </div></div>
             <div class="card"><div class="card-body">
                 <div class="pm"><button class="active" onclick="sp('cash',this)">Cash</button><button onclick="sp('card',this)">Card</button><button onclick="sp('mobile',this)">Mobile</button><button onclick="sp('credit',this)">Store Credit</button></div>
             </div></div>
-            <button class="btn btn-s btn-lg" id="chg" onclick="pay()" style="justify-content:center">Charge $0.00</button>
+            <button class="btn btn-s btn-lg" id="chg" onclick="pay()" style="justify-content:center">Charge Rs 0.00</button>
             <div style="display:flex;gap:6px">
                 <button class="btn btn-ghost btn-sm" onclick="toggleReturn()" id="rtn">Return</button>
                 <button class="btn btn-ghost btn-sm" onclick="toggleExchange()" id="exc">Exchange</button>
@@ -47,17 +47,17 @@ document.getElementById('s').addEventListener('keydown',e=>{if(e.key==='Enter')s
 document.getElementById('disc').addEventListener('input',calc);
 function search(){fetch('/api/products/search?q='+encodeURIComponent(document.getElementById('s').value)).then(r=>r.json()).then(d=>{allP=d;renderP(d)});}
 function renderP(l){const g=document.getElementById('prods');if(!l.length){g.innerHTML='<div class="empty">No products</div>';return;}
-g.innerHTML=l.map(p=>'<div class="pc" onclick="add('+p.vid+','+p.price+')"><div class="pn">'+p.name+'</div><div class="pv">'+(p.size||'')+' '+(p.color||'')+' | '+p.sku+'</div><div class="pp">$'+p.price.toFixed(2)+'</div><div class="ps '+(p.stock<=3?'sl':'')+'">'+p.stock+' in stock</div></div>').join('');}
+g.innerHTML=l.map(p=>'<div class="pc" onclick="add('+p.vid+','+p.price+')"><div class="pn">'+p.name+'</div><div class="pv">'+(p.size||'')+' '+(p.color||'')+' | '+p.sku+'</div><div class="pp">Rs '+p.price.toFixed(2)+'</div><div class="ps '+(p.stock<=3?'sl':'')+'">'+p.stock+' in stock</div></div>').join('');}
 function add(vid,pr){const e=cart.find(x=>x.vid===vid);if(e&&!isR&&!isE){e.qty++;renderC();return;}
 const p=allP.find(x=>x.vid===vid);if(!p)return;if(p.stock<=0&&!isR&&!isE){f('Out of stock','err');return;}
 cart.push({vid,pname:p.name,variant:(p.size||'')+' '+(p.color||''),price:pr||p.price,qty:1});renderC();
 document.getElementById('s').value='';document.getElementById('prods').innerHTML='';document.getElementById('s').focus();}
 function renderC(){const el=document.getElementById('cart'),cnt=document.getElementById('cnt');let n=0,h='';
-if(isR)h+='<div class="rb">RETURN MODE</div>';if(isE)h+='<div class="rb" style="background:#fffbeb;color:#d97706;border:1px solid #fde68a">EXCHANGE MODE (10% deduction)</div>';
+if(isR)h+='<div class="rb">RETURN MODE</div>';if(isE)h+='<div class="rb" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a">EXCHANGE MODE (10% deduction)</div>';
 if(!cart.length){el.innerHTML='<div class="cart-empty">Add items to begin</div>';cnt.textContent='';calc();return;}
 cart.forEach((c,i)=>{n+=Math.abs(c.qty);h+='<div class="ci"><div><div class="cn">'+c.pname+'</div><div class="cv">'+c.variant+'</div></div>'+
 '<input type="number" value="'+c.qty+'" min="'+(isR||isE?-99:1)+'" onchange="uq('+i+',this.value)">'+
-'<div class="text-right">$'+c.price.toFixed(2)+'</div><div class="text-right fw-600">$'+(c.qty*c.price).toFixed(2)+'</div><button class="rm" onclick="ri('+i+')">&times;</button></div>';});
+'<div class="text-right">Rs '+c.price.toFixed(2)+'</div><div class="text-right fw-600">Rs '+(c.qty*c.price).toFixed(2)+'</div><button class="rm" onclick="ri('+i+')">&times;</button></div>';});
 el.innerHTML=h;cnt.textContent=n+' items';calc();}
 function uq(i,v){v=parseInt(v);if(!v||v===0){cart.splice(i,1);}else{cart[i].qty=v;}renderC();}
 function ri(i){cart.splice(i,1);renderC();}
@@ -71,8 +71,8 @@ function toggleExchange(){isE=!isE;if(isE)isR=false;const b=document.getElementB
 b.textContent=isE?'Sale':'Exchange';b.className=isE?'btn btn-w btn-sm':'btn btn-ghost btn-sm';renderC();}
 function calc(){const sub=cart.reduce((s,c)=>s+c.qty*c.price,0);const dp=parseFloat(document.getElementById('disc').value)||0;
 const d=sub*dp/100;const tx=Math.max(0,sub-d)*0.08;const tot=Math.max(0,sub-d+tx);
-document.getElementById('sub').textContent='$'+sub.toFixed(2);document.getElementById('tax').textContent='$'+tx.toFixed(2);
-document.getElementById('tot').textContent='$'+tot.toFixed(2);document.getElementById('chg').textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'$'+tot.toFixed(2);}
+document.getElementById('sub').textContent='Rs '+sub.toFixed(2);document.getElementById('tax').textContent='Rs '+tx.toFixed(2);
+document.getElementById('tot').textContent='Rs '+tot.toFixed(2);document.getElementById('chg').textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2);}
 function sp(m,b){pm=m;document.querySelectorAll('.pm button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
 function pay(){if(!cart.length){f('Cart empty','err');return;}
 const items=cart.map(c=>({variant_id:c.vid,quantity:isR||isE?-Math.abs(c.qty):c.qty,price:c.price}));
@@ -80,22 +80,22 @@ const btn=document.getElementById('chg');btn.disabled=true;btn.textContent='Proc
 fetch('/api/sale',{method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({items,payment:pm,discount:parseFloat(document.getElementById('disc').value)||0,
 is_return:isR,is_exchange:isE,customer_id:selC?selC.id:null,customer_name:selC?selC.name:'',notes:document.getElementById('notes').value})})
-.then(r=>r.json()).then(d=>{if(d.error){f(d.error,'err');btn.disabled=false;btn.textContent='Charge $0.00';return;}
+.then(r=>r.json()).then(d=>{if(d.error){f(d.error,'err');btn.disabled=false;btn.textContent='Charge Rs 0.00';return;}
 showR(d);cart=[];isR=false;isE=false;selC=null;document.getElementById('sc').innerHTML='';document.getElementById('cs').value='';
 document.getElementById('notes').value='';document.getElementById('disc').value='';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
 document.getElementById('exc').textContent='Exchange';document.getElementById('exc').className='btn btn-ghost btn-sm';renderC();btn.disabled=false;search();})
 .catch(()=>{f('Sale failed','err');btn.disabled=false;});}
 function showR(d){let h='<div class="rh"><h3>JITM Baby Garments</h3><p>'+new Date().toLocaleString()+'</p><p style="font-size:11px">'+d.receipt+'</p></div><div class="ri">';
-d.items.forEach(i=>{h+='<div class="rl"><span>'+i.quantity+'x '+i.product_name+(i.variant_label?' ('+i.variant_label+')':'')+'</span><span>$'+i.total.toFixed(2)+'</span></div>';});
-h+='</div><div class="rl"><span>Subtotal</span><span>$'+d.subtotal.toFixed(2)+'</span></div>';
-if(d.discount>0)h+='<div class="rl"><span>Discount</span><span>-$'+d.discount.toFixed(2)+'</span></div>';
-h+='<div class="rl"><span>Tax (8%)</span><span>$'+d.tax.toFixed(2)+'</span></div><div class="rl" style="font-weight:700;font-size:15px"><span>TOTAL</span><span>$'+d.total.toFixed(2)+'</span></div>'+
+d.items.forEach(i=>{h+='<div class="rl"><span>'+i.quantity+'x '+i.product_name+(i.variant_label?' ('+i.variant_label+')':'')+'</span><span>Rs '+i.total.toFixed(2)+'</span></div>';});
+h+='</div><div class="rl"><span>Subtotal</span><span>Rs '+d.subtotal.toFixed(2)+'</span></div>';
+if(d.discount>0)h+='<div class="rl"><span>Discount</span><span>-Rs '+d.discount.toFixed(2)+'</span></div>';
+h+='<div class="rl"><span>Tax (8%)</span><span>Rs '+d.tax.toFixed(2)+'</span></div><div class="rl" style="font-weight:700;font-size:15px"><span>TOTAL</span><span>Rs '+d.total.toFixed(2)+'</span></div>'+
 '<div class="rl"><span>Paid: '+d.payment+'</span></div>'+(d.customer_name?'<div class="rl"><span>Customer: '+d.customer_name+'</span></div>':'')+
 '<div class="rl"><span>Staff: '+d.staff_name+'</span></div>'+(d.is_return?'<div class="rl" style="color:#dc2626">RETURN</div>':'')+(d.is_exchange?'<div class="rl" style="color:#d97706">EXCHANGE</div>':'')+
 '<div style="text-align:center;margin-top:12px;font-size:11px;color:#9ca3af">Thank you!<br>Returns within 30 days</div>';
 document.getElementById('rc').innerHTML=h;document.getElementById('rm').classList.add('show');}
 function sc(){const q=document.getElementById('cs').value;if(q.length<2){document.getElementById('cr').innerHTML='';return;}
-fetch('/api/customers?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{document.getElementById('cr').innerHTML=d.map(c=>'<div onclick="scs('+c.id+',\''+c.name+'\')">'+c.name+' '+(c.phone||'')+(c.baby_name?' 🐣'+c.baby_name:'')+' | Credit: $'+c.credit.toFixed(2)+'</div>').join('');});}
+fetch('/api/customers?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{document.getElementById('cr').innerHTML=d.map(c=>'<div onclick="scs('+c.id+',\''+c.name+'\')">'+c.name+' '+(c.phone||'')+(c.baby_name?' 🐣'+c.baby_name:'')+' | Credit: Rs '+c.credit.toFixed(2)+'</div>').join('');});}
 function scs(id,nm){selC={id:id,name:nm};document.getElementById('sc').innerHTML='Customer: '+nm;document.getElementById('cr').innerHTML='';document.getElementById('cs').value='';}
 function f(m,t){const e=document.getElementById('flash');e.innerHTML='<div class="fl fl-'+t+'">'+m+'</div>';setTimeout(()=>{const f=e.querySelector('.fl');if(f){f.style.opacity='0';setTimeout(()=>f.remove(),300);}},3000);}
 function cl(id){document.getElementById(id).classList.remove('show');}

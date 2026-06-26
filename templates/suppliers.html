@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head><title>JITM · Suppliers</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head>
+<body>
+{{sidebar|safe}}
+<div class="main">
+    <div class="topbar"><h2>Suppliers</h2><div class="actions">
+        {% if role == 'manager' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Supplier</button>{% endif %}
+        <span class="text-muted">{{name}}</span>
+    </div></div>
+    <div class="content">
+        <div class="search"><input id="s" placeholder="Search suppliers..." oninput="load()"></div>
+        <div class="table-wrap"><table><thead><tr><th onclick="sortCol(0)" style="cursor:pointer;user-select:none">Company Name <span id="si0"></span></th><th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Contact Person <span id="si1"></span></th><th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Phone <span id="si2"></span></th><th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Company Phone <span id="si3"></span></th><th onclick="sortCol(4)" style="cursor:pointer;user-select:none">Address <span id="si4"></span></th><th onclick="sortCol(5)" style="cursor:pointer;user-select:none">Balance <span id="si5"></span></th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+    </div>
+</div>
+<div class="modal" id="am"><div class="mc"><button class="mx" onclick="cl('am')">&times;</button><h2>Add Supplier</h2>
+<form onsubmit="saveS(event)"><label>Company Name</label><input id="sn" required><label>Contact Person</label><input id="scp"><label>Phone Number</label><input id="sph" type="tel"><label>Company Phone Number</label><input id="scph" type="tel"><label>Address</label><input id="sad"><button class="btn btn-p" type="submit">Save</button></form></div></div>
+<div class="modal" id="em"><div class="mc"><button class="mx" onclick="cl('em')">&times;</button><h2>Edit Supplier</h2>
+<form onsubmit="editS(event)"><label>Company Name</label><input id="esn" required><label>Contact Person</label><input id="escp"><label>Phone Number</label><input id="esph" type="tel"><label>Company Phone Number</label><input id="escph" type="tel"><label>Address</label><input id="esad"><button class="btn btn-p" type="submit">Update</button></form></div></div>
+<script>
+var supList = [], sortIdx = -1, sortDir = 1, editId = null;
+function load(){var q=document.getElementById('s').value.toLowerCase();fetch('/api/suppliers').then(r=>r.json()).then(d=>{supList=d;render(d.filter(function(s){return!q||(s.name||'').toLowerCase().includes(q)||(s.contact_person||'').toLowerCase().includes(q)||(s.phone||'').toLowerCase().includes(q)||(s.company_phone||'').toLowerCase().includes(q)||(s.address||'').toLowerCase().includes(q);}));});}
+function render(l){document.getElementById('tb').innerHTML=l.map(s=>'<tr><td style="font-weight:600">'+s.name+'</td><td>'+(s.contact_person||'-')+'</td><td>'+(s.phone||'-')+'</td><td>'+(s.company_phone||'-')+'</td><td>'+(s.address||'-')+'</td><td>Rs '+s.balance.toFixed(2)+'</td><td>'+({{role|tojson}}=='manager'?'<button class="btn btn-xs btn-ghost" onclick="showEdit('+s.id+')">Edit</button><button class="btn btn-xs btn-ghost" onclick="del('+s.id+')">Delete</button>':'')+'</td></tr>').join('');}
+function sortCol(i){if(sortIdx===i){sortDir*=-1;}else{sortIdx=i;sortDir=1;}for(let j=0;j<6;j++)document.getElementById('si'+j).textContent='';document.getElementById('si'+i).textContent=sortDir===1?' \u25B2':' \u25BC';const vals=[s=>(s.name||'').toLowerCase(),s=>(s.contact_person||'').toLowerCase(),s=>(s.phone||'').toLowerCase(),s=>(s.company_phone||'').toLowerCase(),s=>(s.address||'').toLowerCase(),s=>s.balance||0];supList.sort((a,b)=>{const va=vals[i](a),vb=vals[i](b);return va<vb?-sortDir:va>vb?sortDir:0;});var q=document.getElementById('s').value.toLowerCase();render(supList.filter(function(s){return!q||(s.name||'').toLowerCase().includes(q)||(s.contact_person||'').toLowerCase().includes(q)||(s.phone||'').toLowerCase().includes(q)||(s.company_phone||'').toLowerCase().includes(q)||(s.address||'').toLowerCase().includes(q);}));}
+function showAdd(){document.getElementById('am').classList.add('show');document.getElementById('sn').value='';document.getElementById('scp').value='';document.getElementById('sph').value='';document.getElementById('scph').value='';document.getElementById('sad').value='';}
+function saveS(e){e.preventDefault();const name=document.getElementById('sn').value.trim();if(!name)return;fetch('/api/suppliers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,contact_person:document.getElementById('scp').value,phone:document.getElementById('sph').value,company_phone:document.getElementById('scph').value,address:document.getElementById('sad').value})}).then(r=>r.json()).then(d=>{if(d.error){alert(d.error);return;}cl('am');load();});}
+function showEdit(id){const s=supList.find(x=>x.id===id);if(!s)return;editId=id;document.getElementById('esn').value=s.name;document.getElementById('escp').value=s.contact_person||'';document.getElementById('esph').value=s.phone||'';document.getElementById('escph').value=s.company_phone||'';document.getElementById('esad').value=s.address||'';document.getElementById('em').classList.add('show');}
+function editS(e){e.preventDefault();const name=document.getElementById('esn').value.trim();if(!name)return;fetch('/api/suppliers/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,contact_person:document.getElementById('escp').value,phone:document.getElementById('esph').value,company_phone:document.getElementById('escph').value,address:document.getElementById('esad').value})}).then(r=>r.json()).then(d=>{if(d.error){alert(d.error);return;}cl('em');load();});}
+function del(id){if(!confirm('Delete this supplier?'))return;fetch('/api/suppliers/'+id,{method:'DELETE'}).then(r=>r.json()).then(()=>load());}
+load();
+function cl(id){document.getElementById(id).classList.remove('show');}
+window.onclick=function(e){document.querySelectorAll('.modal').forEach(m=>{if(e.target===m)m.classList.remove('show');});};
+</script>
+</body>
+</html>

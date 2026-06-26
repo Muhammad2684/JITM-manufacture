@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html><head><title>JITM · Financial Summary</title><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f5f6f8; color:#1e293b; min-height:100vh; display:flex; }
+
+  .sidebar { width:230px; min-height:100vh; background:#1a1c2e; color:#9ca3af; display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0; z-index:100; }
+  .sidebar .brand { padding:20px 20px 12px; font-size:22px; font-weight:700; color:#fff; letter-spacing:-.3px; border-bottom:1px solid #2a2c3e; margin-bottom:8px; }
+  .sidebar .brand span { color:#818cf8; }
+  .sidebar a { display:flex; align-items:center; gap:10px; padding:10px 20px; color:#9ca3af; text-decoration:none; font-size:13px; font-weight:500; transition:.1s; border-left:3px solid transparent; }
+  .sidebar a:hover { color:#e2e8f0; background:#222438; }
+  .sidebar a.active { color:#fff; background:#222438; border-left-color:#818cf8; }
+  .sidebar .sec { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#4b5563; padding:16px 20px 6px; font-weight:700; }
+  .sidebar .spacer { flex:1; }
+  .sidebar .user { padding:12px 20px; border-top:1px solid #2a2c3e; font-size:12px; color:#6b7280; display:flex; justify-content:space-between; align-items:center; }
+  .sidebar .user .role { background:#222438; padding:2px 8px; border-radius:4px; font-size:10px; color:#818cf8; }
+  .main { margin-left:230px; flex:1; min-height:100vh; display:flex; flex-direction:column; }
+
+  .topbar { background:#fff; border-bottom:1px solid #e5e7eb; padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
+  .topbar h2 { font-size:16px; font-weight:600; color:#111827; }
+  .topbar .actions { display:flex; gap:8px; align-items:center; }
+
+  .content { padding:32px 40px; flex:1; }
+
+  .dashboard-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; max-width:1100px; margin:0 auto; }
+  .grid-column { display:flex; flex-direction:column; gap:22px; }
+
+  .manager-card { background:#fcfbf8; border:1px solid #e2e1de; border-radius:10px; overflow:hidden; }
+  .manager-card .card-header { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-bottom:1px solid #e2e1de; }
+  .manager-card .card-header span:first-child { font-size:13px; font-weight:600; color:#1e293b; text-transform:uppercase; letter-spacing:.04em; }
+  .manager-card .card-header span:last-child { font-size:15px; font-weight:700; color:#1e293b; }
+  .manager-card .card-body { padding:8px 20px 14px; }
+  .card-body-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; font-size:13px; }
+  .card-body-row span:first-child { color:#6b7280; }
+  .card-body-row .value-active { font-weight:600; color:#3b4fe2; }
+  .card-body-row .value-null { color:#d1d5db; font-weight:500; }
+</style>
+</head><body>
+{{sidebar|safe}}
+<div class="main">
+  <div class="topbar"><h2>Financial Summary</h2><div class="actions"><span class="text-muted" style="font-size:12px;color:#9ca3af">{{name}}</span></div></div>
+  <div class="content">
+    <div class="dashboard-grid">
+      <div class="grid-column">
+        <div class="manager-card">
+          <div class="card-header"><span>Assets</span><span id="assets-total">0.00</span></div>
+          <div class="card-body" id="assets"></div>
+        </div>
+        <div class="manager-card">
+          <div class="card-header"><span>Liabilities</span><span id="liabilities-total">0.00</span></div>
+          <div class="card-body" id="liabilities"></div>
+        </div>
+        <div class="manager-card">
+          <div class="card-header"><span>Equity</span><span id="equity-total">0.00</span></div>
+          <div class="card-body" id="equity"></div>
+        </div>
+      </div>
+      <div class="grid-column">
+        <div class="manager-card">
+          <div class="card-header"><span>Net profit (loss)</span><span id="pnl-total">0.00</span></div>
+          <div class="card-body" id="pnl-items"></div>
+        </div>
+        <div class="manager-card">
+          <div class="card-header"><span>Uncategorized</span><span id="uncat-total">0.00</span></div>
+          <div class="card-body" id="uncat-items"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fmt(n) { return n.toLocaleString('en', {minimumFractionDigits:2,maximumFractionDigits:2}); }
+function activeRow(label, amount) {
+  return '<div class="card-body-row"><span>'+label+'</span><span class="value-active">'+fmt(amount)+'</span></div>';
+}
+function nullRow(label) {
+  return '<div class="card-body-row"><span>'+label+'</span><span class="value-null">&ndash;</span></div>';
+}
+
+fetch('/api/summary').then(r=>r.json()).then(d=>{
+  const bs = d.balance_sheet;
+  document.getElementById('assets').innerHTML = bs.assets.map(a => activeRow(a.label, a.amount)).join('');
+  document.getElementById('assets-total').textContent = fmt(bs.total_assets);
+  document.getElementById('liabilities').innerHTML = bs.liabilities.map(l => activeRow(l.label, l.amount)).join('');
+  document.getElementById('liabilities-total').textContent = fmt(bs.total_liabilities);
+  document.getElementById('equity').innerHTML = bs.equity.map(e => activeRow(e.label, e.amount)).join('');
+  document.getElementById('equity-total').textContent = fmt(bs.total_equity);
+
+  const pnl = d.pnl;
+  let h = '';
+  h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Income</div>';
+  h += activeRow('Total Revenue', pnl.income[0].amount);
+  h += activeRow('Less Returns', pnl.income[1].amount);
+  h += activeRow('Net Revenue', pnl.income[2].amount);
+  h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Cost of Sales</div>';
+  h += activeRow('Cost of Goods Sold', pnl.expenses[0].amount);
+  h += activeRow('Discounts Given', pnl.expenses[1].amount);
+  h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Expenses</div>';
+  h += pnl.expenses_detail.map(e => activeRow(e.label, e.amount)).join('');
+  h += activeRow('Total Expenses', pnl.total_expenses);
+  document.getElementById('pnl-items').innerHTML = h;
+  document.getElementById('pnl-total').textContent = fmt(pnl.net_profit);
+
+  document.getElementById('uncat-total').textContent = fmt(pnl.uncategorized);
+  document.getElementById('uncat-items').innerHTML = nullRow('Uncategorized');
+});
+</script>
+</body></html>

@@ -1,4 +1,5 @@
 import random
+import time
 from flask import Blueprint, request, jsonify, session
 from database import get_db
 from routes.auth import login_required
@@ -7,7 +8,9 @@ pos_bp = Blueprint('pos', __name__, url_prefix='/api')
 
 
 def make_receipt():
-    return f"JITM-{random.randint(100000, 999999)}"
+    ts = int(time.time() * 1000) % 10000000
+    rand = random.randint(100, 999)
+    return f"JITM-{ts}{rand}"
 
 
 @pos_bp.route('/sale', methods=['POST'])
@@ -28,31 +31,31 @@ def complete_sale():
     notes = d.get('notes', '')
 
     with get_db() as db:
+        exchange_items_data = d.get('exchange_items', None) if is_exchange else None
+
+        settings = dict(db.execute('SELECT key, value FROM settings').fetchall())
+        tax_rate = float(settings.get('tax_rate', '8')) / 100
+
         errors = []
         sale_items = []
         subtotal = 0
 
-        for item in items:
+        def process_item(item, qty_mult=1):
+            nonlocal subtotal
             vid = item.get('variant_id') or item.get('vid')
-            qty = int(item['quantity'])
-            if is_return or is_exchange:
-                qty = -abs(qty)
-
+            qty = int(item['quantity']) * qty_mult
             variant = db.execute('SELECT * FROM variants WHERE id=?', (vid,)).fetchone()
             if not variant:
                 errors.append(f'Variant {vid} not found')
-                continue
-
+                return None
             prod = db.execute('SELECT * FROM products WHERE id=?', (variant['product_id'],)).fetchone()
             price = float(item.get('price', variant['price'] or prod['base_price']))
             line_total = round(price * qty, 2)
             subtotal += line_total
-
             if qty < 0 and variant['stock'] < abs(qty):
                 errors.append(f'Not enough stock of {prod["name"]} to return')
-                continue
-
-            sale_items.append({
+                return None
+            return {
                 'product_id': prod['id'],
                 'variant_id': vid,
                 'product_name': prod['name'],
@@ -62,21 +65,36 @@ def complete_sale():
                 'price': price,
                 'total': line_total,
                 'is_return': 1 if (is_return or is_exchange) else 0,
-            })
+            }
 
-            if is_exchange:
+        for item in items:
+            qty_mult = -1 if (is_return or is_exchange) else 1
+            si = process_item(item, qty_mult)
+            if si is None:
+                continue
+            sale_items.append(si)
+
+            if is_exchange and exchange_items_data is not None:
                 pass
-            elif qty < 0:
-                db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (abs(qty), vid))
+            elif qty_mult < 0:
+                db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (abs(si['quantity']), si['variant_id']))
             else:
-                db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (qty, vid))
+                db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
+
+        if is_exchange and exchange_items_data is not None:
+            for item in exchange_items_data:
+                si = process_item(item, 1)
+                if si is None:
+                    continue
+                sale_items.append(si)
+                db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
 
         if errors:
             return jsonify({'error': '; '.join(errors)}), 400
 
         disc_amt = round(subtotal * discount / 100, 2) if discount_type == 'percent' else discount
         taxable = round(subtotal - disc_amt, 2)
-        tax = round(taxable * 0.08, 2)
+        tax = round(taxable * tax_rate, 2)
         total = round(taxable + tax, 2)
 
         if is_exchange:

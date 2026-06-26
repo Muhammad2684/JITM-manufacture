@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from werkzeug.security import generate_password_hash
 
 DB = os.path.join(os.path.dirname(__file__), 'jitm.db')
 
@@ -131,45 +132,193 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            INSERT OR IGNORE INTO users (id, username, password, role, name)
-            VALUES (1, 'admin', 'admin123', 'manager', 'Manager');
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                phone TEXT DEFAULT '',
+                email TEXT DEFAULT '',
+                address TEXT DEFAULT '',
+                contact_person TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                balance REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
 
-            INSERT OR IGNORE INTO users (id, username, password, role, name)
-            VALUES (2, 'staff1', 'staff123', 'staff', 'Staff One');
+            CREATE TABLE IF NOT EXISTS supplier_khata (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+                type TEXT NOT NULL,
+                amount REAL NOT NULL,
+                balance REAL NOT NULL,
+                reference TEXT DEFAULT '',
+                note TEXT DEFAULT '',
+                staff_name TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
 
-            INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode, has_variants, low_stock)
-            VALUES (1, 'Bear Onesie', 'Onesies', 24.99, 12.00, 'ONS-001', '8901234567890', 1, 5);
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                amount REAL NOT NULL DEFAULT 0,
+                note TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
 
-            INSERT OR IGNORE INTO variants (id, product_id, size, color, sku, barcode, price, stock)
-            VALUES
-                (1, 1, '0-3M', 'Blue', 'ONS-001-03-BL', '8901234560010', NULL, 25),
-                (2, 1, '0-3M', 'Pink', 'ONS-001-03-PK', '8901234560027', NULL, 20),
-                (3, 1, '3-6M', 'Blue', 'ONS-001-06-BL', '8901234560034', NULL, 18),
-                (4, 1, '3-6M', 'Pink', 'ONS-001-06-PK', '8901234560041', 26.99, 15),
-                (5, 1, '6-12M', 'Blue', 'ONS-001-12-BL', '8901234560058', 27.99, 10),
-                (6, 1, '6-12M', 'Pink', 'ONS-001-12-PK', '8901234560065', NULL, 8);
+            CREATE TABLE IF NOT EXISTS commission_classes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
 
-            INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode)
-            VALUES (2, 'Bodysuit 3-Pack', 'Sets', 34.99, 16.00, 'BDY-001', '8901234560072');
+            CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
 
-            INSERT OR IGNORE INTO variants (id, product_id, size, color, sku, stock)
-            VALUES (7, 2, '', '', 'BDY-001-DEF', 30);
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
 
-            INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode)
-            VALUES (3, 'Knitted Beanie', 'Accessories', 12.99, 5.00, 'BN-001', '8901234560089');
+            INSERT OR IGNORE INTO settings (key, value) VALUES
+                ('store_name', 'JITM Baby Garments'),
+                ('tax_rate', '8'),
+                ('receipt_footer', 'Thank you for shopping with us!'),
+                ('currency', 'Rs');
 
-            INSERT OR IGNORE INTO variants (id, product_id, size, color, sku, stock)
-            VALUES (8, 3, '', '', 'BN-001-DEF', 40);
+            CREATE TABLE IF NOT EXISTS purchase_invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_no TEXT NOT NULL,
+                issue_date TEXT NOT NULL,
+                due_date TEXT DEFAULT '',
+                supplier_id INTEGER REFERENCES suppliers(id),
+                description TEXT DEFAULT '',
+                invoice_amount REAL NOT NULL DEFAULT 0,
+                balance_due REAL NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'Unpaid',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
 
-            INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode)
-            VALUES (4, 'Baby Blanket', 'Bedding', 29.99, 14.00, 'BLK-001', '8901234560096');
-
-            INSERT OR IGNORE INTO variants (id, product_id, size, color, sku, stock)
-            VALUES (9, 4, '', '', 'BLK-001-DEF', 15);
-
-            INSERT OR IGNORE INTO customers (id, name, phone, baby_name, baby_birth)
-            VALUES (1, 'Sarah Johnson', '555-0123', 'Emma', '2026-03');
-
-            INSERT OR IGNORE INTO customers (id, name, phone, baby_name, baby_birth)
-            VALUES (2, 'Mike Peters', '555-0456', 'Leo', '2025-11');
+            CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_id INTEGER NOT NULL REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+                line_number INTEGER NOT NULL DEFAULT 0,
+                item TEXT DEFAULT '',
+                product_id INTEGER,
+                qty REAL NOT NULL DEFAULT 1,
+                unit_price REAL NOT NULL DEFAULT 0,
+                total REAL NOT NULL DEFAULT 0
+            );
         ''')
+
+        # migrations
+        try:
+            db.execute('ALTER TABLE products ADD COLUMN commission_class TEXT DEFAULT NULL')
+        except Exception:
+            pass  # already exists
+
+        try:
+            db.execute('ALTER TABLE commission_classes ADD COLUMN percentage REAL NOT NULL DEFAULT 0')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN company_phone TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE purchase_invoices ADD COLUMN due_date TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE purchase_invoices ADD COLUMN description TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('''CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_id INTEGER NOT NULL REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+                line_number INTEGER NOT NULL DEFAULT 0,
+                item TEXT DEFAULT '',
+                product_id INTEGER,
+                qty REAL NOT NULL DEFAULT 1,
+                unit_price REAL NOT NULL DEFAULT 0,
+                total REAL NOT NULL DEFAULT 0
+            )''')
+        except Exception:
+            pass
+
+        hashed_admin = generate_password_hash('admin123')
+        hashed_staff = generate_password_hash('staff123')
+        db.execute(
+            'INSERT OR IGNORE INTO users (id, username, password, role, name) VALUES (?,?,?,?,?)',
+            (1, 'admin', hashed_admin, 'manager', 'Manager')
+        )
+        db.execute(
+            'INSERT OR IGNORE INTO users (id, username, password, role, name) VALUES (?,?,?,?,?)',
+            (2, 'staff1', hashed_staff, 'staff', 'Staff One')
+        )
+
+        db.execute(
+            'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode, low_stock) '
+            'VALUES (?,?,?,?,?,?,?,?)',
+            (1, 'Bear Onesie', 'Onesies', 24.99, 12.00, 'ONS-001', '8901234567890', 5)
+        )
+        db.execute(
+            'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
+            (1, 1, 'ONS-001-DEF', 81)
+        )
+
+        db.execute(
+            'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode) '
+            'VALUES (?,?,?,?,?,?,?)',
+            (2, 'Bodysuit 3-Pack', 'Sets', 34.99, 16.00, 'BDY-001', '8901234560072')
+        )
+        db.execute(
+            'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
+            (2, 2, 'BDY-001-DEF', 30)
+        )
+
+        db.execute(
+            'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode) '
+            'VALUES (?,?,?,?,?,?,?)',
+            (3, 'Knitted Beanie', 'Accessories', 12.99, 5.00, 'BN-001', '8901234560089')
+        )
+        db.execute(
+            'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
+            (3, 3, 'BN-001-DEF', 40)
+        )
+
+        db.execute(
+            'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode) '
+            'VALUES (?,?,?,?,?,?,?)',
+            (4, 'Baby Blanket', 'Bedding', 29.99, 14.00, 'BLK-001', '8901234560096')
+        )
+        db.execute(
+            'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
+            (4, 4, 'BLK-001-DEF', 15)
+        )
+
+        for c in [(1, 'Sarah Johnson', '555-0123', 'Emma', '2026-03'),
+                   (2, 'Mike Peters', '555-0456', 'Leo', '2025-11')]:
+            db.execute(
+                'INSERT OR IGNORE INTO customers (id, name, phone, baby_name, baby_birth) VALUES (?,?,?,?,?)',
+                c
+            )
+
+        for s in [(1, 'Wonder Wear Ltd', '555-1001', '', '', 'Ali Khan', 'Onesie supplier'),
+                  (2, 'Cozy Knits', '555-1002', '', '', '', 'Beanie & blanket supplier')]:
+            db.execute(
+                'INSERT OR IGNORE INTO suppliers (id, name, phone, email, address, contact_person, notes) VALUES (?,?,?,?,?,?,?)',
+                s
+            )
+
+        for cc in ['Full Commission', 'Half Commission', 'No Commission']:
+            db.execute('INSERT OR IGNORE INTO commission_classes (name) VALUES (?)', (cc,))
+
+        for cat in ['Onesies', 'Sets', 'Accessories', 'Bedding']:
+            db.execute('INSERT OR IGNORE INTO categories (name) VALUES (?)', (cat,))

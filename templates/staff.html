@@ -26,12 +26,12 @@ fetch(editing?'/api/staff/'+editing:'/api/staff',{method:editing?'PUT':'POST',he
 function analytics(id){fetch('/api/staff/'+id+'/analytics').then(r=>r.json()).then(d=>{const s=d.staff;
 let h='<h2>'+s.name+' <span class="bdg bdg-info">'+s.role+'</span></h2><div class="stats" style="margin-top:12px">'+
 '<div class="stat"><div class="val">'+d.today_sales+'</div><div class="lbl">Today</div></div>'+
-'<div class="stat"><div class="val">$'+d.today_revenue.toFixed(2)+'</div><div class="lbl">Today Revenue</div></div>'+
+'<div class="stat"><div class="val">Rs '+d.today_revenue.toFixed(2)+'</div><div class="lbl">Today Revenue</div></div>'+
 '<div class="stat"><div class="val">'+d.total_sales+'</div><div class="lbl">Total Sales</div></div>'+
-'<div class="stat"><div class="val">$'+d.total_revenue.toFixed(2)+'</div><div class="lbl">Total Revenue</div></div>'+
-'<div class="stat"><div class="val">$'+d.total_returns.toFixed(2)+'</div><div class="lbl">Returns</div></div></div>'+
+'<div class="stat"><div class="val">Rs '+d.total_revenue.toFixed(2)+'</div><div class="lbl">Total Revenue</div></div>'+
+'<div class="stat"><div class="val">Rs '+d.total_returns.toFixed(2)+'</div><div class="lbl">Returns</div></div></div>'+
 '<h3 style="font-size:14px;margin:12px 0 8px">Recent Sales</h3>';
-if(d.recent_sales&&d.recent_sales.length)h+='<table><tr><th>Receipt</th><th>Date</th><th class="text-right">Total</th><th>Payment</th><th>Status</th></tr>'+d.recent_sales.map(s=>'<tr><td>'+s.receipt+'</td><td>'+(s.created_at||'').slice(0,16)+'</td><td class="text-right">$'+s.total.toFixed(2)+'</td><td>'+s.payment+'</td><td><span class="bdg bdg-'+(s.status==='completed'?'ok':'err')+'">'+s.status+'</span></td></tr>').join('')+'</table>';
+if(d.recent_sales&&d.recent_sales.length)h+='<table><tr><th>Receipt</th><th>Date</th><th class="text-right">Total</th><th>Payment</th><th>Status</th></tr>'+d.recent_sales.map(s=>'<tr><td>'+s.receipt+'</td><td>'+(s.created_at||'').slice(0,16)+'</td><td class="text-right">Rs '+s.total.toFixed(2)+'</td><td>'+s.payment+'</td><td><span class="bdg bdg-'+(s.status==='completed'?'ok':'err')+'">'+s.status+'</span></td></tr>').join('')+'</table>';
 else h+='<p class="text-muted" style="font-size:13px">No sales yet</p>';
 document.getElementById('ac').innerHTML=h;document.getElementById('am').classList.add('show');});}
 function cl(id){document.getElementById(id).classList.remove('show');}

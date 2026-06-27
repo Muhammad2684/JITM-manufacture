@@ -11,6 +11,7 @@
     <div class="content">
         <div class="search"><input id="s" placeholder="Search categories..." oninput="load()"></div>
         <div class="table-wrap"><table><thead><tr><th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th><th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Name <span id="si1"></span></th><th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Created <span id="si2"></span></th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+        <div style="margin-top:12px;text-align:right"><button class="btn btn-sm btn-print" onclick="printTable()">Print</button></div>
     </div>
 </div>
 <div class="modal" id="am"><div class="mc"><button class="mx" onclick="cl('am')">&times;</button><h2>Add Category</h2>
@@ -26,6 +27,8 @@ function del(id){if(!confirm('Delete this category?'))return;fetch('/api/categor
 load();
 function cl(id){document.getElementById(id).classList.remove('show');}
 window.onclick=function(e){document.querySelectorAll('.modal').forEach(m=>{if(e.target===m)m.classList.remove('show');});};
+function printTable(){document.body.classList.add('printing');window.print();}
+window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
 </script>
 </body>
 </html>

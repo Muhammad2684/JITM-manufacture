@@ -13,6 +13,7 @@ from routes.categories import cat_bp
 from routes.purchase_invoices import pi_bp
 from routes.accounts import acc_bp
 from routes.transactions import txn_bp
+from routes.ledger import ledger_bp
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-change-in-prod')
@@ -29,6 +30,7 @@ app.register_blueprint(cat_bp)
 app.register_blueprint(pi_bp)
 app.register_blueprint(acc_bp)
 app.register_blueprint(txn_bp)
+app.register_blueprint(ledger_bp)
 
 
 def sidebar(active):
@@ -37,23 +39,25 @@ def sidebar(active):
     items = [
         ('/', 'Dashboard', 'dashboard'),
         ('/pos', 'POS', 'pos'),
-        ('/suppliers', 'Suppliers', 'suppliers'),
-        ('/purchase-invoices', 'Purchase Invoice', 'purchase-invoices', [
-            ('/purchase-invoices', 'All Invoices'),
+        (None, 'Purchase', 'purchase', [
+            ('/suppliers', 'Suppliers'),
+            ('/purchase-invoices', 'Purchase Invoices'),
             ('/purchase-invoices/create', 'Create Invoice'),
         ]),
-        ('/inventory', 'Inventory', 'inventory', [
+        (None, 'Sales', 'sales', [
+            ('/customers', 'Customers'),
+            ('/sales-invoices', 'Sale Invoices'),
+            ('/sales-invoices/create', 'Create Invoice'),
+        ]),
+        (None, 'Inventory', 'inventory', [
+            ('/inventory', 'All Products'),
             ('/inventory/categories', 'Categories'),
             ('/inventory/commission-classes', 'Commission Class'),
         ]),
-        ('/sales-invoices', 'Sales Invoices', 'sales-invoices', [
-            ('/sales-invoices', 'All Invoices'),
-            ('/sales-invoices/create', 'Create Invoice'),
-        ]),
-        ('/customers', 'Customers', 'customers'),
-        ('/accounts', 'Cash & Bank Accounts', 'accounts', [
-            ('/accounts/receipts', 'Receipt'),
-            ('/accounts/payments', 'Payment'),
+        (None, 'Cash And Bank Accounts', 'accounts', [
+            ('/accounts', 'All Accounts'),
+            ('/accounts/payments', 'Payments'),
+            ('/accounts/receipts', 'Receipts'),
             ('/accounts/transfers', 'Inter Account Transfers'),
         ]),
         ('/staff', 'Staff', 'staff'),
@@ -63,12 +67,16 @@ def sidebar(active):
     for item in items:
         if len(item) == 4:
             url, label, key, subs = item
-            prefix = url + '/'
-            is_active = active == url or active.startswith(prefix)
-            is_open = 'true' if active.startswith(prefix) else 'false'
+            sub_active = any(active == s[0] or active.startswith(s[0] + '/') for s in subs)
+            is_open = 'true' if sub_active else 'false'
             arrow = '&#9660;' if is_open else '&#9654;'
-            links += f'<div class="nav-group"><a href="{url}" class=' + ('"active"' if is_active else '""') + f'>{label} <span class="arrow">{arrow}</span></a>'
-            links += f'<div class="sub-group {"show" if active.startswith(prefix) else ""}">'
+            if url:
+                prefix = url + '/'
+                is_active = active == url or active.startswith(prefix)
+                links += f'<div class="nav-group"><a href="{url}" class=' + ('"active"' if is_active else '""') + f'>{label} <span class="arrow">{arrow}</span></a>'
+            else:
+                links += f'<div class="nav-group"><span class="group-heading" style="display:flex;align-items:center;gap:4px;padding:10px 16px;font-size:13px;font-weight:600;color:#9ca3af;cursor:pointer">{label} <span class="arrow" style="margin-left:auto;font-size:10px">{arrow}</span></span>'
+            links += f'<div class="sub-group {"show" if sub_active else ""}">'
             for sub_url, sub_label in subs:
                 links += f'<a href="{sub_url}" class="sub {"active" if active == sub_url else ""}">{sub_label}</a>'
             links += '</div></div>'
@@ -77,9 +85,13 @@ def sidebar(active):
             links += f'<a href="{url}" class=' + ('"active"' if url == active else '""') + f'>{label}</a>'
     sidebar_js = '''<script>
     document.querySelector('.sidebar').addEventListener('click',function(e){
-        if(e.target.classList.contains('arrow')){
-            var g=e.target.closest('.nav-group');var s=g.querySelector('.sub-group');var ar=g.querySelector('.arrow');
-            s.classList.toggle('show');ar.innerHTML=s.classList.contains('show')?'&#9660;':'&#9654;';e.preventDefault();
+        var heading = e.target.closest('.group-heading');
+        if(heading){
+            var g = heading.closest('.nav-group');var s = g.querySelector('.sub-group');var ar = g.querySelector('.arrow');
+            s.classList.toggle('show');ar.innerHTML = s.classList.contains('show')?'&#9660;':'&#9654;';
+        }else if(e.target.classList.contains('arrow')){
+            var g = e.target.closest('.nav-group');var s = g.querySelector('.sub-group');var ar = g.querySelector('.arrow');
+            s.classList.toggle('show');ar.innerHTML = s.classList.contains('show')?'&#9660;':'&#9654;';e.preventDefault();
         }
     });
     </script>'''
@@ -197,6 +209,14 @@ def inventory_categories():
 @login_required
 def inventory_commission_classes():
     return page('commission_classes.html', '/inventory/commission-classes')
+
+
+@app.route('/ledger/<entity_type>/<int:entity_id>', strict_slashes=False)
+@login_required
+def ledger_page(entity_type, entity_id):
+    return render_template('ledger.html', role=session.get('role'), name=session.get('name'),
+                           sidebar=sidebar('/ledger/' + entity_type + '/' + str(entity_id)),
+                           entity_type=entity_type, entity_id=entity_id)
 
 
 if __name__ == '__main__':

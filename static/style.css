@@ -144,7 +144,22 @@ input[type="checkbox"] { width:auto; }
 .rec .ri { border-top:1px dashed #e2e1de; border-bottom:1px dashed #e2e1de; padding:8px 0; margin:8px 0; }
 .rec .rl { display:flex; justify-content:space-between; padding:2px 0; }
 .ra { display:flex; gap:8px; justify-content:center; margin-top:14px; }
-@media print { body * { visibility:hidden; } #rp, #rp * { visibility:visible; } #rp { position:absolute; left:0; top:0; width:80mm; } }
+@media print { #rp, #rp * { visibility:visible; } #rp { position:absolute; left:0; top:0; width:80mm; } }
+@media print {
+  body:not(.printing) * { visibility:hidden; }
+}
+@media print {
+  body.printing .sidebar, body.printing .topbar, body.printing .search, body.printing .btn-print,
+  body.printing .actions, body.printing .topbar .actions, body.printing .modal, body.printing .flash,
+  body.printing #flash { display:none !important; }
+  body.printing .main { margin-left:0 !important; }
+  body.printing .content { padding:10px 20px !important; max-width:none !important; }
+  body.printing body, body.printing .table-wrap { background:#fff !important; }
+  body.printing .table-wrap { border:none !important; box-shadow:none !important; }
+  body.printing tr:hover td { background:transparent !important; }
+  body.printing th, body.printing td { padding:6px 10px !important; }
+  body.printing .main, body.printing .content, body.printing .content * { visibility:visible !important; }
+}
 
 /* ─── Customer Cards ─── */
 .cg { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }

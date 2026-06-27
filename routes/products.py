@@ -8,8 +8,17 @@ prod_bp = Blueprint('products', __name__, url_prefix='/api')
 @prod_bp.route('/products')
 @login_required
 def list_products():
+    q = request.args.get('q', '')
     with get_db() as db:
-        rows = db.execute('SELECT * FROM products ORDER BY name').fetchall()
+        if q:
+            rows = db.execute(
+                'SELECT DISTINCT p.* FROM products p LEFT JOIN variants v ON v.product_id=p.id '
+                'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? OR p.category LIKE ? '
+                'ORDER BY p.name',
+                (f'%{q}%', f'%{q}%', f'%{q}%', q, q, f'%{q}%')
+            ).fetchall()
+        else:
+            rows = db.execute('SELECT * FROM products ORDER BY name').fetchall()
         products = []
         for p in rows:
             variants = db.execute('SELECT * FROM variants WHERE product_id=? ORDER BY size, color', (p['id'],)).fetchall()

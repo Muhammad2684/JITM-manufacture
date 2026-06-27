@@ -8,6 +8,7 @@
     <div class="content">
         <div class="search"><input id="s" placeholder="Search accounts..." oninput="load()"></div>
         <div class="table-wrap"><table><thead><tr><th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th><th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Account <span id="si1"></span></th><th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Type <span id="si2"></span></th><th onclick="sortCol(3)" class="text-right" style="cursor:pointer;user-select:none">Balance <span id="si3"></span></th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+        <div style="margin-top:12px;text-align:right"><button class="btn btn-sm btn-print" onclick="printTable()">Print</button></div>
         <div style="margin-top:16px;padding:12px 16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;display:flex;gap:24px;font-size:14px">
             <span>Total Cash: <strong id="t_cash">Rs 0.00</strong></span>
             <span>Total Bank: <strong id="t_bank">Rs 0.00</strong></span>
@@ -23,7 +24,7 @@
 var accList = [], sortIdx = -1, sortDir = 1, editId = null;
 function load(){var q=document.getElementById('s').value.toLowerCase();fetch('/api/accounts').then(r=>r.json()).then(d=>{accList=d;render(d.filter(function(a){return!q||(a.name||'').toLowerCase().includes(q)||(a.type||'').toLowerCase().includes(q);}));});}
 function render(l){
-    document.getElementById('tb').innerHTML=l.map((a,i)=>'<tr><td style="color:#6b7280;font-size:12px">'+(i+1)+'</td><td style="font-weight:600">'+a.name+'</td><td><span class="bdg bdg-'+(a.type==='bank'?'ok':'warn')+'">'+a.type+'</span></td><td class="text-right">Rs '+a.balance.toFixed(2)+'</td><td>'+({{role|tojson}}=='manager'?'<button class="btn btn-xs btn-ghost" onclick="showEdit('+a.id+')">Edit</button><button class="btn btn-xs btn-ghost" onclick="del('+a.id+')">Delete</button>':'')+'</td></tr>').join('');
+    document.getElementById('tb').innerHTML=l.map((a,i)=>'<tr><td style="color:#6b7280;font-size:12px">'+(i+1)+'</td><td style="font-weight:600"><a href="/ledger/account/'+a.id+'" style="text-decoration:none;color:inherit">'+a.name+'</a></td><td><span class="bdg bdg-'+(a.type==='bank'?'ok':'warn')+'">'+a.type+'</span></td><td class="text-right">Rs '+a.balance.toFixed(2)+'</td><td>'+({{role|tojson}}=='manager'?'<button class="btn btn-xs btn-ghost" onclick="showEdit('+a.id+')">Edit</button><button class="btn btn-xs btn-ghost" onclick="del('+a.id+')">Delete</button>':'')+'</td></tr>').join('');
     var cash=0,bank=0;l.forEach(function(a){if(a.type==='bank')bank+=a.balance;else cash+=a.balance;});
     document.getElementById('t_cash').textContent='Rs '+cash.toFixed(2);
     document.getElementById('t_bank').textContent='Rs '+bank.toFixed(2);
@@ -38,6 +39,8 @@ function del(id){if(!confirm('Delete this account?'))return;fetch('/api/accounts
 load();
 function cl(id){document.getElementById(id).classList.remove('show');}
 window.onclick=function(e){document.querySelectorAll('.modal').forEach(function(m){if(e.target===m)m.classList.remove('show');});};
+function printTable(){document.body.classList.add('printing');window.print();}
+window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
 </script>
 </body>
 </html>

@@ -42,6 +42,7 @@
                     <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
                 </table>
             </div>
+            <div style="margin-top:12px;text-align:right"><button class="btn btn-sm btn-print" onclick="printTable()">Print</button></div>
         </div>
     </div>
     <div class="modal" id="pm">
@@ -306,6 +307,8 @@
         function f(m, t) { const e = document.getElementById('flash'); e.innerHTML = '<div class="fl fl-' + t + '">' + m + '</div>'; setTimeout(() => { const f = e.querySelector('.fl'); if (f) { f.style.opacity = '0'; setTimeout(() => f.remove(), 300); } }, 3000); }
         function cl(id) { document.getElementById(id).classList.remove('show'); }
         window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
+        function printTable(){document.body.classList.add('printing');window.print();}
+        window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
     </script>
 </body>
 

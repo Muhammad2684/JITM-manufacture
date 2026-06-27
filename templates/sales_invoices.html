@@ -6,6 +6,7 @@
     <div class="content">
         <div class="search"><input id="s" placeholder="Search receipt or customer..." oninput="load()"></div>
         <div class="table-wrap"><table><thead><tr><th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th><th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Receipt <span id="si1"></span></th><th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Date <span id="si2"></span></th><th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Customer <span id="si3"></span></th><th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Items <span id="si4"></span></th><th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Total <span id="si5"></span></th><th onclick="sortCol(6)" style="cursor:pointer;user-select:none">Payment <span id="si6"></span></th><th onclick="sortCol(7)" style="cursor:pointer;user-select:none">Staff <span id="si7"></span></th><th onclick="sortCol(8)" style="cursor:pointer;user-select:none">Status <span id="si8"></span></th><th></th></tr></thead><tbody id="tb"></tbody><tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot></table></div>
+        <div style="margin-top:12px;text-align:right"><button class="btn btn-sm btn-print" onclick="printTable()">Print</button></div>
     </div>
 </div>
 <div class="modal" id="dm"><div class="mc" style="max-width:520px"><button class="mx" onclick="cl('dm')">&times;</button><div id="dc"></div></div></div>
@@ -46,7 +47,7 @@ function render(l){
         document.getElementById('tb').innerHTML=l.map(function(s,i){
             return '<tr><td style="color:#6b7280;font-size:12px">'+(i+1)+'</td><td style="font-weight:600">'+(s.receipt||'')+'</td>'
                 +'<td>'+((s.created_at||'')).slice(0,16)+'</td>'
-                +'<td>'+(s.customer_name||'-')+'</td>'
+                +'<td>'+(s.customer_name?'<a href="/ledger/customer/'+s.customer_id+'" style="text-decoration:none;color:inherit">'+s.customer_name+'</a>':'-')+'</td>'
                 +'<td class="text-right">'+((s.items&&s.items.length)||0)+'</td>'
                 +'<td class="text-right fw-600">Rs '+(s.total||0).toFixed(2)+'</td>'
                 +'<td>'+(s.payment||'')+'</td>'
@@ -66,4 +67,6 @@ function cl(id){document.getElementById(id).classList.remove('show');}
 function del(id){if(!confirm('Delete this sales invoice? Stock will be restored.'))return;fetch('/api/sales-invoices/'+id,{method:'DELETE'}).then(r=>r.json()).then(function(d){if(d.error){alert(d.error);return;}load();}).catch(function(){alert('Delete failed');});}
 window.onclick=function(e){document.querySelectorAll('.modal').forEach(m=>{if(e.target===m)m.classList.remove('show');});};
 load();
+function printTable(){document.body.classList.add('printing');window.print();}
+window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
 </script></body></html>

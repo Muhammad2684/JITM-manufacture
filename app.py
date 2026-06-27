@@ -82,7 +82,8 @@ def sidebar(active):
             links += '</div></div>'
         else:
             url, label, key = item
-            links += f'<a href="{url}" class=' + ('"active"' if url == active else '""') + f'>{label}</a>'
+            target = ' target="_blank"' if url == '/pos' else ''
+            links += f'<a href="{url}" class=' + ('"active"' if url == active else '""') + f'{target}>{label}</a>'
     sidebar_js = '''<script>
     document.querySelector('.sidebar').addEventListener('click',function(e){
         var heading = e.target.closest('.group-heading');

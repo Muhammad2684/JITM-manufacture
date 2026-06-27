@@ -144,11 +144,23 @@ def update_stock(vid):
         qty = new_stock - old['stock']
         db.execute('UPDATE variants SET stock=? WHERE id=?', (new_stock, vid))
         if qty > 0:
+            cost = float(d.get('cost', 0))
             db.execute(
                 'INSERT INTO restock_log (variant_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?)',
-                (vid, old['stock'], new_stock, qty, float(d.get('cost', 0)), d.get('note', ''),
+                (vid, old['stock'], new_stock, qty, cost, d.get('note', ''),
                  session.get('name', ''))
             )
+            pid = db.execute('SELECT product_id FROM variants WHERE id=?', (vid,)).fetchone()
+            if pid and cost > 0:
+                total_row = db.execute(
+                    'SELECT COALESCE(SUM(r.qty_added * r.cost),0) as total_cost, COALESCE(SUM(r.qty_added),0) as total_qty '
+                    'FROM restock_log r JOIN variants v ON v.id=r.variant_id '
+                    'WHERE v.product_id=? AND r.cost > 0',
+                    (pid['product_id'],)
+                ).fetchone()
+                if total_row and total_row['total_qty'] > 0:
+                    avg = round(total_row['total_cost'] / total_row['total_qty'], 2)
+                    db.execute('UPDATE products SET cost_price=? WHERE id=?', (avg, pid['product_id']))
         return jsonify({'ok': True})
 
 

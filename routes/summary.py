@@ -10,7 +10,7 @@ summary_bp = Blueprint('summary', __name__, url_prefix='/api')
 def summary():
     with get_db() as db:
         total_revenue = db.execute(
-            "SELECT COALESCE(SUM(total),0) as total FROM sales WHERE status='completed'"
+            "SELECT COALESCE(SUM(total),0) as total FROM sales WHERE status NOT IN ('returned','exchanged')"
         ).fetchone()
 
         total_returns = db.execute(
@@ -18,7 +18,7 @@ def summary():
         ).fetchone()
 
         total_discounts = db.execute(
-            "SELECT COALESCE(SUM(discount),0) as total FROM sales WHERE status='completed'"
+            "SELECT COALESCE(SUM(discount),0) as total FROM sales WHERE status NOT IN ('returned','exchanged')"
         ).fetchone()
 
         inventory_value = db.execute(
@@ -36,11 +36,15 @@ def summary():
             'JOIN sales s ON s.id=si.sale_id '
             'JOIN variants v ON v.id=si.variant_id '
             'JOIN products p ON p.id=v.product_id '
-            "WHERE s.status='completed' AND si.is_return=0"
+            "WHERE s.status NOT IN ('returned','exchanged') AND si.is_return=0"
         ).fetchone()
 
         supplier_balance = db.execute(
             'SELECT COALESCE(SUM(balance),0) as total FROM suppliers'
+        ).fetchone()
+
+        account_balance = db.execute(
+            'SELECT COALESCE(SUM(balance),0) as total FROM accounts'
         ).fetchone()
 
         expense_rows = db.execute(
@@ -61,14 +65,14 @@ def summary():
         total_expenses = sum(e['amount'] for e in expenses_detail)
         net_profit = gross_profit - discounts - total_expenses
 
-        total_assets = revenue + inventory_value['total'] + customer_credit['total']
+        total_assets = account_balance['total'] + inventory_value['total'] + customer_credit['total']
         total_liabilities = supplier_balance['total']
         equity = total_assets - total_liabilities
 
         return jsonify({
             'balance_sheet': {
                 'assets': [
-                    {'label': 'Cash / Bank', 'amount': round(revenue, 2)},
+                    {'label': 'Cash / Bank', 'amount': round(account_balance['total'], 2)},
                     {'label': 'Inventory Value', 'amount': round(inventory_value['total'], 2)},
                     {'label': 'Customer Receivables', 'amount': round(customer_credit['total'], 2)},
                 ],

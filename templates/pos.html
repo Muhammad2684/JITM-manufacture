@@ -23,7 +23,6 @@
             <div class="card"><div class="card-body totals">
                 <div class="tr"><span>Subtotal</span><span id="sub">Rs 0.00</span></div>
                 <div class="tr"><span>Discount</span><span><input id="disc" type="number" min="0" max="100" step="0.1" placeholder="%" oninput="calc()"> %</span></div>
-                <div class="tr"><span>Tax (8%)</span><span id="tax">Rs 0.00</span></div>
                 <div class="tr gt"><span>TOTAL</span><span id="tot">Rs 0.00</span></div>
             </div></div>
             <div class="card"><div class="card-body">
@@ -70,8 +69,8 @@ b.textContent=isR?'Sale':'Return';b.className=isR?'btn btn-d btn-sm':'btn btn-gh
 function toggleExchange(){isE=!isE;if(isE)isR=false;const b=document.getElementById('exc');
 b.textContent=isE?'Sale':'Exchange';b.className=isE?'btn btn-w btn-sm':'btn btn-ghost btn-sm';renderC();}
 function calc(){const sub=cart.reduce((s,c)=>s+c.qty*c.price,0);const dp=parseFloat(document.getElementById('disc').value)||0;
-const d=sub*dp/100;const tx=Math.max(0,sub-d)*0.08;const tot=Math.max(0,sub-d+tx);
-document.getElementById('sub').textContent='Rs '+sub.toFixed(2);document.getElementById('tax').textContent='Rs '+tx.toFixed(2);
+const d=sub*dp/100;const tot=Math.max(0,sub-d);
+document.getElementById('sub').textContent='Rs '+sub.toFixed(2);
 document.getElementById('tot').textContent='Rs '+tot.toFixed(2);document.getElementById('chg').textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2);}
 function sp(m,b){pm=m;document.querySelectorAll('.pm button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
 function pay(){if(!cart.length){f('Cart empty','err');return;}
@@ -89,7 +88,7 @@ function showR(d){let h='<div class="rh"><h3>JITM Baby Garments</h3><p>'+new Dat
 d.items.forEach(i=>{h+='<div class="rl"><span>'+i.quantity+'x '+i.product_name+(i.variant_label?' ('+i.variant_label+')':'')+'</span><span>Rs '+i.total.toFixed(2)+'</span></div>';});
 h+='</div><div class="rl"><span>Subtotal</span><span>Rs '+d.subtotal.toFixed(2)+'</span></div>';
 if(d.discount>0)h+='<div class="rl"><span>Discount</span><span>-Rs '+d.discount.toFixed(2)+'</span></div>';
-h+='<div class="rl"><span>Tax (8%)</span><span>Rs '+d.tax.toFixed(2)+'</span></div><div class="rl" style="font-weight:700;font-size:15px"><span>TOTAL</span><span>Rs '+d.total.toFixed(2)+'</span></div>'+
+h+='<div class="rl" style="font-weight:700;font-size:15px"><span>TOTAL</span><span>Rs '+d.total.toFixed(2)+'</span></div>'+
 '<div class="rl"><span>Paid: '+d.payment+'</span></div>'+(d.customer_name?'<div class="rl"><span>Customer: '+d.customer_name+'</span></div>':'')+
 '<div class="rl"><span>Staff: '+d.staff_name+'</span></div>'+(d.is_return?'<div class="rl" style="color:#dc2626">RETURN</div>':'')+(d.is_exchange?'<div class="rl" style="color:#d97706">EXCHANGE</div>':'')+
 '<div style="text-align:center;margin-top:12px;font-size:11px;color:#9ca3af">Thank you!<br>Returns within 30 days</div>';

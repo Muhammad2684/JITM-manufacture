@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
-<head><title>JITM · Create Purchase Invoice</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
+<head><title>JITM · Create Sales Invoice</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
 <style>
 .ci-wrap{max-width:960px;margin:0 auto}
-.ci-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
+.ci-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
 .ci-meta label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600;display:block;margin-bottom:4px}
 .ci-meta input,.ci-meta select{width:100%;padding:7px 10px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
 .ci-meta input:focus,.ci-meta select:focus{outline:none;border-color:#3b4fe2}
@@ -12,7 +12,6 @@
 .ci-entity select,.ci-entity input{width:100%;padding:8px 12px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
 .ci-entity select:focus,.ci-entity input:focus{outline:none;border-color:#3b4fe2}
 .ssheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;margin-bottom:16px}
-
 .ssheet table{width:100%;border-collapse:collapse;table-layout:fixed}
 .ssheet th{background:#f3f4f6;padding:6px 8px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db;border-right:1px solid #e5e7eb}
 .ssheet th:last-child{border-right:none}
@@ -27,6 +26,8 @@
 .ssheet .del-cell{padding:2px 4px;text-align:center}
 .ssheet .del-cell button{background:none;border:none;color:#9ca3af;cursor:pointer;font-size:14px;padding:4px}
 .ssheet .del-cell button:hover{color:#dc2626}
+.ssheet .stock-warn{font-size:10px;color:#dc2626;padding:2px 8px 4px;display:none}
+.ssheet .stock-warn.show{display:block}
 .ssheet-foot{display:flex;align-items:center;padding:8px 10px;gap:8px;border-top:1px solid #e5e7eb}
 .ci-footer{display:flex;gap:10px;align-items:center;padding-top:4px}
 .ci-footer .gt{margin-left:auto;font-size:16px;font-weight:700;color:#1e293b}
@@ -48,17 +49,20 @@
 <body>
 {{sidebar|safe}}
 <div class="main">
-    <div class="topbar"><h2>Create Purchase Invoice</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
+    <div class="topbar"><h2>Create Sales Invoice</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
     <div class="content">
         <div class="ci-wrap">
             <div class="ci-meta">
-                <div><label>Issue date</label><input type="date" id="issue_date"></div>
-                <div><label>Due date</label><input type="date" id="due_date"></div>
-                <div><label>Invoice No.</label><input type="text" id="invoice_no" placeholder="e.g. INV-001" required></div>
+                <div><label>Sale date</label><input type="date" id="sale_date"></div>
+                <div><label>Receipt No.</label><input type="text" id="receipt_no" placeholder="(auto-generated)" readonly style="background:#f9fafb;color:#6b7280"></div>
             </div>
             <div class="ci-entity">
-                <div style="margin-bottom:12px"><label>Supplier</label><select id="supplier_id"><option value="">-- Select Supplier --</option></select></div>
-                <div><label>Description</label><input type="text" id="description" placeholder="Invoice description (optional)"></div>
+                <div style="margin-bottom:12px"><label>Customer</label><select id="customer_id"><option value="">-- Walk-in / No Customer --</option></select></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                    <div><label>Payment Method</label><select id="payment_method" onchange="toggleDueDate()"><option value="cash">Cash</option><option value="card">Card</option><option value="credit">Credit</option></select></div>
+                    <div><label>Notes</label><input type="text" id="notes" placeholder="Optional notes"></div>
+                    <div id="due_date_wrap" style="display:none"><label>Due Date</label><input type="date" id="due_date"></div>
+                </div>
             </div>
             <div class="ssheet">
                 <table>
@@ -68,7 +72,7 @@
                 <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button></div>
             </div>
             <div class="ci-footer">
-                <button class="btn btn-p" onclick="submitInvoice()">Create</button>
+                <button class="btn btn-p" id="submit-btn" onclick="submitInvoice()">Create Sale</button>
                 <div class="gt">Total: <span id="grand_total">Rs 0.00</span></div>
             </div>
         </div>
@@ -94,17 +98,40 @@
         </div>
     </div>
 </div>
-<script>
-var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null;
 
-function loadSuppliers() {
-    fetch('/api/suppliers').then(r=>r.json()).then(d=>{
-        suppliers=d;
-        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+d.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('');
+<div class="modal" id="err_modal">
+    <div class="mc" style="max-width:480px">
+        <button class="mx" onclick="closeErrModal()">&times;</button>
+        <h2 style="color:#dc2626">Insufficient Stock</h2>
+        <div id="err_content" style="font-size:13px;color:#374151;margin:12px 0"></div>
+        <div style="display:flex;gap:8px">
+            <button class="btn" onclick="closeErrModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var products = [], customers = [], rowId = 0, acHighlightIdx = -1, editId = null, stockMap = {};
+
+function toggleDueDate() {
+    var pm = document.getElementById('payment_method').value;
+    document.getElementById('due_date_wrap').style.display = pm === 'credit' ? '' : 'none';
+}
+
+function loadCustomers() {
+    fetch('/api/customers').then(r=>r.json()).then(d=>{
+        customers=d;
+        document.getElementById('customer_id').innerHTML='<option value="">-- Walk-in / No Customer --</option>'+d.map(c=>'<option value="'+c.id+'">'+c.name+'</option>').join('');
     });
 }
 function loadProducts() {
-    fetch('/api/products').then(r=>r.json()).then(d=>{products=d;});
+    fetch('/api/products').then(r=>r.json()).then(d=>{
+        products=d;
+        d.forEach(function(p){
+            var stock = (p.variants||[]).reduce(function(s,v){return s+(v.stock||0);},0);
+            stockMap[p.id] = stock;
+        });
+    });
 }
 
 function isLastRow(el) {
@@ -120,14 +147,20 @@ function addRow(data) {
     var total = data ? data.total : 0;
     var pid = data ? (data.pid || null) : null;
     var html = '<tr id="rr-'+rowId+'"' + (pid ? ' data-pid="'+pid+'"' : '') + '>';
-    html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
+    html += '<td class="item-wrap" style="position:relative"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div><div class="stock-warn" id="sw-'+rowId+'"></div></td>';
     html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
     html += '<td><input class="cell num up" value="'+up.toFixed(2)+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
     html += '<td><div class="total-cell" id="rt-'+rowId+'">Rs '+total.toFixed(2)+'</div></td>';
     html += '<td class="del-cell"><button onclick="delRow(this)">&times;</button></td>';
     html += '</tr>';
     document.getElementById('items_tb').insertAdjacentHTML('beforeend', html);
+    if (pid) updateStockWarning(rid_from_tr('rr-'+rowId));
     calcGrand();
+}
+
+function rid_from_tr(tr_or_id) {
+    var tr = typeof tr_or_id === 'string' ? document.getElementById(tr_or_id) : tr_or_id;
+    return parseInt(tr.id.replace('rr-',''));
 }
 
 function onItemInput(inp, rid) {
@@ -149,7 +182,10 @@ function acShow(inp, rid) {
     if (!q) { list.style.display = 'none'; return; }
     var matches = products.filter(function(p){return (p.name||'').toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q);});
     if (!matches.length) { list.style.display = 'none'; return; }
-    list.innerHTML = matches.map(function(p){return '<div onmousedown="acPick('+rid+','+p.id+',\''+p.name.replace(/'/g,"\\'")+'\','+(p.cost_price||0)+')" data-pid="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+(p.cost_price||0)+'">'+p.name+' <span style="color:#9ca3af;font-size:10px">'+p.sku+'</span></div>';}).join('');
+    list.innerHTML = matches.map(function(p){
+        var stk = stockMap[p.id] || 0;
+        return '<div onmousedown="acPick('+rid+','+p.id+',\''+p.name.replace(/'/g,"\\'")+'\','+p.base_price+')" data-pid="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+p.base_price+'">'+p.name+' <span style="color:#9ca3af;font-size:10px">'+p.sku+'</span> <span style="color:'+(stk<=5?'#dc2626':'#16a34a')+';font-size:10px;font-weight:600">['+stk+' in stock]</span></div>';
+    }).join('');
     acHighlightIdx = -1;
     list.style.display = 'block';
 }
@@ -215,6 +251,7 @@ function acPick(rid, pid, name, price) {
     tr.querySelector('.qty').value = 1;
     tr.dataset.pid = pid;
     calcRow(tr.querySelector('.qty'));
+    updateStockWarning(tr);
     if (isLastRow(tr.querySelector('.item-wrap .cell'))) {
         addRow();
     }
@@ -224,7 +261,22 @@ function calcRow(el) {
     var qty = parseFloat(tr.querySelector('.qty').value) || 0;
     var up = parseFloat(tr.querySelector('.up').value) || 0;
     tr.querySelector('.total-cell').textContent = 'Rs '+(qty*up).toFixed(2);
+    updateStockWarning(tr);
     calcGrand();
+}
+function updateStockWarning(tr) {
+    var rid = rid_from_tr(tr);
+    var pid = parseInt(tr.dataset.pid);
+    var qty = parseFloat(tr.querySelector('.qty').value) || 0;
+    var warnEl = document.getElementById('sw-'+rid);
+    if (!pid || !warnEl) { if (warnEl) warnEl.classList.remove('show'); return; }
+    var stk = stockMap[pid] || 0;
+    if (qty > stk) {
+        warnEl.textContent = 'Only '+stk+' in stock — will go negative';
+        warnEl.classList.add('show');
+    } else {
+        warnEl.classList.remove('show');
+    }
 }
 function delRow(btn) {
     var rows = document.querySelectorAll('#items_tb tr');
@@ -307,7 +359,7 @@ function showCSVPreview(rows) {
         html += '<tr'+cls+'><td>'+(r.item||'')+'</td><td class="num">'+r.qty+'</td><td class="num">'+r.up.toFixed(2)+'</td><td class="num">'+total.toFixed(2)+'</td><td>'+tag+'</td></tr>';
     });
     tbody.innerHTML = html;
-    document.getElementById('csv_preview_info').textContent = matched + ' row(s) will be added' + (excluded ? ', ' + excluded + ' new product(s) excluded' : '');
+    document.getElementById('csv_preview_info').textContent = matched + ' row(s) will be added' + (excluded ? ', ' + excluded + ' unrecognized item(s) excluded' : '');
     document.getElementById('csv_preview_modal').classList.add('show');
 }
 
@@ -336,7 +388,7 @@ function applyCSVData() {
     csvData.forEach(function(r) {
         var match = findProductMatch(r.item);
         if (!match) return;
-        var price = (r.up > 0) ? r.up : (match.cost_price || 0);
+        var price = (r.up > 0) ? r.up : match.base_price;
         addRow({
             item: match.name,
             qty: r.qty,
@@ -350,42 +402,37 @@ function applyCSVData() {
     calcGrand();
 }
 
-function loadInvoice(id) {
-    fetch('/api/purchase-invoices/' + id).then(r=>r.json()).then(function(inv){
-        editId = id;
-        document.getElementById('invoice_no').value = inv.invoice_no;
-        document.getElementById('issue_date').value = inv.issue_date || '';
-        document.getElementById('due_date').value = inv.due_date || '';
-        document.getElementById('description').value = inv.description || '';
-        document.querySelector('.btn-p').textContent = 'Update';
-        var sel = document.getElementById('supplier_id');
-        if (inv.supplier_id) {
-            var opts = sel.options;
-            for (var i = 0; i < opts.length; i++) {
-                if (parseInt(opts[i].value) === inv.supplier_id) { sel.value = inv.supplier_id; break; }
-            }
+function generateReceipt() {
+    var ts = new Date().getTime().toString().slice(-7);
+    var rand = Math.floor(Math.random()*900)+100;
+    return 'JITM-'+ts+rand;
+}
+
+function validateStock() {
+    var issues = [];
+    var rows = document.querySelectorAll('#items_tb tr');
+    rows.forEach(function(r){
+        var pid = parseInt(r.dataset.pid);
+        var qty = parseFloat(r.querySelector('.qty').value) || 0;
+        var name = r.querySelector('.item-wrap .cell').value.trim();
+        if (!pid || !name || qty <= 0) return;
+        var stk = stockMap[pid] || 0;
+        if (qty > stk) {
+            issues.push(name+' — only '+stk+' in stock, you tried to sell '+qty);
         }
-        document.getElementById('items_tb').innerHTML = '';
-        rowId = 0;
-        (inv.items || []).forEach(function(item) {
-            addRow({
-                item: item.item,
-                qty: item.qty,
-                unit_price: item.unit_price,
-                total: item.total,
-                pid: item.product_id
-            });
-        });
-        if (!inv.items || !inv.items.length) addRow();
-        calcGrand();
     });
+    return issues;
+}
+
+function showErrModal(html) {
+    document.getElementById('err_content').innerHTML = html;
+    document.getElementById('err_modal').classList.add('show');
+}
+function closeErrModal() {
+    document.getElementById('err_modal').classList.remove('show');
 }
 
 function submitInvoice() {
-    var invoice_no = document.getElementById('invoice_no').value.trim();
-    if (!invoice_no) { alert('Enter invoice number.'); return; }
-    var supplier_id = document.getElementById('supplier_id').value || null;
-    if (!supplier_id) { alert('Select a supplier.'); return; }
     var rows = document.querySelectorAll('#items_tb tr');
     if (!rows.length) { alert('Add at least one item row.'); return; }
     var items = [], total = 0;
@@ -404,37 +451,91 @@ function submitInvoice() {
             total: t
         });
     });
-    var url = editId ? '/api/purchase-invoices/' + editId : '/api/purchase-invoices';
+    if (total <= 0) { alert('Add at least one item with a price.'); return; }
+    var stockIssues = validateStock();
+    if (stockIssues.length) {
+        var proceed = confirm('The following items exceed available stock (will be sold at negative stock):\n\n' +
+            stockIssues.map(function(m){return '• '+m;}).join('\n') + '\n\nProceed anyway?');
+        if (!proceed) return;
+    }
+    var receipt_no = document.getElementById('receipt_no').value.trim() || generateReceipt();
+    var customer_id = document.getElementById('customer_id').value || null;
+    var payment = document.getElementById('payment_method').value;
+    var notes = document.getElementById('notes').value;
+    var due_date = payment === 'credit' ? document.getElementById('due_date').value : null;
+    var btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = editId ? 'Updating...' : 'Creating...';
+    var url = editId ? '/api/sales-invoices/' + editId : '/api/sales-invoices';
     var method = editId ? 'PUT' : 'POST';
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            invoice_no: invoice_no,
-            issue_date: document.getElementById('issue_date').value,
-            due_date: document.getElementById('due_date').value,
-            supplier_id: supplier_id,
-            description: document.getElementById('description').value,
-            invoice_amount: total,
-            balance_due: total,
-            status: 'Unpaid',
+            receipt: receipt_no,
+            sale_date: document.getElementById('sale_date').value,
+            customer_id: customer_id,
+            payment: payment,
+            notes: notes,
+            due_date: due_date,
             items: items
         })
     }).then(function(r){return r.json();}).then(function(d){
-        if (d.error) { alert(d.error); return; }
-        window.location.href = '/purchase-invoices';
+        btn.disabled = false;
+        btn.textContent = editId ? 'Update Sale' : 'Create Sale';
+        if (d.error) { showErrModal(d.error); return; }
+        window.location.href = '/sales-invoices';
+    }).catch(function(err){
+        btn.disabled = false;
+        btn.textContent = editId ? 'Update Sale' : 'Create Sale';
+        showErrModal('Network error: '+err);
     });
 }
-document.getElementById('issue_date').value=new Date().toISOString().slice(0,10);
-loadSuppliers();
+
+function loadSale(id) {
+    editId = id;
+    fetch('/api/sales/' + id).then(r=>r.json()).then(function(s){
+        document.querySelector('.topbar h2').textContent = 'Edit Sales Invoice';
+        document.getElementById('receipt_no').value = s.receipt || '';
+        document.getElementById('receipt_no').readOnly = true;
+        document.getElementById('receipt_no').style.background = '#f9fafb';
+        document.getElementById('sale_date').value = (s.created_at || '').slice(0, 10);
+        document.getElementById('notes').value = s.notes || '';
+        document.getElementById('payment_method').value = s.payment || 'cash';
+        toggleDueDate();
+        if (s.payment === 'credit' && s.due_date) {
+            document.getElementById('due_date').value = s.due_date;
+        }
+        document.getElementById('submit-btn').textContent = 'Update Sale';
+        document.getElementById('customer_id').value = s.customer_id || '';
+        document.getElementById('items_tb').innerHTML = '';
+        rowId = 0;
+        (s.items || []).forEach(function(it){
+            addRow({
+                item: it.product_name,
+                qty: it.quantity,
+                unit_price: it.price,
+                total: it.total,
+                pid: it.product_id
+            });
+        });
+        if (!document.querySelectorAll('#items_tb tr').length) addRow();
+        calcGrand();
+    });
+}
+
+document.getElementById('sale_date').value = new Date().toISOString().slice(0,10);
+document.getElementById('receipt_no').value = generateReceipt();
+loadCustomers();
 loadProducts();
 var params = new URLSearchParams(window.location.search);
 var editIdParam = params.get('id');
 if (editIdParam) {
-    loadInvoice(parseInt(editIdParam));
+    setTimeout(function(){ loadSale(parseInt(editIdParam)); }, 200);
 } else {
     addRow();
 }
+addRow();
 </script>
 </body>
 </html>

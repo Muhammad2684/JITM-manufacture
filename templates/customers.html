@@ -1,11 +1,24 @@
 <!DOCTYPE html>
-<html><head><title>JITM · Customers</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head><body>
+<html>
+<head><title>JITM · Customers</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head>
+<body>
 {{sidebar|safe}}
+<style>
+.bdg{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.bdg-ok{background:#d4edda;color:#155724}
+.bdg-err{background:#f8d7da;color:#721c24}
+.bdg-over{background:#cfe2ff;color:#084298}
+.text-right{text-align:right}
+.text-muted{color:#888;font-size:13px}
+</style>
 <div class="main">
-    <div class="topbar"><h2>Customers</h2><div class="actions"><button class="btn btn-p btn-sm" onclick="showAdd()">+ New Customer</button><span class="text-muted">{{name}}</span></div></div>
+    <div class="topbar"><h2>Customers</h2><div class="actions">
+        <button class="btn btn-p btn-sm" onclick="showAdd()">+ New Customer</button>
+        <span class="text-muted">{{name}}</span>
+    </div></div>
     <div class="content">
-        <div class="search"><input id="s" placeholder="Search name or phone..." oninput="load()"></div>
-        <div class="cg" id="grid"></div>
+        <div class="search"><input id="s" placeholder="Search customers..." oninput="load()"></div>
+        <div class="table-wrap"><table><thead><tr><th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th><th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Customer Name <span id="si1"></span></th><th onclick="sortCol(2)" class="text-right" style="cursor:pointer;user-select:none">Account Receivable <span id="si2"></span></th><th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Status <span id="si3"></span></th><th></th></tr></thead><tbody id="tb"></tbody><tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot></table></div>
     </div>
 </div>
 <div class="modal" id="fm"><div class="mc"><button class="mx" onclick="cl('fm')">&times;</button><h2 id="ft">Customer</h2>
@@ -13,33 +26,21 @@
 <div class="form-row"><div><label>Address</label><input id="ca"></div><div><label>Store Credit (Rs)</label><input id="cc" type="number" step="0.01" value="0"></div></div>
 <div class="form-row"><div><label>Baby's Name</label><input id="cbn"></div><div><label>Birth Month</label><input id="cbm" type="month"></div></div>
 <label>Notes</label><textarea id="cno" rows="2"></textarea><button class="btn btn-p" type="submit">Save</button></form></div></div>
-<div class="modal" id="dmm"><div class="mc" style="max-width:640px"><button class="mx" onclick="cl('dmm')">&times;</button><div id="dc"></div></div></div>
 <script>
-var editing=null,custs=[];
-load();
-function load(){const q=document.getElementById('s').value;fetch('/api/customers?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{custs=d;render(d);});}
-function render(l){document.getElementById('grid').innerHTML=l.length?l.map(c=>'<div class="cc" onclick="detail('+c.id+')"><h3>'+c.name+'</h3><div class="cm">'+(c.phone||'')+(c.email?' | '+c.email:'')+'</div>'+
-(c.baby_name||c.baby_birth?'<div class="cb">'+(c.baby_name?'Baby: '+c.baby_name:'')+(c.baby_birth?' | '+c.baby_birth:'')+'</div>':'')+
-'<div class="cs"><span>Credit: <strong>Rs '+c.credit.toFixed(2)+'</strong></span><span>Spent: Rs '+c.total_spent.toFixed(2)+'</span><span>Visits: '+c.visit_count+'</span></div></div>').join(''):'<div class="empty">No customers</div>';}
-function showAdd(){editing=null;document.getElementById('ft').textContent='New Customer';document.getElementById('cn').value='';document.getElementById('cp').value='';document.getElementById('ce').value='';document.getElementById('ca').value='';document.getElementById('cc').value='0';document.getElementById('cbn').value='';document.getElementById('cbm').value='';document.getElementById('cno').value='';document.getElementById('fm').classList.add('show');}
+var custList = [], sortIdx = -1, sortDir = 1, editId = null;
+function statusBadge(c){var cr=c.credit||0;if(cr>0)return'<span class="bdg bdg-err">Unpaid</span>';if(cr<0)return'<span class="bdg bdg-over">Overpaid</span>';return'<span class="bdg bdg-ok">Paid</span>';}
+function statusCell(c){var html=statusBadge(c);var cr=c.credit||0;if(cr<0)html+='<div style="font-size:11px;color:#084298;margin-top:2px">+Rs '+Math.abs(cr).toFixed(2)+'</div>';return html;}
+function load(){var q=document.getElementById('s').value.toLowerCase();fetch('/api/customers').then(r=>r.json()).then(d=>{custList=d;render(d.filter(function(c){return!q||(c.name||'').toLowerCase().includes(q)||(c.phone||'').toLowerCase().includes(q);}));});}
+function render(l){document.getElementById('tb').innerHTML=l.map((c,i)=>'<tr><td style="color:#6b7280;font-size:12px">'+(i+1)+'</td><td style="font-weight:600">'+c.name+'</td><td class="text-right">Rs '+(c.credit||0).toFixed(2)+'</td><td>'+statusCell(c)+'</td><td><button class="btn btn-xs btn-ghost" onclick="showEdit('+c.id+')">Edit</button><button class="btn btn-xs btn-ghost" onclick="del('+c.id+')">Delete</button></td></tr>').join('');var tot=0;l.forEach(function(c){tot+=c.credit||0;});document.getElementById('tf').innerHTML='<tr><td colspan="2" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px;font-weight:700">Rs '+tot.toFixed(2)+'</td><td></td><td></td></tr>';}
+function sortCol(i){if(sortIdx===i){sortDir*=-1;}else{sortIdx=i;sortDir=1;}for(let j=0;j<4;j++)document.getElementById('si'+j).textContent='';document.getElementById('si'+i).textContent=sortDir===1?' \u25B2':' \u25BC';const vals=[()=>0,c=>(c.name||'').toLowerCase(),c=>c.credit||0,c=>{var cr=c.credit||0;if(cr>0)return 1;if(cr<0)return 2;return 0;}];custList.sort((a,b)=>{var va=vals[i](a),vb=vals[i](b);return va<vb?-sortDir:va>vb?sortDir:0;});var q=document.getElementById('s').value.toLowerCase();render(custList.filter(function(c){return!q||(c.name||'').toLowerCase().includes(q)||(c.phone||'').toLowerCase().includes(q);}));}
+function showAdd(){editId=null;document.getElementById('ft').textContent='New Customer';document.getElementById('cn').value='';document.getElementById('cp').value='';document.getElementById('ce').value='';document.getElementById('ca').value='';document.getElementById('cc').value='0';document.getElementById('cbn').value='';document.getElementById('cbm').value='';document.getElementById('cno').value='';document.getElementById('fm').classList.add('show');}
+function showEdit(id){const c=custList.find(x=>x.id===id);if(!c)return;editId=id;document.getElementById('ft').textContent='Edit '+c.name;document.getElementById('cn').value=c.name;document.getElementById('cp').value=c.phone||'';document.getElementById('ce').value=c.email||'';document.getElementById('ca').value=c.address||'';document.getElementById('cc').value=c.credit;document.getElementById('cbn').value=c.baby_name||'';document.getElementById('cbm').value=c.baby_birth||'';document.getElementById('cno').value=c.notes||'';document.getElementById('fm').classList.add('show');}
 function save(e){e.preventDefault();const data={name:document.getElementById('cn').value,phone:document.getElementById('cp').value,email:document.getElementById('ce').value,address:document.getElementById('ca').value,baby_name:document.getElementById('cbn').value,baby_birth:document.getElementById('cbm').value,notes:document.getElementById('cno').value,credit:document.getElementById('cc').value};
-fetch(editing?'/api/customers/'+editing:'/api/customers',{method:editing?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(r=>r.json()).then(()=>{cl('fm');load();});}
-function detail(id){const c=custs.find(x=>x.id===id);if(!c)return;fetch('/api/customers/'+id+'/history').then(r=>r.json()).then(h=>{
-let sh='',kh='';if(h.sales&&h.sales.length)sh='<table><tr><th>Receipt</th><th>Date</th><th class="text-right">Total</th><th>Status</th></tr>'+h.sales.map(s=>'<tr><td>'+s.receipt+'</td><td>'+(s.created_at||'').slice(0,10)+'</td><td class="text-right">Rs '+s.total.toFixed(2)+'</td><td><span class="bdg bdg-'+(s.status==='completed'?'ok':'err')+'">'+s.status+'</span></td></tr>').join('')+'</table>';
-else sh='<p class="text-muted" style="font-size:13px">No sales</p>';
-if(h.khata&&h.khata.length)kh='<table><tr><th>Date</th><th>Type</th><th class="text-right">Amount</th><th class="text-right">Balance</th><th>Note</th></tr>'+h.khata.map(k=>'<tr><td>'+(k.created_at||'').slice(0,10)+'</td><td>'+k.type+'</td><td class="text-right">Rs '+k.amount.toFixed(2)+'</td><td class="text-right">Rs '+k.balance.toFixed(2)+'</td><td>'+(k.note||'')+'</td></tr>').join('')+'</table>';
-else kh='<p class="text-muted" style="font-size:13px">No entries</p>';
-const baby=(c.baby_name||c.baby_birth)?'<p style="font-size:13px;color:#6b7280">'+(c.baby_name?'Baby: '+c.baby_name:'')+(c.baby_birth?' | Born: '+c.baby_birth:'')+'</p>':'';
-document.getElementById('dc').innerHTML='<h2>'+c.name+'</h2><p style="font-size:13px;color:#6b7280">'+(c.phone||'')+(c.email?' | '+c.email:'')+'</p>'+baby+
-'<div style="display:flex;gap:16px;margin:8px 0;font-size:13px"><span>Credit: <strong>Rs '+c.credit.toFixed(2)+'</strong></span><span>Spent: <strong>Rs '+c.total_spent.toFixed(2)+'</strong></span><span>Visits: <strong>'+c.visit_count+'</strong></span></div>'+
-'<hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"><h3 style="font-size:14px;margin-bottom:8px">Purchase History</h3>'+sh+
-'<hr style="border:none;border-top:1px solid #e5e7eb;margin:12px 0"><h3 style="font-size:14px;margin-bottom:8px">Khata Ledger</h3>'+kh+
-'<div style="margin-top:12px"><button class="btn btn-sm btn-p" onclick="editC('+id+')">Edit</button> <button class="btn btn-sm" onclick="cl(\'dmm\')">Close</button></div>';
-document.getElementById('dmm').classList.add('show');});}
-function editC(id){cl('dmm');const c=custs.find(x=>x.id===id);if(!c)return;editing=id;document.getElementById('ft').textContent='Edit '+c.name;
-document.getElementById('cn').value=c.name;document.getElementById('cp').value=c.phone||'';document.getElementById('ce').value=c.email||'';document.getElementById('ca').value=c.address||'';
-document.getElementById('cc').value=c.credit;document.getElementById('cbn').value=c.baby_name||'';document.getElementById('cbm').value=c.baby_birth||'';document.getElementById('cno').value=c.notes||'';
-document.getElementById('fm').classList.add('show');}
+fetch(editId?'/api/customers/'+editId:'/api/customers',{method:editId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(r=>r.json()).then(()=>{cl('fm');load();});}
+function del(id){if(!confirm('Delete this customer?'))return;fetch('/api/customers/'+id,{method:'DELETE'}).then(r=>r.json()).then(()=>load());}
 function cl(id){document.getElementById(id).classList.remove('show');}
 window.onclick=function(e){document.querySelectorAll('.modal').forEach(m=>{if(e.target===m)m.classList.remove('show');});};
-</script></body></html>
+load();
+</script>
+</body>
+</html>

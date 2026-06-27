@@ -59,11 +59,18 @@ def customer_history(cid):
             'SELECT * FROM sales WHERE customer_id=? ORDER BY id DESC LIMIT 50',
             (cid,)
         ).fetchall()
-        khata = db.execute(
-            'SELECT * FROM khata WHERE customer_id=? ORDER BY id DESC LIMIT 50',
-            (cid,)
-        ).fetchall()
         return jsonify({
             'sales': [dict(r) for r in sales],
-            'khata': [dict(r) for r in khata],
         })
+
+
+@cust_bp.route('/customers/<int:cid>/invoices')
+@login_required
+def customer_invoices(cid):
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT id, receipt, subtotal, total, paid, (total-paid) as outstanding, created_at "
+            "FROM sales WHERE customer_id=? AND status IN ('Unpaid','Partial') AND total>paid "
+            "ORDER BY created_at", (cid,)
+        ).fetchall()
+        return jsonify([dict(r) for r in rows])

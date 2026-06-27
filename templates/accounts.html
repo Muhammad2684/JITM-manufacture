@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head><title>JITM · Cash & Bank Accounts</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head>
+<body>
+{{sidebar|safe}}
+<div class="main">
+    <div class="topbar"><h2>Cash & Bank Accounts</h2><div class="actions">{% if role=='manager' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Account</button>{% endif %}<span class="text-muted">{{name}}</span></div></div>
+    <div class="content">
+        <div class="search"><input id="s" placeholder="Search accounts..." oninput="load()"></div>
+        <div class="table-wrap"><table><thead><tr><th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th><th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Account <span id="si1"></span></th><th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Type <span id="si2"></span></th><th onclick="sortCol(3)" class="text-right" style="cursor:pointer;user-select:none">Balance <span id="si3"></span></th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+        <div style="margin-top:16px;padding:12px 16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;display:flex;gap:24px;font-size:14px">
+            <span>Total Cash: <strong id="t_cash">Rs 0.00</strong></span>
+            <span>Total Bank: <strong id="t_bank">Rs 0.00</strong></span>
+            <span style="margin-left:auto">Grand Total: <strong id="t_all">Rs 0.00</strong></span>
+        </div>
+    </div>
+</div>
+<div class="modal" id="am"><div class="mc"><button class="mx" onclick="cl('am')">&times;</button><h2>Add Account</h2>
+<form onsubmit="save(event)"><label>Account Name</label><input id="an" required><label>Type</label><select id="at"><option value="cash">Cash</option><option value="bank">Bank</option></select><label>Opening Balance (Rs)</label><input id="ab" type="number" step="0.01" value="0"><button class="btn btn-p" type="submit">Save</button></form></div></div>
+<div class="modal" id="em"><div class="mc"><button class="mx" onclick="cl('em')">&times;</button><h2>Edit Account</h2>
+<form onsubmit="edit(event)"><label>Account Name</label><input id="e_an" required><label>Type</label><select id="e_at"><option value="cash">Cash</option><option value="bank">Bank</option></select><label>Balance (Rs)</label><input id="e_ab" type="number" step="0.01" value="0"><button class="btn btn-p" type="submit">Update</button></form></div></div>
+<script>
+var accList = [], sortIdx = -1, sortDir = 1, editId = null;
+function load(){var q=document.getElementById('s').value.toLowerCase();fetch('/api/accounts').then(r=>r.json()).then(d=>{accList=d;render(d.filter(function(a){return!q||(a.name||'').toLowerCase().includes(q)||(a.type||'').toLowerCase().includes(q);}));});}
+function render(l){
+    document.getElementById('tb').innerHTML=l.map((a,i)=>'<tr><td style="color:#6b7280;font-size:12px">'+(i+1)+'</td><td style="font-weight:600">'+a.name+'</td><td><span class="bdg bdg-'+(a.type==='bank'?'ok':'warn')+'">'+a.type+'</span></td><td class="text-right">Rs '+a.balance.toFixed(2)+'</td><td>'+({{role|tojson}}=='manager'?'<button class="btn btn-xs btn-ghost" onclick="showEdit('+a.id+')">Edit</button><button class="btn btn-xs btn-ghost" onclick="del('+a.id+')">Delete</button>':'')+'</td></tr>').join('');
+    var cash=0,bank=0;l.forEach(function(a){if(a.type==='bank')bank+=a.balance;else cash+=a.balance;});
+    document.getElementById('t_cash').textContent='Rs '+cash.toFixed(2);
+    document.getElementById('t_bank').textContent='Rs '+bank.toFixed(2);
+    document.getElementById('t_all').textContent='Rs '+(cash+bank).toFixed(2);
+}
+function sortCol(i){if(sortIdx===i){sortDir*=-1;}else{sortIdx=i;sortDir=1;}for(let j=0;j<4;j++)document.getElementById('si'+j).textContent='';document.getElementById('si'+i).textContent=sortDir===1?' \u25B2':' \u25BC';const vals=[()=>0,a=>(a.name||'').toLowerCase(),a=>(a.type||''),a=>a.balance||0];accList.sort((a,b)=>{const va=vals[i](a),vb=vals[i](b);return va<vb?-sortDir:va>vb?sortDir:0;});var q=document.getElementById('s').value.toLowerCase();render(accList.filter(function(a){return!q||(a.name||'').toLowerCase().includes(q)||(a.type||'').toLowerCase().includes(q);}));}
+function showAdd(){document.getElementById('am').classList.add('show');document.getElementById('an').value='';document.getElementById('at').value='cash';document.getElementById('ab').value='0';}
+function save(e){e.preventDefault();var name=document.getElementById('an').value.trim();if(!name)return;fetch('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,type:document.getElementById('at').value,balance:document.getElementById('ab').value})}).then(r=>r.json()).then(function(d){if(d.error){alert(d.error);return;}cl('am');load();});}
+function showEdit(id){var a=accList.find(x=>x.id===id);if(!a)return;editId=id;document.getElementById('e_an').value=a.name;document.getElementById('e_at').value=a.type;document.getElementById('e_ab').value=a.balance;document.getElementById('em').classList.add('show');}
+function edit(e){e.preventDefault();var name=document.getElementById('e_an').value.trim();if(!name)return;fetch('/api/accounts/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,type:document.getElementById('e_at').value,balance:document.getElementById('e_ab').value})}).then(r=>r.json()).then(function(d){if(d.error){alert(d.error);return;}cl('em');load();});}
+function del(id){if(!confirm('Delete this account?'))return;fetch('/api/accounts/'+id,{method:'DELETE'}).then(r=>r.json()).then(function(){load();});}
+load();
+function cl(id){document.getElementById(id).classList.remove('show');}
+window.onclick=function(e){document.querySelectorAll('.modal').forEach(function(m){if(e.target===m)m.classList.remove('show');});};
+</script>
+</body>
+</html>

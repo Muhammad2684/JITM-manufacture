@@ -26,18 +26,20 @@
                 <table>
                     <thead>
                         <tr>
-                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none">Product <span id="si0"></span></th>
-                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">SKU <span id="si1"></span></th>
-                            <th onclick="sortCol(2)" class="text-right" style="cursor:pointer;user-select:none">Stock <span id="si2"></span></th>
-                            <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Category <span id="si3"></span></th>
-                            <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Sale Price <span id="si4"></span></th>
-                            <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Avg Cost <span id="si5"></span></th>
-                            <th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Last P.Cost <span id="si6"></span></th>
-                            <th onclick="sortCol(7)" class="text-right" style="cursor:pointer;user-select:none">Total Cost <span id="si7"></span></th>
+                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Product <span id="si1"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">SKU <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" class="text-right" style="cursor:pointer;user-select:none">Stock <span id="si3"></span></th>
+                            <th onclick="sortCol(4)" style="cursor:pointer;user-select:none">Category <span id="si4"></span></th>
+                            <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Sale Price <span id="si5"></span></th>
+                            <th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Avg Cost <span id="si6"></span></th>
+                            <th onclick="sortCol(7)" class="text-right" style="cursor:pointer;user-select:none">Last P.Cost <span id="si7"></span></th>
+                            <th onclick="sortCol(8)" class="text-right" style="cursor:pointer;user-select:none">Total Cost <span id="si8"></span></th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody id="tb"></tbody>
+                    <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
                 </table>
             </div>
         </div>
@@ -125,9 +127,10 @@
         }
         function sortCol(i){
             if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
-            for (let j = 0; j < 8; j++) document.getElementById('si' + j).textContent = '';
+            for (let j = 0; j < 9; j++) document.getElementById('si' + j).textContent = '';
             document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
             const vals = [
+                () => 0,
                 p => (p.name || '').toLowerCase(),
                 p => (p.sku || '').toLowerCase(),
                 p => p.total_stock || 0,
@@ -141,17 +144,20 @@
             render(all);
         }
         function render(l) {
-            document.getElementById('tb').innerHTML = l.map(p => {
+            document.getElementById('tb').innerHTML = l.map((p, idx) => {
                 let vh = ''; if (p.variants && p.variants.length) {
-                    const vc = p.cost_price || 0; vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="9" style="padding:6px 14px 8px;background:#f8f7f4">' +
+                    const vc = p.cost_price || 0; vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="10" style="padding:6px 14px 8px;background:#f8f7f4">' +
                         p.variants.map(v => '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px"><span style="width:95px">' + (v.size || '-') + ' / ' + (v.color || '-') + '</span><span style="width:80px;color:#6b7280">' + v.sku + '</span><span style="width:45px;text-align:right" class="' + (v.stock <= p.low_stock ? 'bdg bdg-err' : '') + '">' + v.stock + '</span><span style="width:70px">' + (v.barcode ? '<code>' + v.barcode + '</code>' : '-') + '</span><span style="width:65px;font-weight:600;text-align:right">Rs ' + (v.price || p.base_price).toFixed(2) + '</span><span style="width:60px;text-align:right">Rs ' + vc.toFixed(2) + '</span><span style="width:65px;text-align:right;color:#6b7280">' + (p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '- -') + '</span><span style="width:65px;text-align:right;color:#374151">Rs ' + (vc * v.stock).toFixed(2) + '</span>' +
                             (ROLE == 'manager' ? '<button class="btn btn-xs" onclick="editStock(' + v.id + ')">Stock</button>' : '') + '</div>').join('') + '</td></tr>';
-        }
+                }
         const arrow = p.has_variants ? '<span onclick="toggleV(' + p.id + ')" style="cursor:pointer;font-size:10px;color:#9ca3af;margin-right:6px;user-select:none" id="a-' + p.id + '">&#9654;</span> ' : '';
         const tc = p.cost_price * p.total_stock;
         const lc = p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>';
-        return '<tr><td style="font-weight:600">' + arrow + p.name + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td>' +
-            '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button>' : '') + '</td></tr>' + vh;}).join('');}
+        return '<tr><td style="color:#6b7280;font-size:12px">' + (idx + 1) + '</td><td style="font-weight:600">' + arrow + p.name + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td>' +
+            '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button>' : '') + '</td></tr>' + vh;}).join('');
+    var totStock=0,totCost=0;
+    l.forEach(function(p){totStock+=p.total_stock||0;totCost+=(p.cost_price||0)*(p.total_stock||0);});
+    document.getElementById('tf').innerHTML='<tr><td colspan="3" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td></tr>';}
         function toggleV(id) { const e = document.getElementById('v-' + id); const a = document.getElementById('a-' + id); if (e.style.display === 'none') { e.style.display = ''; a.innerHTML = '&#9660;'; } else { e.style.display = 'none'; a.innerHTML = '&#9654;'; } }
         function autoSku(on) {
             const inp = document.getElementById('ps');

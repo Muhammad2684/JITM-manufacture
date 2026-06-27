@@ -61,6 +61,7 @@ def init_db():
                 total REAL NOT NULL DEFAULT 0,
                 payment TEXT NOT NULL DEFAULT 'cash',
                 status TEXT NOT NULL DEFAULT 'completed',
+                paid REAL NOT NULL DEFAULT 0,
                 customer_id INTEGER REFERENCES customers(id),
                 customer_name TEXT DEFAULT '',
                 staff_id INTEGER NOT NULL REFERENCES users(id),
@@ -107,19 +108,6 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            CREATE TABLE IF NOT EXISTS khata (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                customer_id INTEGER NOT NULL REFERENCES customers(id),
-                type TEXT NOT NULL,
-                amount REAL NOT NULL,
-                balance REAL NOT NULL,
-                reference TEXT DEFAULT '',
-                sale_id INTEGER REFERENCES sales(id),
-                note TEXT DEFAULT '',
-                staff_name TEXT DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-
             CREATE TABLE IF NOT EXISTS restock_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 variant_id INTEGER NOT NULL REFERENCES variants(id),
@@ -141,18 +129,6 @@ def init_db():
                 contact_person TEXT DEFAULT '',
                 notes TEXT DEFAULT '',
                 balance REAL NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-
-            CREATE TABLE IF NOT EXISTS supplier_khata (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
-                type TEXT NOT NULL,
-                amount REAL NOT NULL,
-                balance REAL NOT NULL,
-                reference TEXT DEFAULT '',
-                note TEXT DEFAULT '',
-                staff_name TEXT DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
@@ -186,6 +162,39 @@ def init_db():
                 ('tax_rate', '8'),
                 ('receipt_footer', 'Thank you for shopping with us!'),
                 ('currency', 'Rs');
+
+            CREATE TABLE IF NOT EXISTS accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL DEFAULT 'cash',
+                balance REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS account_transfers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_account_id INTEGER NOT NULL REFERENCES accounts(id),
+                to_account_id INTEGER NOT NULL REFERENCES accounts(id),
+                amount REAL NOT NULL DEFAULT 0,
+                note TEXT DEFAULT '',
+                date TEXT NOT NULL DEFAULT (date('now')),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL REFERENCES accounts(id),
+                type TEXT NOT NULL CHECK(type IN ('receipt','payment')),
+                amount REAL NOT NULL DEFAULT 0,
+                description TEXT DEFAULT '',
+                party_type TEXT DEFAULT 'other',
+                party_id INTEGER DEFAULT NULL,
+                reference_type TEXT DEFAULT NULL,
+                reference_id INTEGER DEFAULT NULL,
+                allocations TEXT DEFAULT '[]',
+                date TEXT NOT NULL DEFAULT (date('now')),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
 
             CREATE TABLE IF NOT EXISTS purchase_invoices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -239,6 +248,41 @@ def init_db():
             pass
 
         try:
+            db.execute('ALTER TABLE sales ADD COLUMN paid REAL NOT NULL DEFAULT 0')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE sales ADD COLUMN due_date TEXT DEFAULT NULL')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE transactions ADD COLUMN party_type TEXT DEFAULT \'other\'')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE transactions ADD COLUMN party_id INTEGER DEFAULT NULL')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE transactions ADD COLUMN reference_type TEXT DEFAULT NULL')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE transactions ADD COLUMN reference_id INTEGER DEFAULT NULL')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE transactions ADD COLUMN allocations TEXT DEFAULT \'[]\'')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE transactions ADD COLUMN expense_category TEXT DEFAULT NULL')
+        except Exception:
+            pass
+
+        try:
             db.execute('''CREATE TABLE IF NOT EXISTS purchase_invoice_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 invoice_id INTEGER NOT NULL REFERENCES purchase_invoices(id) ON DELETE CASCADE,
@@ -263,58 +307,19 @@ def init_db():
             (2, 'staff1', hashed_staff, 'staff', 'Staff One')
         )
 
-        db.execute(
-            'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode, low_stock) '
-            'VALUES (?,?,?,?,?,?,?,?)',
-            (1, 'Bear Onesie', 'Onesies', 24.99, 12.00, 'ONS-001', '8901234567890', 5)
-        )
-        db.execute(
-            'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
-            (1, 1, 'ONS-001-DEF', 81)
-        )
-
-        db.execute(
-            'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode) '
-            'VALUES (?,?,?,?,?,?,?)',
-            (2, 'Bodysuit 3-Pack', 'Sets', 34.99, 16.00, 'BDY-001', '8901234560072')
-        )
-        db.execute(
-            'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
-            (2, 2, 'BDY-001-DEF', 30)
-        )
-
-        db.execute(
-            'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode) '
-            'VALUES (?,?,?,?,?,?,?)',
-            (3, 'Knitted Beanie', 'Accessories', 12.99, 5.00, 'BN-001', '8901234560089')
-        )
-        db.execute(
-            'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
-            (3, 3, 'BN-001-DEF', 40)
-        )
-
-        db.execute(
-            'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode) '
-            'VALUES (?,?,?,?,?,?,?)',
-            (4, 'Baby Blanket', 'Bedding', 29.99, 14.00, 'BLK-001', '8901234560096')
-        )
-        db.execute(
-            'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
-            (4, 4, 'BLK-001-DEF', 15)
-        )
-
-        for c in [(1, 'Sarah Johnson', '555-0123', 'Emma', '2026-03'),
-                   (2, 'Mike Peters', '555-0456', 'Leo', '2025-11')]:
+        for prod in [
+            (1, 'Bear Onesie', 'Onesies', 24.99, 12.00, 'ONS-001', '8901234567890'),
+            (2, 'Bodysuit 3-Pack', 'Sets', 34.99, 16.00, 'BDY-001', '8901234560072'),
+            (3, 'Knitted Beanie', 'Accessories', 12.99, 5.00, 'BN-001', '8901234560089'),
+            (4, 'Baby Blanket', 'Bedding', 29.99, 14.00, 'BLK-001', '8901234560096'),
+        ]:
             db.execute(
-                'INSERT OR IGNORE INTO customers (id, name, phone, baby_name, baby_birth) VALUES (?,?,?,?,?)',
-                c
+                'INSERT OR IGNORE INTO products (id, name, category, base_price, cost_price, sku, barcode) '
+                'VALUES (?,?,?,?,?,?,?)', prod
             )
-
-        for s in [(1, 'Wonder Wear Ltd', '555-1001', '', '', 'Ali Khan', 'Onesie supplier'),
-                  (2, 'Cozy Knits', '555-1002', '', '', '', 'Beanie & blanket supplier')]:
             db.execute(
-                'INSERT OR IGNORE INTO suppliers (id, name, phone, email, address, contact_person, notes) VALUES (?,?,?,?,?,?,?)',
-                s
+                'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
+                (prod[0], prod[0], prod[5] + '-DEF', 0)
             )
 
         for cc in ['Full Commission', 'Half Commission', 'No Commission']:
@@ -322,3 +327,24 @@ def init_db():
 
         for cat in ['Onesies', 'Sets', 'Accessories', 'Bedding']:
             db.execute('INSERT OR IGNORE INTO categories (name) VALUES (?)', (cat,))
+
+        seed_customers = ['Sophia Ahmed', 'Ali Raza', 'Ayesha Khan', 'Fatima Noor']
+        for i, name in enumerate(seed_customers, 1):
+            db.execute(
+                'INSERT OR IGNORE INTO customers (id, name, phone, credit) VALUES (?,?,?,?)',
+                (i, name, f'0300-000000{i}', 0)
+            )
+
+        seed_suppliers = ['New Born Fashions', 'Kids Wear House', 'Baby Garments Co', 'Tiny Tots Suppliers']
+        for i, name in enumerate(seed_suppliers, 1):
+            db.execute(
+                'INSERT OR IGNORE INTO suppliers (id, name, phone, balance) VALUES (?,?,?,?)',
+                (i, name, f'0301-000000{i}', 0)
+            )
+
+        seed_accounts = [('Cash in Hand', 'cash'), ('Bank Account (HBL)', 'bank')]
+        for i, (name, typ) in enumerate(seed_accounts, 1):
+            db.execute(
+                'INSERT OR IGNORE INTO accounts (id, name, type, balance) VALUES (?,?,?,?)',
+                (i, name, typ, 0)
+            )

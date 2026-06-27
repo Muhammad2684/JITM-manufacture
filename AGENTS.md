@@ -25,6 +25,7 @@
 - `page(template, active)` renders template with role, name, sidebar
 
 ## API Conventions
+- `/api/accounts` — GET (list), POST (create), PUT `/api/accounts/<id>`, DELETE `/api/accounts/<id>`
 - `/api/products` — GET (list + search by `?q=`), POST (create), PUT `/api/products/<id>`
 - `/api/variants` — POST (create), PUT `/api/variants/<id>`, PUT `/api/variants/<id>/stock`
 - `/api/categories` — GET, POST, DELETE `/api/categories/<id>`
@@ -50,6 +51,12 @@
 - The cached list (e.g. `supList`, `ccList`, `allSales`) is sorted in-place and re-rendered
 - Apply this pattern to any new table added in the future
 
+## Serial Number (SN) Column
+- All data tables must include a `#` column as the first column with `onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span>`
+- In `render()`, add SN as the first `<td>` using the map index: `<td style="color:#6b7280;font-size:12px">'+(i+1)+'</td>` (adjust `l.map((item,i)=>` signature)
+- In `sortCol()`, the first value extractor (index 0) must be `()=>0` so sorting by SN leaves the list unchanged
+- All existing sort indices must be bumped by +1 (old index 0 → new index 1, etc.)
+
 ## Template Patterns
 - Sidebar: `{{sidebar|safe}}` at top of body
 - Role check in inline JS: `ROLE` JS variable set from `{{role|tojson}}`
@@ -57,6 +64,21 @@
 - Tables rendered by inline JS `render()` functions from fetched JSON
 - Inventory table columns: Product, SKU, Stock, Category, Sale Price, Avg Cost, Last P.Cost, Total Cost, (actions)
 - Sortable columns via `sortCol(n)` with ▲/▼ indicators
+
+## Total Footer Row
+- All listing tables with numeric columns must include a `<tfoot id="tf">` after `<tbody>` for totals
+- In `render()`, after populating `#tb`, compute sums from the current (filtered/sorted) list and set `#tf` innerHTML
+- The totals row spans columns with `colspan` for labels, shows summed values in bold in the relevant `<td>`s
+- Applied to: Inventory (Stock, Total Cost), Suppliers (Balance), Customers (Account Receivable), Purchase Invoices (Invoice Amount, Balance Due), Sales Invoices (Total)
+
+## Sales Invoice Statuses
+- **Paid** — cash/card sales fully paid (paid = total)
+- **Unpaid** — credit sales, no payment collected (paid = 0)
+- **Partial** — partially paid credit sales (0 < paid < total)
+- **Overpaid** — customer paid more than total (paid > total)
+- **returned** / **exchanged** — POS terminal returns/exchanges (separate flow)
+- Status is set at creation based on payment method; updated by `update_sale_due()` in `routes/transactions.py:42` when payments are applied
+- `statusCell(s)` in templates renders colored badges with due amount info
 
 ## Default Login
 - admin / admin123

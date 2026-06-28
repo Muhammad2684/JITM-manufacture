@@ -1,6 +1,7 @@
 import json
 import random
 import time
+from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from database import get_db
 from routes.auth import login_required, manager_required
@@ -216,12 +217,14 @@ def complete_sale():
             'payment': payment,
             'payments': pymt_list,
             'customer_name': customer_name,
+            'customer_phone': customer_phone,
             'staff_name': session['name'],
             'is_return': is_return,
             'is_exchange': is_exchange,
             'status': status,
             'cash_tendered': cash_tendered,
             'change_given': change_given,
+            'created_at': datetime.now().strftime('%d/%m/%Y %I:%M %p'),
         })
 
 

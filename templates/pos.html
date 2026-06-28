@@ -206,17 +206,44 @@ showR(d);cart=[];isR=false;isE=false;selC=null;walkIn=false;document.getElementB
     document.getElementById('notes').value='';document.getElementById('disc').value='';document.getElementById('am-cash').value='';document.getElementById('am-bl').value='';document.getElementById('am-jl').value='';document.getElementById('am-z').value='';document.getElementById('am-credit').value='';document.getElementById('appliedTotal').textContent='0.00';document.getElementById('totDisp').textContent='0.00';document.getElementById('splitStatus').textContent='Enter amounts';document.getElementById('splitStatus').style.color='#6b7280';document.getElementById('splitStatus').style.background='transparent';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
 document.getElementById('exc').textContent='Exchange';document.getElementById('exc').className='btn btn-ghost btn-sm';renderC();btn.disabled=false;document.getElementById('s').value='';closeDropdown();document.getElementById('s').focus();})
 .catch(()=>{f('Sale failed');btn.disabled=false;});}
-function showR(d){let h='<div class="rh"><h3>JITM Baby Garments</h3><p>'+new Date().toLocaleString()+'</p><p style="font-size:11px">'+d.receipt+'</p></div><div class="ri">';
-d.items.forEach(i=>{h+='<div class="rl"><span>'+i.quantity+'x '+i.product_name+(i.variant_label?' ('+i.variant_label+')':'')+'</span><span>Rs '+i.total.toFixed(2)+'</span></div>';});
-h+='</div><div class="rl"><span>Subtotal</span><span>Rs '+d.subtotal.toFixed(2)+'</span></div>';
-if(d.discount>0)h+='<div class="rl"><span>Discount</span><span>-Rs '+d.discount.toFixed(2)+'</span></div>';
-h+='<div class="rl" style="font-weight:700;font-size:15px"><span>TOTAL</span><span>Rs '+d.total.toFixed(2)+'</span></div>'+
-(d.payments?d.payments.map(function(p){return'<div class="rl"><span>Paid: '+p.method+'</span><span>Rs '+p.amount.toFixed(2)+'</span></div>';}).join(''):'<div class="rl"><span>Paid: '+d.payment+'</span></div>')+
-(d.cash_tendered>0?'<div class="rl"><span>Cash Tendered</span><span>Rs '+d.cash_tendered.toFixed(2)+'</span></div>':'')+
-(d.change_given>0?'<div class="rl"><span>Change</span><span>Rs '+d.change_given.toFixed(2)+'</span></div>':'')+
-(d.customer_name?'<div class="rl"><span>Customer: '+d.customer_name+'</span></div>':'')+
-'<div class="rl"><span>Staff: '+d.staff_name+'</span></div>'+(d.is_return?'<div class="rl" style="color:#dc2626">RETURN</div>':'')+(d.is_exchange?'<div class="rl" style="color:#d97706">EXCHANGE</div>':'')+
-'<div style="text-align:center;margin-top:12px;font-size:11px;color:#9ca3af">Thank you!<br>Returns within 30 days</div>';
+function fmt(n){return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+function showR(d){
+var totQty=d.items.reduce(function(s,i){return s+Math.abs(i.quantity);},0);
+var crAmt=0;d.payments.forEach(function(p){if(p.method==='credit')crAmt=p.amount;});
+var netCash=d.cash_tendered-d.change_given;
+var h='<div class="rh"><h3>JITM Baby Garments</h3></div>';
+h+='<div style="border-bottom:1px dashed #e2e1de;padding-bottom:6px;margin-bottom:6px">';
+h+='<div class="rl"><span>Invoice/Receipt No:</span><span>'+d.receipt+'</span></div>';
+h+='<div class="rl"><span>Customer Name:</span><span>'+(d.customer_name||'Walk In')+'</span></div>';
+h+='<div class="rl"><span>Mobile/Phone No:</span><span>'+(d.customer_phone||'-')+'</span></div></div>';
+h+='<div style="display:grid;grid-template-columns:60px 1fr 45px 30px 55px;gap:2px 4px;font-size:10px;border-bottom:1px dashed #e2e1de;padding-bottom:4px;margin-bottom:4px">';
+h+='<span style="font-weight:600">SC Code</span><span style="font-weight:600">Description</span><span style="font-weight:600;text-align:right">@</span><span style="font-weight:600;text-align:right">Qty</span><span style="font-weight:600;text-align:right">Total</span>';
+d.items.forEach(function(i){
+h+='<span style="font-size:9px;color:#6b7280">'+(i.sku||'-')+'</span>';
+h+='<span>'+i.product_name+(i.variant_label?' ('+i.variant_label+')':'')+'</span>';
+h+='<span style="text-align:right">'+fmt(i.price)+'</span>';
+h+='<span style="text-align:right">'+Math.abs(i.quantity)+'</span>';
+h+='<span style="text-align:right">'+fmt(i.total)+'</span>';
+});
+h+='</div>';
+h+='<div class="rl"><span>Items: '+d.items.length+'</span><span>Qty: '+totQty+'</span><span>Time Stamp: '+d.created_at+'</span></div>';
+h+='<div class="rl" style="margin-bottom:6px"><span>Status/Tag:</span><span style="font-weight:600;color:#3b4fe2">'+(d.is_return?'Return':d.is_exchange?'Exchange':d.status)+'</span></div>';
+h+='<div style="border-top:1px dashed #e2e1de;padding-top:6px">';
+h+='<div class="rl"><span>Sub Total:</span><span>Rs '+fmt(d.subtotal)+'</span></div>';
+h+='<div class="rl"><span>Adjustment:</span><span>Rs '+fmt(d.discount)+'</span></div>';
+h+='<div class="rl" style="font-weight:700;font-size:14px"><span>Total:</span><span>Rs '+fmt(d.total)+'</span></div>';
+h+='<div class="rl"><span>Credit:</span><span>Rs '+fmt(crAmt)+'</span></div>';
+h+='<div class="rl"><span>Cash:</span><span>Rs '+fmt(netCash)+'</span></div>';
+h+='<div class="rl"><span>Change:</span><span>Rs '+fmt(d.change_given)+'</span></div></div>';
+h+='<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e1de;text-align:center;font-size:10px;color:#6b7280;line-height:1.6">';
+h+='<div style="font-size:12px;color:#374151;font-weight:600">Thanks for Shopping</div>';
+h+='Please check items, cash, and receipt before leaving the counter.<br>';
+h+='Items can be exchanged within 10 days with receipt and barcode tag.<br>';
+h+='Toys, personal care, undergarments, and sale items are non-exchangeable.<br>';
+h+='Imported items carry no guarantee.<br>';
+h+='<strong style="color:#dc2626">NO CASH Refund Allowed</strong><br><br>';
+h+='<em>Software Developed by Igon Solutions</em><br>';
+h+='Contact: 0321-8234755 | www.igonsolutions.com</div>';
 document.getElementById('rc').innerHTML=h;document.getElementById('rm').classList.add('show');}
 function findCust(){var ph=document.getElementById('cPhone').value.trim();if(ph.length<3){selC=null;document.getElementById('sc').innerHTML='';return;}
 fetch('/api/customers?q='+encodeURIComponent(ph)).then(r=>r.json()).then(function(list){var match=list.find(function(c){return c.phone===ph;});if(match){selC={id:match.id,name:match.name,phone:match.phone};document.getElementById('cName').value=match.name;document.getElementById('cName').readOnly=true;document.getElementById('sc').innerHTML='Customer: '+match.name+' | Credit: Rs '+match.credit.toFixed(2);}else{selC=null;document.getElementById('cName').readOnly=false;document.getElementById('sc').innerHTML='<span style=\"color:#6b7280\">New customer</span>';}});}

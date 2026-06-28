@@ -248,6 +248,9 @@ def get_account_entries(db, account_id, entity):
         if p['reference_type'] == 'purchase' and p['reference_id']:
             pi = db.execute('SELECT invoice_no FROM purchase_invoices WHERE id=?', (p['reference_id'],)).fetchone()
             label = pi['invoice_no'] if pi else ''
+        elif p['reference_type'] == 'sale' and p['reference_id']:
+            sl = db.execute('SELECT receipt FROM sales WHERE id=?', (p['reference_id'],)).fetchone()
+            label = sl['receipt'] if sl else ''
 
         desc = p['description'] or 'Payment'
         if pname:
@@ -340,6 +343,7 @@ def get_product_entries(db, product_id, entity):
             'date': (s['created_at'] or '')[:10],
             'description': desc,
             'reference': ref,
+            'qty': abs(s['quantity']),
             'debit': 0 if s['is_return'] else s['total'],
             'credit': s['total'] if s['is_return'] else 0,
             'type': 'sale_return' if s['is_return'] else 'sale'
@@ -362,6 +366,7 @@ def get_product_entries(db, product_id, entity):
             'date': (r['created_at'] or '')[:10],
             'description': desc,
             'reference': r['sku'] or '',
+            'qty': abs(r['qty_added']),
             'debit': total_cost,
             'credit': 0,
             'type': 'restock'
@@ -383,6 +388,7 @@ def get_product_entries(db, product_id, entity):
             'date': p['issue_date'] or (p['created_at'] or '')[:10],
             'description': desc,
             'reference': p['invoice_no'] or '',
+            'qty': abs(p['qty']),
             'debit': p['total'],
             'credit': 0,
             'type': 'purchase'

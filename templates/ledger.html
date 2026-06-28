@@ -36,9 +36,10 @@
                 <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Date <span id="si1"></span></th>
                 <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Description <span id="si2"></span></th>
                 <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Reference <span id="si3"></span></th>
-                <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Debit <span id="si4"></span></th>
-                <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Credit <span id="si5"></span></th>
-                <th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Balance <span id="si6"></span></th>
+                {% if entity_type == 'product' %}<th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Qty <span id="si4"></span></th>{% endif %}
+                <th onclick="sortCol({{ 5 if entity_type == 'product' else 4 }})" class="text-right" style="cursor:pointer;user-select:none">Debit <span id="si{{ 5 if entity_type == 'product' else 4 }}"></span></th>
+                <th onclick="sortCol({{ 6 if entity_type == 'product' else 5 }})" class="text-right" style="cursor:pointer;user-select:none">Credit <span id="si{{ 6 if entity_type == 'product' else 5 }}"></span></th>
+                <th onclick="sortCol({{ 7 if entity_type == 'product' else 6 }})" class="text-right" style="cursor:pointer;user-select:none">Balance <span id="si{{ 7 if entity_type == 'product' else 6 }}"></span></th>
             </tr></thead>
             <tbody id="tb"></tbody>
             <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
@@ -72,17 +73,20 @@ function load(){
 function render(l){
     document.getElementById('tb').innerHTML=l.map(function(e,i){
         var tClass = 'bdg-'+e.type;
+        var qtyCol = '{{ entity_type }}' === 'product' ? '<td class="text-right">'+(e.qty||'')+'</td>' : '';
         return '<tr><td style="color:#6b7280;font-size:12px">'+(i+1)+'</td>'
             +'<td>'+(e.date||'')+'</td>'
             +'<td><span class="bdg '+tClass+'">'+e.description+'</span></td>'
             +'<td>'+(e.reference||'')+'</td>'
+            +qtyCol
             +'<td class="text-right">'+(e.debit>0?'Rs '+e.debit.toFixed(2):'')+'</td>'
             +'<td class="text-right">'+(e.credit>0?'Rs '+e.credit.toFixed(2):'')+'</td>'
             +'<td class="text-right" style="font-weight:600">Rs '+e.balance.toFixed(2)+'</td></tr>';
     }).join('');
     var totD=0,totC=0;
     l.forEach(function(e){totD+=e.debit||0;totC+=e.credit||0;});
-    document.getElementById('tf').innerHTML='<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td>'
+    var cols = '{{ entity_type }}' === 'product' ? 5 : 4;
+    document.getElementById('tf').innerHTML='<tr><td colspan="'+cols+'" class="text-right" style="padding:6px 8px">Total</td>'
         +'<td class="text-right" style="padding:6px 8px">Rs '+totD.toFixed(2)+'</td>'
         +'<td class="text-right" style="padding:6px 8px">Rs '+totC.toFixed(2)+'</td>'
         +'<td></td></tr>';
@@ -90,17 +94,25 @@ function render(l){
 
 function sortCol(i){
     if(sortIdx===i){sortDir*=-1;}else{sortIdx=i;sortDir=1;}
-    for(let j=0;j<7;j++)document.getElementById('si'+j).textContent='';
+    var colCount = '{{ entity_type }}' === 'product' ? 8 : 7;
+    for(let j=0;j<colCount;j++)document.getElementById('si'+j).textContent='';
     document.getElementById('si'+i).textContent=sortDir===1?' \u25B2':' \u25BC';
     const vals=[
         function(){return 0;},
         function(e){return e.date||'';},
         function(e){return (e.description||'').toLowerCase();},
         function(e){return (e.reference||'').toLowerCase();},
-        function(e){return e.debit||0;},
-        function(e){return e.credit||0;},
-        function(e){return e.balance||0;}
     ];
+    if('{{ entity_type }}' === 'product') {
+        vals.push(function(e){return e.qty||0;});
+        vals.push(function(e){return e.debit||0;});
+        vals.push(function(e){return e.credit||0;});
+        vals.push(function(e){return e.balance||0;});
+    } else {
+        vals.push(function(e){return e.debit||0;});
+        vals.push(function(e){return e.credit||0;});
+        vals.push(function(e){return e.balance||0;});
+    }
     list.sort(function(a,b){var va=vals[i](a),vb=vals[i](b);return va<vb?-sortDir:va>vb?sortDir:0;});
     var q=document.getElementById('s').value.toLowerCase();
     render(list.filter(function(e){return!q||(e.date||'').includes(q)||(e.description||'').toLowerCase().includes(q)||(e.reference||'').toLowerCase().includes(q);}));

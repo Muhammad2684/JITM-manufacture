@@ -398,8 +398,8 @@
             var dt = d.created_at ? d.created_at.split(' ') : ['', ''];
             h += '<div class="rl"><span>Date:</span><span>' + dt[0] + '</span></div>';
             h += '<div class="rl"><span>Time:</span><span>' + (dt[1] && dt[2] ? dt[1] + ' ' + dt[2] : dt[1] || '') + '</span></div></div>';
-            h += '<div style="display:grid;grid-template-columns:25px 1fr 55px 55px;column-gap:0px;font-size:10px;border-bottom:1px dashed #e2e1de;padding-bottom:4px;margin-bottom:18px">';
-            h += '<span style="text-align:center;background:#000;color:#fff;font-weight:700;padding:2px 4px">Qty</span><span style="background:#000;color:#fff;font-weight:700;padding:2px 4px">Description</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:2px 4px">U.Price</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:2px 4px">Total</span>';
+            h += '<div style="display:grid;grid-template-columns:25px 1fr 55px 55px;column-gap:0px;font-size:10px;border-bottom:1px dashed #e2e1de;padding-bottom:4px;margin-bottom:8px">';
+            h += '<span style="text-align:center;background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Qty</span><span style="background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Description</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">U.Price</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Total</span>';
             d.items.forEach(function (i) {
                 h += '<span style="text-align:center">' + Math.abs(i.quantity) + '</span>';
                 h += '<span>' + i.product_name + (i.variant_label ? ' (' + i.variant_label + ')' : '') + '<br><span style="font-size:9px;color:#000">' + (i.sku || '') + '</span></span>';

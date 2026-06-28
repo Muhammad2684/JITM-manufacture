@@ -119,19 +119,37 @@ def complete_sale():
             total = round(total * 0.9, 2)
 
         receipt = make_receipt()
+
+        pymt_list = d.get('payments', [])
+        if not pymt_list:
+            pymt_list = [{'method': payment, 'amount': total}]
+
+        paid_amt = 0
+        has_credit = False
+        for p in pymt_list:
+            if p['method'] == 'credit':
+                has_credit = True
+            else:
+                paid_amt += p['amount']
+
         if is_return:
             status = 'returned'
         elif is_exchange:
             status = 'exchanged'
+        elif has_credit and paid_amt >= total:
+            status = 'Paid'
+        elif has_credit and paid_amt > 0:
+            status = 'Partial'
+        elif has_credit:
+            status = 'Unpaid'
         else:
-            status = 'Paid' if payment != 'credit' else 'Unpaid'
+            status = 'Paid'
 
-        due_date = d.get('due_date') if payment == 'credit' else None
-        paid_amt = total if (not is_return and not is_exchange and payment != 'credit') else 0
+        due_date = d.get('due_date') if has_credit else None
         sale_id = db.execute(
             'INSERT INTO sales (receipt, subtotal, discount, discount_type, tax, total, payment, status, customer_id, customer_name, staff_id, staff_name, notes, due_date, paid) '
             'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            (receipt, round(subtotal, 2), disc_amt, discount_type, tax, total, payment, status,
+            (receipt, round(subtotal, 2), disc_amt, discount_type, tax, total, 'split' if len(pymt_list) > 1 else payment, status,
              customer_id, customer_name, session['user_id'], session['name'], notes, due_date, paid_amt)
         ).lastrowid
 
@@ -144,34 +162,35 @@ def complete_sale():
                  si['sku'], si['quantity'], si['price'], si['total'], si['is_return'])
             )
 
-        db.execute(
-            'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
-            (sale_id, payment, total)
-        )
-
         account_map = {'cash': ('POS Petty Cash', 'cash'), 'bl': ('Bilal', 'bank'), 'jl': ('Jamal', 'bank'), 'z': ('Zahid', 'bank')}
-        if payment in account_map:
-            acc_name, acc_type = account_map[payment]
-            acc = db.execute('SELECT * FROM accounts WHERE name=?', (acc_name,)).fetchone()
-            if not acc:
-                cur = db.execute('INSERT INTO accounts (name, type, balance) VALUES (?,?,?)',
-                                 (acc_name, acc_type, 0))
-                acc_id = cur.lastrowid
-            else:
-                acc_id = acc['id']
+        for p in pymt_list:
             db.execute(
-                "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
-                "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
-                (acc_id, 'receipt', total, f'Sale receipt: {receipt}',
-                 'customer', customer_id, 'sale', sale_id, json.dumps([]))
+                'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
+                (sale_id, p['method'], p['amount'])
             )
-            db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (total, acc_id))
+            if p['method'] in account_map:
+                acc_name, acc_type = account_map[p['method']]
+                acc = db.execute('SELECT * FROM accounts WHERE name=?', (acc_name,)).fetchone()
+                if not acc:
+                    cur = db.execute('INSERT INTO accounts (name, type, balance) VALUES (?,?,?)',
+                                     (acc_name, acc_type, 0))
+                    acc_id = cur.lastrowid
+                else:
+                    acc_id = acc['id']
+                db.execute(
+                    "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
+                    (acc_id, 'receipt', p['amount'], f'Sale receipt: {receipt}',
+                     'customer', customer_id, 'sale', sale_id, json.dumps([]))
+                )
+                db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (p['amount'], acc_id))
 
         if customer_id:
             db.execute('UPDATE customers SET total_spent=total_spent+?, visit_count=visit_count+1 WHERE id=?',
                        (total, customer_id))
-            if payment == 'credit':
-                db.execute('UPDATE customers SET credit=credit+? WHERE id=?', (total, customer_id))
+            for p in pymt_list:
+                if p['method'] == 'credit':
+                    db.execute('UPDATE customers SET credit=credit+? WHERE id=?', (p['amount'], customer_id))
 
         return jsonify({
             'ok': True,
@@ -183,6 +202,7 @@ def complete_sale():
             'tax': tax,
             'total': total,
             'payment': payment,
+            'payments': pymt_list,
             'customer_name': customer_name,
             'staff_name': session['name'],
             'is_return': is_return,

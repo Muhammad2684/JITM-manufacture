@@ -22,7 +22,7 @@
 .queue-item .qi-copies{color:#6b7280;min-width:40px;text-align:center;}
 .queue-item .qi-remove{color:#dc2626;cursor:pointer;font-size:14px;padding:2px 6px;}
 .queue-item .qi-remove:hover{background:#fef2f2;border-radius:4px;}
-.bc-preview{display:flex;flex-wrap:wrap;gap:6px;padding:12px;justify-content:center;}
+.bc-preview{display:grid;gap:6px;padding:12px;justify-content:center;}
 .bc-preview-item{border:1px solid #e2e1de;border-radius:4px;padding:6px;text-align:center;background:#fff;}
 .bc-preview-item svg{display:block;margin:0 auto;}
 .bc-preview-item .bp-sku{font-size:10px;font-weight:700;font-family:monospace;margin-top:2px;}
@@ -138,8 +138,17 @@ function renderPreview(){
     if(!queue.length){area.innerHTML='<div style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px;">Add products to queue to preview barcodes</div>';return;}
     var sz=labelSizes[document.getElementById('labelSize').value];
     var cols=parseInt(document.getElementById('cols').value)||4;
-    area.innerHTML='<div class="bc-preview" style="grid-template-columns:repeat('+cols+',1fr);">'+queue.map(function(q){return'<div class="bc-preview-item" style="width:'+sz.w+'px;"><svg id="pv-'+q.id+'"></svg><div class="bp-sku">'+q.sku+'</div><div class="bp-name">'+q.name+'</div></div>';}).join('')+'</div>';
-    setTimeout(function(){queue.forEach(function(q){try{JsBarcode('#pv-'+q.id,q.sku,{format:'CODE128',width:1.5,height:sz.h*0.3,fontSize:sz.fs*0.8,margin:4,textMargin:2});}catch(e){}});},50);
+    var html='<div class="bc-preview" style="grid-template-columns:repeat('+cols+','+sz.w+'px);">';
+    queue.forEach(function(q){
+        html+='<div class="bc-preview-item" style="width:'+sz.w+'px;height:'+sz.h+'px;">';
+        html+='<svg id="pv-'+q.id+'" width="'+sz.w+'" height="'+Math.round(sz.h*0.65)+'"></svg>';
+        html+='<div class="bp-sku">'+q.sku+'</div>';
+        html+='<div class="bp-name">'+q.name+'</div>';
+        html+='</div>';
+    });
+    html+='</div>';
+    area.innerHTML=html;
+    setTimeout(function(){queue.forEach(function(q){try{JsBarcode('#pv-'+q.id,q.sku,{format:'CODE128',width:1.5,height:Math.round(sz.h*0.3),fontSize:sz.fs*0.8,margin:4,textMargin:2});}catch(e){console.error('Barcode error for '+q.sku,e);}});},100);
 }
 
 function printBarcodes(){

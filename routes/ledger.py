@@ -32,8 +32,16 @@ def get_ledger():
                 return jsonify({'error': 'not found'}), 404
             entity = dict(entity)
             entries = get_account_entries(db, entity_id, entity)
+        elif entity_type == 'product':
+            entity = db.execute('SELECT * FROM products WHERE id=?', (entity_id,)).fetchone()
+            if not entity:
+                return jsonify({'error': 'not found'}), 404
+            entity = dict(entity)
+            variants = db.execute('SELECT stock FROM variants WHERE product_id=?', (entity_id,)).fetchall()
+            entity['total_stock'] = sum(v['stock'] for v in variants)
+            entries = get_product_entries(db, entity_id, entity)
         else:
-            return jsonify({'error': 'invalid type, use customer/supplier/account'}), 400
+            return jsonify({'error': 'invalid type, use customer/supplier/account/product'}), 400
 
     return jsonify({'entity': entity, 'entries': entries})
 
@@ -302,6 +310,85 @@ def get_account_entries(db, account_id, entity):
             'type': 'opening'
         })
 
+    balance = 0
+    for e in entries:
+        balance += e['debit'] - e['credit']
+        e['balance'] = round(balance, 2)
+
+    return entries
+
+
+def get_product_entries(db, product_id, entity):
+    entries = []
+
+    sales = db.execute(
+        'SELECT si.id, si.quantity, si.price, si.total, si.is_return, si.sku, '
+        's.receipt, s.created_at, s.customer_name '
+        'FROM sale_items si JOIN sales s ON s.id=si.sale_id '
+        'WHERE si.product_id=? ORDER BY s.created_at',
+        (product_id,)
+    ).fetchall()
+    for s in sales:
+        s = dict(s)
+        desc = 'Sale'
+        if s['is_return']:
+            desc = 'Sale Return'
+        ref = s['receipt'] or ''
+        if s['customer_name']:
+            desc += ' - ' + s['customer_name']
+        entries.append({
+            'date': (s['created_at'] or '')[:10],
+            'description': desc,
+            'reference': ref,
+            'debit': 0 if s['is_return'] else s['total'],
+            'credit': s['total'] if s['is_return'] else 0,
+            'type': 'sale_return' if s['is_return'] else 'sale'
+        })
+
+    restocks = db.execute(
+        'SELECT rl.id, rl.qty_added, rl.cost, rl.note, rl.staff_name, rl.created_at, '
+        'v.sku '
+        'FROM restock_log rl JOIN variants v ON v.id=rl.variant_id '
+        'WHERE v.product_id=? ORDER BY rl.created_at',
+        (product_id,)
+    ).fetchall()
+    for r in restocks:
+        r = dict(r)
+        total_cost = r['qty_added'] * r['cost']
+        desc = 'Restock'
+        if r['note']:
+            desc += ' - ' + r['note']
+        entries.append({
+            'date': (r['created_at'] or '')[:10],
+            'description': desc,
+            'reference': r['sku'] or '',
+            'debit': total_cost,
+            'credit': 0,
+            'type': 'restock'
+        })
+
+    purchases = db.execute(
+        'SELECT pii.id, pii.qty, pii.unit_price, pii.total, pii.item, '
+        'pi.invoice_no, pi.issue_date, pi.created_at '
+        'FROM purchase_invoice_items pii JOIN purchase_invoices pi ON pi.id=pii.invoice_id '
+        'WHERE pii.product_id=? ORDER BY pi.created_at',
+        (product_id,)
+    ).fetchall()
+    for p in purchases:
+        p = dict(p)
+        desc = 'Purchase'
+        if p['item']:
+            desc += ' - ' + p['item']
+        entries.append({
+            'date': p['issue_date'] or (p['created_at'] or '')[:10],
+            'description': desc,
+            'reference': p['invoice_no'] or '',
+            'debit': p['total'],
+            'credit': 0,
+            'type': 'purchase'
+        })
+
+    entries.sort(key=lambda e: e['date'])
     balance = 0
     for e in entries:
         balance += e['debit'] - e['credit']

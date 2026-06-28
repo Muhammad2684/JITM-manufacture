@@ -54,10 +54,16 @@ function load(){
     var q=document.getElementById('s').value.toLowerCase();
     fetch('/api/ledger?type='+entityType+'&id='+entityId).then(r=>r.json()).then(d=>{
         document.getElementById('ename').textContent = d.entity.name||d.entity.id;
-        var typeLabel = {customer:'Customer',supplier:'Supplier',account:'Account'}[entityType]||entityType;
+        var typeLabel = {customer:'Customer',supplier:'Supplier',account:'Account',product:'Product'}[entityType]||entityType;
         document.getElementById('etype_badge').innerHTML = '<span class="bdg">'+typeLabel+'</span>';
-        var bal = d.entity.credit !== undefined ? d.entity.credit : (d.entity.balance !== undefined ? d.entity.balance : 0);
-        document.getElementById('ebal').textContent = 'Rs '+bal.toFixed(2);
+        var bal = 0;
+        if(entityType === 'product') {
+            bal = (d.entity.cost_price || 0) * (d.entity.total_stock || 0);
+            document.getElementById('ebal').textContent = 'Rs '+bal.toFixed(2);
+        } else {
+            bal = d.entity.credit !== undefined ? d.entity.credit : (d.entity.balance !== undefined ? d.entity.balance : 0);
+            document.getElementById('ebal').textContent = 'Rs '+bal.toFixed(2);
+        }
         list = d.entries;
         render(list.filter(function(e){return!q||(e.date||'').includes(q)||(e.description||'').toLowerCase().includes(q)||(e.reference||'').toLowerCase().includes(q);}));
     });

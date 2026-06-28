@@ -258,8 +258,8 @@ def get_account_entries(db, account_id, entity):
                 'date': p['date'] or '',
                 'description': desc,
                 'reference': label,
-                'debit': p['amount'],
-                'credit': 0,
+                'debit': 0,
+                'credit': p['amount'],
                 'type': 'sale_return'
             })
         else:

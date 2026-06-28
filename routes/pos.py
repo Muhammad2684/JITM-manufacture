@@ -190,20 +190,25 @@ def complete_sale():
                     acc_id = cur.lastrowid
                 else:
                     acc_id = acc['id']
+                txn_type = 'payment' if (is_return or is_exchange) else 'receipt'
+                txn_desc = f'Sale return: {receipt}' if (is_return or is_exchange) else f'Sale receipt: {receipt}'
                 db.execute(
                     "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
                     "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
-                    (acc_id, 'receipt', p['amount'], f'Sale receipt: {receipt}',
+                    (acc_id, txn_type, abs(p['amount']), txn_desc,
                      'customer', customer_id, 'sale', sale_id, json.dumps([]))
                 )
-                db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (p['amount'], acc_id))
+                balance_change = -abs(p['amount']) if (is_return or is_exchange) else p['amount']
+                db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (balance_change, acc_id))
 
         if customer_id:
+            spent_change = -abs(total) if (is_return or is_exchange) else total
             db.execute('UPDATE customers SET total_spent=total_spent+?, visit_count=visit_count+1 WHERE id=?',
-                       (total, customer_id))
+                       (spent_change, customer_id))
             for p in pymt_list:
                 if p['method'] == 'credit':
-                    db.execute('UPDATE customers SET credit=credit+? WHERE id=?', (p['amount'], customer_id))
+                    credit_change = -abs(p['amount']) if (is_return or is_exchange) else p['amount']
+                    db.execute('UPDATE customers SET credit=credit+? WHERE id=?', (credit_change, customer_id))
 
         return jsonify({
             'ok': True,

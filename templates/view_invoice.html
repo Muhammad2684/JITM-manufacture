@@ -66,7 +66,7 @@
                 {% for item in items %}
                 <tr>
                     <td style="color:#6b7280;font-size:11px">{{ loop.index }}</td>
-                    {% for val in item %}<td{% if not loop.first %} class="text-right"{% endif %}>{{ val }}</td>{% endfor %}
+                    {% for val in item %}<td{% if not loop.first %} class="text-right"{% endif %}>{% if loop.first %}{{ val|safe }}{% else %}{{ val }}{% endif %}</td>{% endfor %}
                 </tr>
                 {% endfor %}
             </tbody></table>

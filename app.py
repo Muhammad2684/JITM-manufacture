@@ -198,6 +198,160 @@ def create_sales_invoice_page():
     return page('create_sales_invoice.html', '/sales-invoices/create')
 
 
+@app.route('/sales-invoices/<int:sid>', strict_slashes=False)
+@login_required
+def view_sales_invoice(sid):
+    from database import get_db
+    with get_db() as db:
+        sale = db.execute('SELECT * FROM sales WHERE id=?', (sid,)).fetchone()
+        if not sale:
+            return 'Not found', 404
+        sale = dict(sale)
+        items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sid,)).fetchall()
+        payments = db.execute('SELECT * FROM payments WHERE sale_id=?', (sid,)).fetchall()
+        customer_phone = ''
+        if sale.get('customer_id'):
+            cust = db.execute('SELECT phone FROM customers WHERE id=?', (sale['customer_id'],)).fetchone()
+            customer_phone = cust['phone'] if cust else ''
+        is_return = sale.get('status') == 'returned'
+        is_exchange = sale.get('status') == 'exchanged'
+        fmt = lambda n: 'Rs {:,.2f}'.format(n or 0)
+        dt = (sale.get('created_at') or '').split(' ')
+        item_rows = []
+        for i in items:
+            desc = i['product_name']
+            if i['variant_label']:
+                desc += ' (' + i['variant_label'] + ')'
+            if i['sku']:
+                desc += '<br><span style="font-size:10px;color:#9ca3af">' + i['sku'] + '</span>'
+            item_rows.append([desc, abs(i['quantity']), fmt(i['price']), fmt(i['total'])])
+        totals = [
+            ('Sub Total', fmt(sale['subtotal']), False),
+            ('Adjustment', fmt(sale['discount']), False),
+            ('Total', fmt(sale['total']), True),
+        ]
+        cr_amt = sum(p['amount'] for p in payments if p['method'] == 'credit')
+        if cr_amt > 0:
+            totals.append(('Credit', fmt(cr_amt), False))
+        net_cash = (sale.get('cash_tendered') or 0) - (sale.get('change_given') or 0)
+        if net_cash > 0:
+            totals.append(('Cash', fmt(net_cash), False))
+        if sale.get('change_given'):
+            totals.append(('Change', fmt(sale['change_given']), False))
+        status_class = ''
+        status_label = sale.get('status', '')
+        if status_label == 'Paid':
+            status_class = 'paid'
+        elif status_label == 'Unpaid':
+            status_class = 'unpaid'
+        elif status_label == 'Partial':
+            status_class = 'partial'
+        elif status_label == 'Overpaid':
+            status_class = 'overpaid'
+        elif status_label == 'returned':
+            status_class = 'unpaid'
+            status_label = 'Returned'
+        elif status_label == 'exchanged':
+            status_class = 'partial'
+            status_label = 'Exchanged'
+        paid_info = ''
+        if sale.get('paid') and sale['paid'] > 0:
+            paid_info = 'Paid: ' + fmt(sale['paid'])
+        details = [
+            ('Date', dt[0] if dt else ''),
+            ('Time', (dt[1] + ' ' + dt[2]) if len(dt) > 2 and len(dt) > 1 else (dt[1] if len(dt) > 1 else '')),
+            ('Receipt No', sale['receipt']),
+            ('Payment', sale.get('payment', '')),
+            ('Staff', sale.get('staff_name', '')),
+        ]
+        return render_template('view_invoice.html',
+            role=session.get('role'), name=session.get('name'), sidebar=sidebar('/sales-invoices'),
+            title='Sale Invoice',
+            head_sub='Sale Invoice',
+            inv_type_label='Sale Invoice',
+            inv_number=sale['receipt'],
+            party_label='Bill To',
+            party_name=sale.get('customer_name') or 'Walk In Customer',
+            party_phone=customer_phone,
+            party_extra='',
+            details=details,
+            item_cols=['Description', 'Qty', 'Unit Price', 'Total'],
+            items=item_rows,
+            totals=totals,
+            notes=sale.get('notes', ''),
+            status_class=status_class,
+            status_label=status_label,
+            paid_info=paid_info,
+            back_url='/sales-invoices',
+        )
+
+
+@app.route('/purchase-invoices/<int:piid>', strict_slashes=False)
+@login_required
+def view_purchase_invoice(piid):
+    from database import get_db
+    with get_db() as db:
+        inv = db.execute(
+            'SELECT pi.*, s.name as supplier_name FROM purchase_invoices pi '
+            'LEFT JOIN suppliers s ON s.id=pi.supplier_id WHERE pi.id=?', (piid,)
+        ).fetchone()
+        if not inv:
+            return 'Not found', 404
+        inv = dict(inv)
+        items = db.execute(
+            'SELECT * FROM purchase_invoice_items WHERE invoice_id=? ORDER BY line_number', (piid,)
+        ).fetchall()
+        fmt = lambda n: 'Rs {:,.2f}'.format(n or 0)
+        item_rows = []
+        for i in items:
+            item_rows.append([i['item'] or '', i['qty'], fmt(i['unit_price']), fmt(i['total'])])
+        totals = [
+            ('Invoice Amount', fmt(inv['invoice_amount']), True),
+        ]
+        if inv.get('balance_due'):
+            totals.append(('Balance Due', fmt(inv['balance_due']), False))
+        status_class = ''
+        status_label = inv.get('status', '')
+        if status_label == 'Paid':
+            status_class = 'paid'
+        elif status_label == 'Unpaid':
+            status_class = 'unpaid'
+        elif status_label == 'Partial':
+            status_class = 'partial'
+        elif status_label == 'Overpaid':
+            status_class = 'overpaid'
+        paid_info = ''
+        if inv.get('invoice_amount') and inv.get('balance_due') is not None:
+            paid_amt = inv['invoice_amount'] - inv['balance_due']
+            if paid_amt > 0:
+                paid_info = 'Paid: ' + fmt(paid_amt)
+        details = [
+            ('Issue Date', inv.get('issue_date') or ''),
+            ('Due Date', inv.get('due_date') or ''),
+            ('Invoice No', inv['invoice_no']),
+        ]
+        return render_template('view_invoice.html',
+            role=session.get('role'), name=session.get('name'), sidebar=sidebar('/purchase-invoices'),
+            title='Purchase Invoice',
+            head_sub='Purchase Invoice',
+            inv_type_label='Purchase Invoice',
+            inv_number=inv['invoice_no'],
+            party_label='From Supplier',
+            party_name=inv.get('supplier_name') or '-',
+            party_phone='',
+            party_extra='',
+            details=details,
+            item_cols=['Item', 'Qty', 'Unit Price', 'Total'],
+            items=item_rows,
+            totals=totals,
+            notes=inv.get('description', ''),
+            status_class=status_class,
+            status_label=status_label,
+            paid_info=paid_info,
+            back_url='/purchase-invoices',
+        )
+
+
 @app.route('/summary', strict_slashes=False)
 @login_required
 def summary():

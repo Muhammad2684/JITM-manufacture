@@ -166,7 +166,7 @@ var st=document.getElementById('splitStatus');
 if(applied===0){st.textContent='Enter amounts';st.style.color='#6b7280';st.style.background='transparent';}
 else if(Math.abs(diff)<0.005){st.textContent='\u2713 Ready';st.style.background='#f3faf7';st.style.color='#16a34a';}
 else if(diff<0){st.textContent='Short Rs '+Math.abs(diff).toFixed(2);st.style.background='#fef2f2';st.style.color='#dc2626';}
-else if(cashAmt===0){st.textContent='Overpayment \u2014 reduce non-cash amounts';st.style.background='#fef2f2';st.style.color='#dc2626';}
+else if(otherTotal>tot){st.textContent='Overpayment \u2014 reduce non-cash amounts';st.style.background='#fef2f2';st.style.color='#dc2626';}
 else{st.textContent='Change Rs '+diff.toFixed(2);st.style.background='#f3faf7';st.style.color='#16a34a';}
 var btn=document.getElementById('chg');
 btn.textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2);}
@@ -194,7 +194,7 @@ if(!walkIn&&!selC&&!cnm){f('Please select or add a customer');return;}
 var pd=getPayments();
 if(pd.applied<pd.tot-0.005){f('Payment total Rs '+pd.applied.toFixed(2)+' is short of total Rs '+pd.tot.toFixed(2));return;}
 if(!pd.pays.length){f('Enter at least one payment amount');return;}
-if(pd.applied>pd.tot&&pd.cashTendered===0){f('Non-cash payments exceed total. Please adjust amounts.');return;}
+var otherTotal=pd.applied-pd.cashTendered;if(pd.applied>pd.tot&&otherTotal>pd.tot){f('Non-cash payments exceed total. Please adjust amounts.');return;}
 const items=cart.map(c=>({variant_id:c.vid,quantity:isR||isE?-Math.abs(c.qty):c.qty,price:c.price,staff:c.staff}));
 const btn=document.getElementById('chg');btn.disabled=true;btn.textContent='Processing...';
 var primaryMethod=pd.pays.length===1?pd.pays[0].method:'split';

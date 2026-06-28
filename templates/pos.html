@@ -191,7 +191,7 @@ function pay(){if(!cart.length){f('Cart empty');return;}
 var cnm=document.getElementById('cName').value.trim(),cph=document.getElementById('cPhone').value.trim();
 if(!walkIn&&!selC&&!cnm){f('Please select or add a customer');return;}
 var pd=getPayments();
-if(Math.abs(pd.applied-pd.tot)>0.005&&pd.applied>0){f('Payment total Rs '+pd.applied.toFixed(2)+' does not match total Rs '+pd.tot.toFixed(2));return;}
+if(pd.applied<pd.tot-0.005){f('Payment total Rs '+pd.applied.toFixed(2)+' is short of total Rs '+pd.tot.toFixed(2));return;}
 if(!pd.pays.length){f('Enter at least one payment amount');return;}
 const items=cart.map(c=>({variant_id:c.vid,quantity:isR||isE?-Math.abs(c.qty):c.qty,price:c.price}));
 const btn=document.getElementById('chg');btn.disabled=true;btn.textContent='Processing...';

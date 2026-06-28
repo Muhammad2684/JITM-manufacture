@@ -398,13 +398,13 @@
             var dt = d.created_at ? d.created_at.split(' ') : ['', ''];
             h += '<div class="rl"><span>Date:</span><span>' + dt[0] + '</span></div>';
             h += '<div class="rl"><span>Time:</span><span>' + (dt[1] && dt[2] ? dt[1] + ' ' + dt[2] : dt[1] || '') + '</span></div></div>';
-            h += '<div style="display:grid;grid-template-columns:25px 1fr 45px 55px;gap:2px 4px;font-size:10px;border-bottom:1px dashed #e2e1de;padding-bottom:4px;margin-bottom:4px">';
-            h += '<span style="font-weight:600;text-align:center">Qty</span><span style="font-weight:600">Description</span><span style="font-weight:600;text-align:right">@</span><span style="font-weight:600;text-align:right">Total</span>';
+            h += '<div style="display:grid;grid-template-columns:25px 1fr 55px 55px;gap:2px;font-size:11px;border-bottom:1px dashed #e2e1de;padding:4px;margin-bottom:4px;background:#000;color:#fff;font-weight:700">';
+            h += '<span style="text-align:center">Qty</span><span>Description</span><span style="text-align:right">Unit Price</span><span style="text-align:right">Total</span>';
             d.items.forEach(function (i) {
-                h += '<span style="text-align:center">' + Math.abs(i.quantity) + '</span>';
-                h += '<span>' + i.product_name + (i.variant_label ? ' (' + i.variant_label + ')' : '') + '<br><span style="font-size:9px;color:#6b7280">' + (i.sku || '') + '</span></span>';
-                h += '<span style="text-align:right">' + fmt(i.price) + '</span>';
-                h += '<span style="text-align:right">' + fmt(i.total) + '</span>';
+                h += '<span style="text-align:center;padding:4px 0;border-bottom:1px solid #f3f2ef">' + Math.abs(i.quantity) + '</span>';
+                h += '<span style="padding:4px 0;border-bottom:1px solid #f3f2ef">' + i.product_name + (i.variant_label ? ' (' + i.variant_label + ')' : '') + '<br><span style="font-size:9px;color:#6b7280">' + (i.sku || '') + '</span></span>';
+                h += '<span style="text-align:right;padding:4px 0;border-bottom:1px solid #f3f2ef">' + fmt(i.price) + '</span>';
+                h += '<span style="text-align:right;padding:4px 0;border-bottom:1px solid #f3f2ef">' + fmt(i.total) + '</span>';
             });
             h += '</div>';
             h += '<div class="rl"><span>Items: ' + d.items.length + '</span><span>Qty: ' + totQty + '</span></div>';

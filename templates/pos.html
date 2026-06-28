@@ -45,6 +45,10 @@
                 <div class="tr"><span>Discount</span><span><input id="disc" type="number" min="0" max="100" step="0.1" placeholder="%" oninput="calc()"> %</span></div>
                 <div class="tr gt"><span>TOTAL</span><span id="tot">Rs 0.00</span></div>
             </div></div>
+            <div class="card" id="cashCard" style="display:none"><div class="card-body" style="display:flex;gap:8px;align-items:flex-end">
+                <div style="flex:1"><label style="font-size:10px;text-transform:uppercase;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">Cash Received</label><input id="cashRec" type="number" step="0.01" min="0" oninput="calc()" style="width:100%;padding:7px 10px;border:1px solid #e2e1de;border-radius:6px;font-size:13px"></div>
+                <div style="flex:1"><label style="font-size:10px;text-transform:uppercase;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">Change</label><div id="changeDisplay" style="padding:7px 10px;font-size:14px;font-weight:700;color:#16a34a;background:#f3faf7;border:1px solid #bbf7d0;border-radius:6px">Rs 0.00</div></div>
+            </div></div>
             <div class="card"><div class="card-body">
                 <div class="pm"><button class="active" onclick="sp('cash',this)">Cash</button><button onclick="sp('credit',this)">Store Credit</button><button onclick="sp('bl',this)">BL</button><button onclick="sp('jl',this)">JL</button><button onclick="sp('z',this)">Z</button></div>
             </div></div>
@@ -132,8 +136,15 @@ b.textContent=isE?'Sale':'Exchange';b.className=isE?'btn btn-w btn-sm':'btn btn-
 function calc(){const sub=cart.reduce(function(s,c){return s+c.qty*c.price*(1-(c.disc||0)/100);},0);const dp=parseFloat(document.getElementById('disc').value)||0;
 const d=sub*dp/100;const tot=Math.max(0,sub-d);
 document.getElementById('sub').textContent='Rs '+sub.toFixed(2);
-document.getElementById('tot').textContent='Rs '+tot.toFixed(2);document.getElementById('chg').textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2);}
-function sp(m,b){pm=m;document.querySelectorAll('.pm button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
+document.getElementById('tot').textContent='Rs '+tot.toFixed(2);
+var cashRec=parseFloat(document.getElementById('cashRec').value)||0;
+var chg=Math.max(0,cashRec-tot);
+document.getElementById('changeDisplay').textContent='Rs '+chg.toFixed(2);
+var btn=document.getElementById('chg');
+if(pm==='cash'&&cashRec>0){btn.textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2)+' \u2022 Change Rs '+chg.toFixed(2);}
+else{btn.textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2);}}
+function sp(m,b){pm=m;document.querySelectorAll('.pm button').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+document.getElementById('cashCard').style.display=m==='cash'?'':'none';calc();}
 function pay(){if(!cart.length){f('Cart empty');return;}
 var cnm=document.getElementById('cName').value.trim(),cph=document.getElementById('cPhone').value.trim();
 if(!walkIn&&!selC&&!cnm){f('Please select or add a customer');return;}
@@ -144,7 +155,7 @@ body:JSON.stringify({items,payment:pm,discount:parseFloat(document.getElementByI
 is_return:isR,is_exchange:isE,customer_id:selC?selC.id:null,customer_name:walkIn?'Walk In':(document.getElementById('cName').value.trim()||(selC?selC.name:'')),customer_phone:document.getElementById('cPhone').value.trim(),walk_in:walkIn,notes:document.getElementById('notes').value})})
 .then(r=>r.json()).then(d=>{if(d.error){f(d.error);btn.disabled=false;btn.textContent='Charge Rs 0.00';return;}
 showR(d);cart=[];isR=false;isE=false;selC=null;walkIn=false;document.getElementById('sc').innerHTML='';document.getElementById('cPhone').value='';document.getElementById('cName').value='';document.getElementById('cName').readOnly=false;document.getElementById('cName').disabled=false;document.getElementById('cPhone').disabled=false;document.getElementById('walkIn').checked=false;
-document.getElementById('notes').value='';document.getElementById('disc').value='';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
+    document.getElementById('notes').value='';document.getElementById('disc').value='';document.getElementById('cashRec').value='';document.getElementById('changeDisplay').textContent='Rs 0.00';document.getElementById('cashCard').style.display='none';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
 document.getElementById('exc').textContent='Exchange';document.getElementById('exc').className='btn btn-ghost btn-sm';renderC();btn.disabled=false;document.getElementById('s').value='';closeDropdown();document.getElementById('s').focus();})
 .catch(()=>{f('Sale failed');btn.disabled=false;});}
 function showR(d){let h='<div class="rh"><h3>JITM Baby Garments</h3><p>'+new Date().toLocaleString()+'</p><p style="font-size:11px">'+d.receipt+'</p></div><div class="ri">';

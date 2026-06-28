@@ -264,6 +264,26 @@ def init_db():
             pass
 
         try:
+            db.execute('ALTER TABLE sales ADD COLUMN cash_tendered REAL DEFAULT 0')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE sales ADD COLUMN change_given REAL DEFAULT 0')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE sale_items ADD COLUMN staff_id INTEGER DEFAULT NULL')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE customers ADD COLUMN credit_limit REAL DEFAULT NULL')
+        except Exception:
+            pass
+
+        try:
             db.execute('ALTER TABLE transactions ADD COLUMN party_type TEXT DEFAULT \'other\'')
         except Exception:
             pass

@@ -36,7 +36,11 @@ def complete_sale():
     if not walk_in and not customer_phone and not customer_name and not customer_id:
         return jsonify({'error': 'Customer information required'}), 400
 
+    cash_tendered = d.get('cash_tendered', 0) or 0
+    change_given = d.get('change_given', 0) or 0
+
     with get_db() as db:
+        db.execute('BEGIN IMMEDIATE')
         if walk_in:
             customer_name = 'Walk In'
             c = db.execute('SELECT * FROM customers WHERE name=?', ('Walk In',)).fetchone()
@@ -71,9 +75,7 @@ def complete_sale():
             price = float(item.get('price', variant['price'] or prod['base_price']))
             line_total = round(price * qty, 2)
             subtotal += line_total
-            if qty < 0 and variant['stock'] < abs(qty):
-                errors.append(f'Not enough stock of {prod["name"]} to return')
-                return None
+            staff_id = item.get('staff')
             return {
                 'product_id': prod['id'],
                 'variant_id': vid,
@@ -84,6 +86,7 @@ def complete_sale():
                 'price': price,
                 'total': line_total,
                 'is_return': 1 if (is_return or is_exchange) else 0,
+                'staff_id': staff_id,
             }
 
         for item in items:
@@ -116,7 +119,9 @@ def complete_sale():
         tax = 0
 
         if is_exchange:
-            total = round(total * 0.9, 2)
+            returned_value = abs(sum(si['total'] for si in sale_items if si['quantity'] < 0))
+            penalty = round(returned_value * 0.10, 2)
+            total = round(total + penalty, 2)
 
         receipt = make_receipt()
 
@@ -131,6 +136,13 @@ def complete_sale():
                 has_credit = True
             else:
                 paid_amt += p['amount']
+
+        if has_credit and customer_id:
+            cust = db.execute('SELECT credit, credit_limit FROM customers WHERE id=?', (customer_id,)).fetchone()
+            if cust and cust['credit_limit'] is not None:
+                total_credit_after = cust['credit'] + sum(p['amount'] for p in pymt_list if p['method'] == 'credit')
+                if total_credit_after > cust['credit_limit']:
+                    return jsonify({'error': f'Credit limit of Rs {cust["credit_limit"]:.2f} would be exceeded'}), 400
 
         if is_return:
             status = 'returned'
@@ -147,19 +159,19 @@ def complete_sale():
 
         due_date = d.get('due_date') if has_credit else None
         sale_id = db.execute(
-            'INSERT INTO sales (receipt, subtotal, discount, discount_type, tax, total, payment, status, customer_id, customer_name, staff_id, staff_name, notes, due_date, paid) '
-            'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            'INSERT INTO sales (receipt, subtotal, discount, discount_type, tax, total, payment, status, customer_id, customer_name, staff_id, staff_name, notes, due_date, paid, cash_tendered, change_given) '
+            'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
             (receipt, round(subtotal, 2), disc_amt, discount_type, tax, total, 'split' if len(pymt_list) > 1 else payment, status,
-             customer_id, customer_name, session['user_id'], session['name'], notes, due_date, paid_amt)
+             customer_id, customer_name, session['user_id'], session['name'], notes, due_date, paid_amt, cash_tendered, change_given)
         ).lastrowid
 
         for si in sale_items:
             si['sale_id'] = sale_id
             db.execute(
-                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return) '
-                'VALUES (?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
                 (sale_id, si['product_id'], si['variant_id'], si['product_name'], si['variant_label'],
-                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'])
+                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'], si['staff_id'])
             )
 
         account_map = {'cash': ('POS Petty Cash', 'cash'), 'bl': ('Bilal', 'bank'), 'jl': ('Jamal', 'bank'), 'z': ('Zahid', 'bank')}
@@ -208,6 +220,8 @@ def complete_sale():
             'is_return': is_return,
             'is_exchange': is_exchange,
             'status': status,
+            'cash_tendered': cash_tendered,
+            'change_given': change_given,
         })
 
 
@@ -228,6 +242,7 @@ def create_sales_invoice():
     due_date = d.get('due_date') or None
 
     with get_db() as db:
+        db.execute('BEGIN IMMEDIATE')
         # Auto-link products by name where product_id is missing
         for item in items:
             if not item.get('product_id') and item.get('item'):
@@ -300,10 +315,10 @@ def create_sales_invoice():
         for si in sale_items:
             si['sale_id'] = sale_id
             db.execute(
-                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return) '
-                'VALUES (?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
                 (sale_id, si['product_id'], si['variant_id'], si['product_name'], si['variant_label'],
-                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'])
+                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'], None)
             )
 
         db.execute(
@@ -341,6 +356,7 @@ def update_sales_invoice(sid):
         return jsonify({'error': 'No items'}), 400
 
     with get_db() as db:
+        db.execute('BEGIN IMMEDIATE')
         old = db.execute('SELECT * FROM sales WHERE id=?', (sid,)).fetchone()
         if not old:
             return jsonify({'error': 'Sale not found'}), 404
@@ -434,10 +450,10 @@ def update_sales_invoice(sid):
         db.execute('DELETE FROM sale_items WHERE sale_id=? AND is_return=0', (sid,))
         for si in sale_items:
             db.execute(
-                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return) '
-                'VALUES (?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
                 (sid, si['product_id'], si['variant_id'], si['product_name'], si['variant_label'],
-                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'])
+                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'], None)
             )
 
         db.execute('DELETE FROM payments WHERE sale_id=?', (sid,))

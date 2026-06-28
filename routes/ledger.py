@@ -50,19 +50,29 @@ def get_customer_entries(db, customer_id, entity):
     entries = []
 
     sales = db.execute(
-        'SELECT id, receipt, total, created_at, due_date FROM sales WHERE customer_id=? ORDER BY created_at',
+        'SELECT id, receipt, total, created_at, due_date, status FROM sales WHERE customer_id=? ORDER BY created_at',
         (customer_id,)
     ).fetchall()
     for s in sales:
         s = dict(s)
-        entries.append({
-            'date': (s['created_at'] or '')[:10],
-            'description': 'Sale',
-            'reference': s['receipt'] or '',
-            'debit': s['total'],
-            'credit': 0,
-            'type': 'sale'
-        })
+        if s['total'] < 0:
+            entries.append({
+                'date': (s['created_at'] or '')[:10],
+                'description': 'Sale Return',
+                'reference': s['receipt'] or '',
+                'debit': 0,
+                'credit': abs(s['total']),
+                'type': 'sale_return'
+            })
+        else:
+            entries.append({
+                'date': (s['created_at'] or '')[:10],
+                'description': 'Sale',
+                'reference': s['receipt'] or '',
+                'debit': s['total'],
+                'credit': 0,
+                'type': 'sale'
+            })
 
     receipts = db.execute(
         "SELECT * FROM transactions WHERE party_type='customer' AND party_id=? AND type='receipt' ORDER BY date, id",
@@ -81,21 +91,6 @@ def get_customer_entries(db, customer_id, entity):
             'debit': 0,
             'credit': r['amount'],
             'type': 'receipt'
-        })
-
-    payments = db.execute(
-        "SELECT * FROM transactions WHERE party_type='customer' AND party_id=? AND type='payment' ORDER BY date, id",
-        (customer_id,)
-    ).fetchall()
-    for p in payments:
-        p = dict(p)
-        entries.append({
-            'date': p['date'] or '',
-            'description': p['description'] or 'Payment to Customer',
-            'reference': '',
-            'debit': p['amount'],
-            'credit': 0,
-            'type': 'payment'
         })
 
     entries.sort(key=lambda e: e['date'])

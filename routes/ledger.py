@@ -93,6 +93,25 @@ def get_customer_entries(db, customer_id, entity):
             'type': 'receipt'
         })
 
+    refunds = db.execute(
+        "SELECT * FROM transactions WHERE party_type='customer' AND party_id=? AND type='payment' AND description LIKE '%Sale return%' ORDER BY date, id",
+        (customer_id,)
+    ).fetchall()
+    for r in refunds:
+        r = dict(r)
+        label = ''
+        if r['reference_type'] == 'sale' and r['reference_id']:
+            sl = db.execute('SELECT receipt FROM sales WHERE id=?', (r['reference_id'],)).fetchone()
+            label = sl['receipt'] if sl else ''
+        entries.append({
+            'date': r['date'] or (r['created_at'] or '')[:10],
+            'description': 'Refund Payment',
+            'reference': label,
+            'debit': r['amount'],
+            'credit': 0,
+            'type': 'payment'
+        })
+
     entries.sort(key=lambda e: e['date'])
     balance = 0
     for e in entries:

@@ -105,7 +105,10 @@ def complete_sale():
             return jsonify({'error': '; '.join(errors)}), 400
 
         disc_amt = round(abs(subtotal) * discount / 100, 2) if discount_type == 'percent' else discount
-        total = round(subtotal - disc_amt, 2)
+        if subtotal < 0:
+            total = round(subtotal + disc_amt, 2)
+        else:
+            total = round(subtotal - disc_amt, 2)
         tax = 0
 
         receipt = make_receipt()

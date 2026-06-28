@@ -55,7 +55,7 @@ def get_customer_entries(db, customer_id, entity):
     ).fetchall()
     for s in sales:
         s = dict(s)
-        if s['total'] < 0:
+        if s['status'] == 'returned':
             entries.append({
                 'date': (s['created_at'] or '')[:10],
                 'description': 'Sale Return',

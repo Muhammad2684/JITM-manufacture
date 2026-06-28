@@ -88,3 +88,10 @@
 python3 app.py
 # Development server on http://0.0.0.0:5000
 ```
+
+## Git Workflow
+After every successfully completed feature, run:
+```bash
+git add -A && git commit -m "<brief description of feature>" && git push
+```
+Commit immediately after verifying the feature works. Use a concise, descriptive commit message.

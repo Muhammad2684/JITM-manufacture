@@ -51,6 +51,15 @@ def update_customer(cid):
         return jsonify({'ok': True})
 
 
+@cust_bp.route('/customers/<int:cid>', methods=['DELETE'])
+@login_required
+def delete_customer(cid):
+    with get_db() as db:
+        db.execute('UPDATE sales SET customer_id=NULL, customer_name="Deleted" WHERE customer_id=?', (cid,))
+        db.execute('DELETE FROM customers WHERE id=?', (cid,))
+        return jsonify({'ok': True})
+
+
 @cust_bp.route('/customers/<int:cid>/history')
 @login_required
 def customer_history(cid):

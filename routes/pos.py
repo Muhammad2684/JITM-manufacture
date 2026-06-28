@@ -1,3 +1,4 @@
+import json
 import random
 import time
 from flask import Blueprint, request, jsonify, session
@@ -26,11 +27,32 @@ def complete_sale():
     discount = float(d.get('discount', 0))
     discount_type = d.get('discount_type', 'percent')
     payment = d.get('payment', 'cash')
+    customer_phone = d.get('customer_phone', '')
+    walk_in = d.get('walk_in', False)
     customer_id = d.get('customer_id')
     customer_name = d.get('customer_name', '')
     notes = d.get('notes', '')
 
+    if not walk_in and not customer_phone and not customer_name and not customer_id:
+        return jsonify({'error': 'Customer information required'}), 400
+
     with get_db() as db:
+        if walk_in:
+            customer_name = 'Walk In'
+            c = db.execute('SELECT * FROM customers WHERE name=?', ('Walk In',)).fetchone()
+            if c:
+                customer_id = c['id']
+            else:
+                cur = db.execute('INSERT INTO customers (name, phone) VALUES (?,?)', ('Walk In', ''))
+                customer_id = cur.lastrowid
+        elif customer_phone:
+            c = db.execute('SELECT * FROM customers WHERE phone=?', (customer_phone,)).fetchone()
+            if c:
+                customer_id = c['id']
+                customer_name = c['name']
+            elif customer_name:
+                cur = db.execute('INSERT INTO customers (name, phone) VALUES (?,?)', (customer_name, customer_phone))
+                customer_id = cur.lastrowid
         exchange_items_data = d.get('exchange_items', None) if is_exchange else None
 
         errors = []
@@ -126,6 +148,24 @@ def complete_sale():
             'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
             (sale_id, payment, total)
         )
+
+        account_map = {'cash': ('POS Petty Cash', 'cash'), 'bl': ('Bilal', 'bank'), 'jl': ('Jamal', 'bank'), 'z': ('Zahid', 'bank')}
+        if payment in account_map:
+            acc_name, acc_type = account_map[payment]
+            acc = db.execute('SELECT * FROM accounts WHERE name=?', (acc_name,)).fetchone()
+            if not acc:
+                cur = db.execute('INSERT INTO accounts (name, type, balance) VALUES (?,?,?)',
+                                 (acc_name, acc_type, 0))
+                acc_id = cur.lastrowid
+            else:
+                acc_id = acc['id']
+            db.execute(
+                "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
+                "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
+                (acc_id, 'receipt', total, f'Sale receipt: {receipt}',
+                 'customer', customer_id, 'sale', sale_id, json.dumps([]))
+            )
+            db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (total, acc_id))
 
         if customer_id:
             db.execute('UPDATE customers SET total_spent=total_spent+?, visit_count=visit_count+1 WHERE id=?',

@@ -48,23 +48,33 @@
     <div class="modal" id="pm">
         <div class="mc"><button class="mx" onclick="cl('pm')">&times;</button>
             <h2 id="ft">Product</h2>
-            <form onsubmit="save(event)"><label>Name</label><input id="pn" required>
+            <form onsubmit="save(event)">
+                <label>Name</label><input id="pn" required>
                 <div class="form-row">
-                    <div style="flex:1"><label>SKU</label><div style="display:flex;gap:6px;align-items:center"><input id="ps" required style="flex:1"><label style="white-space:nowrap;font-size:12px;font-weight:400"><input type="checkbox" id="pa" onchange="autoSku(this.checked)"> Auto</label></div></div>
-                    <div style="flex:1"><label>Barcode</label><input id="pb"></div>
+                    <div>
+                        <label>SKU</label>
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <input id="ps" required style="flex:1">
+                            <label style="white-space:nowrap;font-size:11px;color:#6b7280;display:flex;align-items:center;gap:3px;font-weight:400;text-transform:none;cursor:pointer;margin:0">
+                                <input type="checkbox" id="pa" onchange="autoSku(this.checked)" checked> Auto
+                            </label>
+                        </div>
+                    </div>
+                    <div><label>Barcode</label><input id="pb"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>Cost (Rs)</label><input id="pc" type="number" step="0.01" value="0" oninput="autoPrice()"></div>
+                    <div><label>Markup %</label><input id="pmu" type="number" step="0.01" value="35" oninput="autoPrice()"></div>
                 </div>
                 <div class="form-row">
                     <div><label>Price (Rs)</label><input id="pp" type="number" step="0.01" required></div>
-                    <div><label>Cost (Rs)</label><input id="pc" type="number" step="0.01" value="0" oninput="autoPrice()"></div>
+                    <div><label>Low Stock Alert</label><input id="pl" type="number" value="5"></div>
                 </div>
                 <div class="form-row">
                     <div><label>Category</label><select id="pcat" onchange="categoryPicker()"></select><input id="pcat_new" style="display:none" placeholder="New category name"></div>
                     <div><label>Commission Class</label><select id="pcc" onchange="commissionPicker()"></select><input id="pcc_new" style="display:none" placeholder="New class name"></div>
                 </div>
-                <div class="form-row">
-                    <div><label>Low Stock Alert</label><input id="pl" type="number" value="5"></div>
-                </div>
-                <button class="btn btn-p" type="submit">Save</button>
+                <button class="btn btn-p" type="submit" style="margin-top:8px">Save</button>
             </form>
         </div>
     </div>
@@ -166,9 +176,7 @@
                 inp.disabled = true;
                 let sku;
                 do {
-                    const letters = String.fromCharCode(65 + Math.random() * 26, 65 + Math.random() * 26, 65 + Math.random() * 26);
-                    const digits = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
-                    sku = letters + digits;
+                    sku = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
                 } while (all.some(p => p.sku === sku || (p.variants || []).some(v => v.sku === sku)));
                 inp.value = sku;
             } else {
@@ -203,13 +211,14 @@
         }
         function autoPrice() {
             var cost = parseFloat(document.getElementById('pc').value) || 0;
+            var markup = parseFloat(document.getElementById('pmu').value) || 0;
             if (cost > 0) {
-                document.getElementById('pp').value = (cost * 1.35).toFixed(2);
+                document.getElementById('pp').value = (cost * (1 + markup / 100)).toFixed(2);
             }
         }
         function showAdd() {
             editing = null; document.getElementById('ft').textContent = 'New Product';
-            document.getElementById('pa').checked = false; document.getElementById('ps').disabled = false; document.getElementById('ps').value = '';
+            document.getElementById('pa').checked = true; document.getElementById('ps').disabled = true; document.getElementById('ps').value = ''; autoSku(true);
             document.getElementById('pcat').style.display = ''; document.getElementById('pcat_new').style.display = 'none';
             document.getElementById('pcc').style.display = ''; document.getElementById('pcc_new').style.display = 'none';
             populateCategories(); document.getElementById('pcat').value = '';
@@ -220,6 +229,8 @@
             const p = all.find(x => x.id === id); if (!p) return; editing = id; document.getElementById('ft').textContent = 'Edit ' + p.name;
             document.getElementById('pn').value = p.name; document.getElementById('ps').value = p.sku; document.getElementById('pb').value = p.barcode || '';
             document.getElementById('pp').value = p.base_price; document.getElementById('pc').value = p.cost_price;
+            var ec = p.cost_price || 0, ep = p.base_price || 0;
+            document.getElementById('pmu').value = (ec > 0 && ep > 0) ? ((ep / ec - 1) * 100).toFixed(1) : 35;
             populateCategories();
             const sel = document.getElementById('pcat');
             sel.style.display = ''; document.getElementById('pcat_new').style.display = 'none';

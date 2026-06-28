@@ -78,7 +78,8 @@ def sidebar(active):
                 links += f'<div class="nav-group"><span class="group-heading" style="display:flex;align-items:center;gap:4px;padding:10px 16px;font-size:13px;font-weight:600;color:#9ca3af;cursor:pointer">{label} <span class="arrow" style="margin-left:auto;font-size:10px">{arrow}</span></span>'
             links += f'<div class="sub-group {"show" if sub_active else ""}">'
             for sub_url, sub_label in subs:
-                links += f'<a href="{sub_url}" class="sub {"active" if active == sub_url else ""}">{sub_label}</a>'
+                target = ' target="_blank"' if '/create' in sub_url else ''
+                links += f'<a href="{sub_url}" class="sub {"active" if active == sub_url else ""}"{target}>{sub_label}</a>'
             links += '</div></div>'
         else:
             url, label, key = item

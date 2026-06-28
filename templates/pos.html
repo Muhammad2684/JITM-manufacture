@@ -21,23 +21,32 @@
     <div class="pos">
         <div class="pos-left">
             <div class="card"><div class="card-body" style="overflow:visible">
-                <div class="search" style="margin-bottom:8px;position:relative"><div style="display:flex;gap:6px"><input id="s" placeholder="Search name, SKU, or scan barcode..." autofocus style="flex:1"><button class="btn btn-sm" id="scBtn" onclick="toggleScanner()">Scanner</button></div><div class="pg" id="prods"></div></div>
+                <div class="search" style="margin-bottom:8px;position:relative"><div style="display:flex;gap:6px"><input id="s" placeholder="Search name, SKU, or scan barcode..." autofocus style="flex:1"><button class="btn btn-sm btn-p" id="scBtn" onclick="toggleScanner()">Scanner On</button></div><div class="pg" id="prods"></div></div>
             </div></div>
             <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column"><div class="card-header"><h3>Sale Items</h3><span id="cnt" class="text-muted"></span></div>
                 <div class="card-body cart" id="cart" style="overflow:auto;flex:1"><div class="cart-empty">Add items to begin</div></div>
             </div>
-            <div class="card"><div class="card-body">
-                <div class="cust-search"><input id="cs" placeholder="Find customer..." oninput="sc()"><div id="cr"></div><div id="sc"></div></div>
-            </div></div>
         </div>
         <div class="pos-right">
+            <div class="card"><div class="card-body">
+                <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <input id="cPhone" placeholder="Phone number..." style="flex:1" oninput="findCust()">
+                        <label style="font-size:11px;color:#6b7280;white-space:nowrap;display:flex;align-items:center;gap:4px;cursor:pointer">
+                            <input type="checkbox" id="walkIn" onchange="toggleWalkIn()"> Walk In
+                        </label>
+                    </div>
+                    <input id="cName" placeholder="Customer name...">
+                    <div id="sc" style="font-size:12px;color:#3b4fe2"></div>
+                </div>
+            </div></div>
             <div class="card"><div class="card-body totals">
                 <div class="tr"><span>Subtotal</span><span id="sub">Rs 0.00</span></div>
                 <div class="tr"><span>Discount</span><span><input id="disc" type="number" min="0" max="100" step="0.1" placeholder="%" oninput="calc()"> %</span></div>
                 <div class="tr gt"><span>TOTAL</span><span id="tot">Rs 0.00</span></div>
             </div></div>
             <div class="card"><div class="card-body">
-                <div class="pm"><button class="active" onclick="sp('cash',this)">Cash</button><button onclick="sp('card',this)">Card</button><button onclick="sp('mobile',this)">Mobile</button><button onclick="sp('credit',this)">Store Credit</button></div>
+                <div class="pm"><button class="active" onclick="sp('cash',this)">Cash</button><button onclick="sp('credit',this)">Store Credit</button><button onclick="sp('bl',this)">BL</button><button onclick="sp('jl',this)">JL</button><button onclick="sp('z',this)">Z</button></div>
             </div></div>
             <button class="btn btn-s btn-lg" id="chg" onclick="pay()" style="justify-content:center">Charge Rs 0.00</button>
             <div style="display:flex;gap:6px">
@@ -52,7 +61,7 @@
 <div class="modal" id="rm"><div class="mc" style="max-width:380px"><button class="mx" onclick="cl('rm')">&times;</button><div id="rp"><div class="rec" id="rc"></div></div><div class="ra"><button class="btn btn-p btn-sm" onclick="window.print()">Print</button><button class="btn btn-sm" onclick="cl('rm')">Done</button></div></div></div>
 <div class="modal" id="em"><div class="mc" style="max-width:360px;padding:0;border-radius:12px;text-align:center"><div class="card-body"><p id="em-msg" style="font-size:15px;color:#dc2626;padding:20px 0;margin:0"></p></div><div style="padding:0 20px 16px"><button class="btn btn-p btn-sm" onclick="cl('em')" style="min-width:80px">OK</button></div></div></div>
 <script>
-var cart=[],pm='cash',isR=false,isE=false,selC=null,allP=[],hlIdx=-1,scMode=false,staffList=[],lastStaff=null;
+var cart=[],pm='cash',isR=false,isE=false,selC=null,walkIn=false,allP=[],hlIdx=-1,scMode=true,staffList=[],lastStaff=null;
 
 document.getElementById('s').addEventListener('input',function(e){
     if(e.target.value.length>=1)search();else closeDropdown();
@@ -112,8 +121,8 @@ function uq(i,v){v=parseInt(v);if(!v||v===0){cart.splice(i,1);}else{cart[i].qty=
 function ri(i){cart.splice(i,1);renderC();}
 function setStaff(i,v){if(cart[i]){cart[i].staff=v?parseInt(v):null;lastStaff=cart[i].staff;}}
 function setDisc(i,v){if(cart[i]){cart[i].disc=parseFloat(v)||0;renderC();}}
-function clearCart(){if(!cart.length)return;if(!confirm('Clear?'))return;cart=[];isR=false;isE=false;selC=null;
-document.getElementById('sc').innerHTML='';document.getElementById('cs').value='';document.getElementById('notes').value='';
+function clearCart(){if(!cart.length)return;if(!confirm('Clear?'))return;cart=[];isR=false;isE=false;selC=null;walkIn=false;
+document.getElementById('sc').innerHTML='';document.getElementById('cPhone').value='';document.getElementById('cName').value='';document.getElementById('cName').readOnly=false;document.getElementById('cName').disabled=false;document.getElementById('cPhone').disabled=false;document.getElementById('walkIn').checked=false;document.getElementById('notes').value='';
 document.getElementById('disc').value='';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
 document.getElementById('exc').textContent='Exchange';document.getElementById('exc').className='btn btn-ghost btn-sm';renderC();search();}
 function toggleReturn(){isR=!isR;if(isR)isE=false;const b=document.getElementById('rtn');
@@ -126,15 +135,17 @@ document.getElementById('sub').textContent='Rs '+sub.toFixed(2);
 document.getElementById('tot').textContent='Rs '+tot.toFixed(2);document.getElementById('chg').textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2);}
 function sp(m,b){pm=m;document.querySelectorAll('.pm button').forEach(x=>x.classList.remove('active'));b.classList.add('active');}
 function pay(){if(!cart.length){f('Cart empty');return;}
+var cnm=document.getElementById('cName').value.trim(),cph=document.getElementById('cPhone').value.trim();
+if(!walkIn&&!selC&&!cnm){f('Please select or add a customer');return;}
 const items=cart.map(c=>({variant_id:c.vid,quantity:isR||isE?-Math.abs(c.qty):c.qty,price:c.price}));
 const btn=document.getElementById('chg');btn.disabled=true;btn.textContent='Processing...';
 fetch('/api/sale',{method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({items,payment:pm,discount:parseFloat(document.getElementById('disc').value)||0,
-is_return:isR,is_exchange:isE,customer_id:selC?selC.id:null,customer_name:selC?selC.name:'',notes:document.getElementById('notes').value})})
+is_return:isR,is_exchange:isE,customer_id:selC?selC.id:null,customer_name:walkIn?'Walk In':(document.getElementById('cName').value.trim()||(selC?selC.name:'')),customer_phone:document.getElementById('cPhone').value.trim(),walk_in:walkIn,notes:document.getElementById('notes').value})})
 .then(r=>r.json()).then(d=>{if(d.error){f(d.error);btn.disabled=false;btn.textContent='Charge Rs 0.00';return;}
-showR(d);cart=[];isR=false;isE=false;selC=null;document.getElementById('sc').innerHTML='';document.getElementById('cs').value='';
+showR(d);cart=[];isR=false;isE=false;selC=null;walkIn=false;document.getElementById('sc').innerHTML='';document.getElementById('cPhone').value='';document.getElementById('cName').value='';document.getElementById('cName').readOnly=false;document.getElementById('cName').disabled=false;document.getElementById('cPhone').disabled=false;document.getElementById('walkIn').checked=false;
 document.getElementById('notes').value='';document.getElementById('disc').value='';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
-document.getElementById('exc').textContent='Exchange';document.getElementById('exc').className='btn btn-ghost btn-sm';renderC();btn.disabled=false;search();})
+document.getElementById('exc').textContent='Exchange';document.getElementById('exc').className='btn btn-ghost btn-sm';renderC();btn.disabled=false;document.getElementById('s').value='';closeDropdown();document.getElementById('s').focus();})
 .catch(()=>{f('Sale failed');btn.disabled=false;});}
 function showR(d){let h='<div class="rh"><h3>JITM Baby Garments</h3><p>'+new Date().toLocaleString()+'</p><p style="font-size:11px">'+d.receipt+'</p></div><div class="ri">';
 d.items.forEach(i=>{h+='<div class="rl"><span>'+i.quantity+'x '+i.product_name+(i.variant_label?' ('+i.variant_label+')':'')+'</span><span>Rs '+i.total.toFixed(2)+'</span></div>';});
@@ -145,11 +156,13 @@ h+='<div class="rl" style="font-weight:700;font-size:15px"><span>TOTAL</span><sp
 '<div class="rl"><span>Staff: '+d.staff_name+'</span></div>'+(d.is_return?'<div class="rl" style="color:#dc2626">RETURN</div>':'')+(d.is_exchange?'<div class="rl" style="color:#d97706">EXCHANGE</div>':'')+
 '<div style="text-align:center;margin-top:12px;font-size:11px;color:#9ca3af">Thank you!<br>Returns within 30 days</div>';
 document.getElementById('rc').innerHTML=h;document.getElementById('rm').classList.add('show');}
-function sc(){const q=document.getElementById('cs').value;if(q.length<2){document.getElementById('cr').innerHTML='';return;}
-fetch('/api/customers?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{document.getElementById('cr').innerHTML=d.map(c=>'<div onclick="scs('+c.id+',\''+c.name+'\')">'+c.name+' '+(c.phone||'')+(c.baby_name?' 🐣'+c.baby_name:'')+' | Credit: Rs '+c.credit.toFixed(2)+'</div>').join('');});}
-function scs(id,nm){selC={id:id,name:nm};document.getElementById('sc').innerHTML='Customer: '+nm;document.getElementById('cr').innerHTML='';document.getElementById('cs').value='';}
+function findCust(){var ph=document.getElementById('cPhone').value.trim();if(ph.length<3){selC=null;document.getElementById('sc').innerHTML='';return;}
+fetch('/api/customers?q='+encodeURIComponent(ph)).then(r=>r.json()).then(function(list){var match=list.find(function(c){return c.phone===ph;});if(match){selC={id:match.id,name:match.name,phone:match.phone};document.getElementById('cName').value=match.name;document.getElementById('cName').readOnly=true;document.getElementById('sc').innerHTML='Customer: '+match.name+' | Credit: Rs '+match.credit.toFixed(2);}else{selC=null;document.getElementById('cName').readOnly=false;document.getElementById('sc').innerHTML='<span style=\"color:#6b7280\">New customer</span>';}});}
+function toggleWalkIn(){walkIn=document.getElementById('walkIn').checked;document.getElementById('cPhone').disabled=walkIn;document.getElementById('cName').disabled=walkIn;if(walkIn){document.getElementById('cName').value='';document.getElementById('sc').innerHTML='Walk In Customer';selC=null;}else{document.getElementById('sc').innerHTML='';}}
 function f(m){document.getElementById('em-msg').textContent=m;document.getElementById('em').classList.add('show');}
 function cl(id){document.getElementById(id).classList.remove('show');}
 window.onclick=function(e){document.querySelectorAll('.modal').forEach(m=>{if(e.target===m)m.classList.remove('show');});};
+document.getElementById('s').focus();
+document.addEventListener('keydown',function(e){var t=(e.target||{}).tagName;if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT')return;if(document.querySelector('.modal.show'))return;document.getElementById('s').focus();});
 fetch('/api/staff').then(function(r){return r.json()}).then(function(d){staffList=d;renderC();});
 </script></body></html>

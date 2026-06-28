@@ -535,4 +535,11 @@ def sale_detail(sid):
         sale = dict(sale)
         sale['items'] = [dict(x) for x in db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sid,)).fetchall()]
         sale['payments'] = [dict(x) for x in db.execute('SELECT * FROM payments WHERE sale_id=?', (sid,)).fetchall()]
+        if sale.get('customer_id'):
+            cust = db.execute('SELECT phone FROM customers WHERE id=?', (sale['customer_id'],)).fetchone()
+            sale['customer_phone'] = cust['phone'] if cust else ''
+        else:
+            sale['customer_phone'] = ''
+        sale['is_return'] = 1 if sale.get('status') == 'returned' else 0
+        sale['is_exchange'] = 1 if sale.get('status') == 'exchanged' else 0
         return jsonify(sale)

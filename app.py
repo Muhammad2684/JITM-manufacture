@@ -214,7 +214,6 @@ def view_sales_invoice(sid):
             cust = db.execute('SELECT phone FROM customers WHERE id=?', (sale['customer_id'],)).fetchone()
             customer_phone = cust['phone'] if cust else ''
         is_return = sale.get('status') == 'returned'
-        is_exchange = sale.get('status') == 'exchanged'
         fmt = lambda n: 'Rs {:,.2f}'.format(n or 0)
         dt = (sale.get('created_at') or '').split(' ')
         item_rows = []
@@ -251,9 +250,6 @@ def view_sales_invoice(sid):
         elif status_label == 'returned':
             status_class = 'unpaid'
             status_label = 'Returned'
-        elif status_label == 'exchanged':
-            status_class = 'partial'
-            status_label = 'Exchanged'
         paid_info = ''
         if sale.get('paid') and sale['paid'] > 0:
             paid_info = 'Paid: ' + fmt(sale['paid'])

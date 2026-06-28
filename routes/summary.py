@@ -10,7 +10,7 @@ summary_bp = Blueprint('summary', __name__, url_prefix='/api')
 def summary():
     with get_db() as db:
         total_revenue = db.execute(
-            "SELECT COALESCE(SUM(total),0) as total FROM sales WHERE status NOT IN ('returned','exchanged')"
+            "SELECT COALESCE(SUM(total),0) as total FROM sales WHERE status NOT IN ('returned')"
         ).fetchone()
 
         total_returns = db.execute(
@@ -18,7 +18,7 @@ def summary():
         ).fetchone()
 
         total_discounts = db.execute(
-            "SELECT COALESCE(SUM(discount),0) as total FROM sales WHERE status NOT IN ('returned','exchanged')"
+            "SELECT COALESCE(SUM(discount),0) as total FROM sales WHERE status NOT IN ('returned')"
         ).fetchone()
 
         inventory_value = db.execute(
@@ -36,7 +36,7 @@ def summary():
             'JOIN sales s ON s.id=si.sale_id '
             'JOIN variants v ON v.id=si.variant_id '
             'JOIN products p ON p.id=v.product_id '
-            "WHERE s.status NOT IN ('returned','exchanged') AND si.is_return=0"
+            "WHERE s.status NOT IN ('returned') AND si.is_return=0"
         ).fetchone()
 
         supplier_balance = db.execute(

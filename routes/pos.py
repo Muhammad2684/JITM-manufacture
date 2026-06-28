@@ -24,7 +24,6 @@ def complete_sale():
         return jsonify({'error': 'No items'}), 400
 
     is_return = d.get('is_return', False)
-    is_exchange = d.get('is_exchange', False)
     discount = float(d.get('discount', 0))
     discount_type = d.get('discount_type', 'percent')
     payment = d.get('payment', 'cash')
@@ -58,7 +57,6 @@ def complete_sale():
             elif customer_name:
                 cur = db.execute('INSERT INTO customers (name, phone) VALUES (?,?)', (customer_name, customer_phone))
                 customer_id = cur.lastrowid
-        exchange_items_data = d.get('exchange_items', None) if is_exchange else None
 
         errors = []
         sale_items = []
@@ -77,7 +75,7 @@ def complete_sale():
             line_total = round(price * qty, 2)
             subtotal += line_total
             staff_id = item.get('staff')
-            is_item_return = is_return or (is_exchange and qty < 0)
+            is_item_return = is_return
             return {
                 'product_id': prod['id'],
                 'variant_id': vid,
@@ -92,18 +90,13 @@ def complete_sale():
             }
 
         for item in items:
-            qty_mult = -1 if is_return else (1 if is_exchange else 1)
+            qty_mult = -1 if is_return else 1
             si = process_item(item, qty_mult)
             if si is None:
                 continue
             sale_items.append(si)
 
-            if is_exchange:
-                if si['quantity'] < 0:
-                    db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (abs(si['quantity']), si['variant_id']))
-                else:
-                    db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
-            elif qty_mult < 0:
+            if qty_mult < 0:
                 db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (abs(si['quantity']), si['variant_id']))
             else:
                 db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
@@ -138,8 +131,6 @@ def complete_sale():
 
         if is_return:
             status = 'returned'
-        elif is_exchange:
-            status = 'exchanged'
         elif has_credit and paid_amt >= total:
             status = 'Paid'
         elif has_credit and paid_amt > 0:
@@ -181,24 +172,24 @@ def complete_sale():
                     acc_id = cur.lastrowid
                 else:
                     acc_id = acc['id']
-                txn_type = 'payment' if (is_return or is_exchange) else 'receipt'
-                txn_desc = f'Sale return: {receipt}' if (is_return or is_exchange) else f'Sale receipt: {receipt}'
+                txn_type = 'payment' if is_return else 'receipt'
+                txn_desc = f'Sale return: {receipt}' if is_return else f'Sale receipt: {receipt}'
                 db.execute(
                     "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
                     "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
                     (acc_id, txn_type, abs(p['amount']), txn_desc,
                      'customer', customer_id, 'sale', sale_id, json.dumps([]))
                 )
-                balance_change = -abs(p['amount']) if (is_return or is_exchange) else p['amount']
+                balance_change = -abs(p['amount']) if is_return else p['amount']
                 db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (balance_change, acc_id))
 
         if customer_id:
-            spent_change = -abs(total) if (is_return or is_exchange) else total
+            spent_change = -abs(total) if is_return else total
             db.execute('UPDATE customers SET total_spent=total_spent+?, visit_count=visit_count+1 WHERE id=?',
                        (spent_change, customer_id))
             for p in pymt_list:
                 if p['method'] == 'credit':
-                    credit_change = -abs(p['amount']) if (is_return or is_exchange) else p['amount']
+                    credit_change = -abs(p['amount']) if is_return else p['amount']
                     db.execute('UPDATE customers SET credit=credit+? WHERE id=?', (credit_change, customer_id))
 
         return jsonify({
@@ -216,7 +207,6 @@ def complete_sale():
             'customer_phone': customer_phone,
             'staff_name': session['name'],
             'is_return': is_return,
-            'is_exchange': is_exchange,
             'status': status,
             'cash_tendered': cash_tendered,
             'change_given': change_given,
@@ -537,5 +527,4 @@ def sale_detail(sid):
         else:
             sale['customer_phone'] = ''
         sale['is_return'] = 1 if sale.get('status') == 'returned' else 0
-        sale['is_exchange'] = 1 if sale.get('status') == 'exchanged' else 0
         return jsonify(sale)

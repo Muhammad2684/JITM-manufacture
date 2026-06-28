@@ -101,12 +101,12 @@ def api_staff_analytics(sid):
             return jsonify({'error': 'Not found'}), 404
 
         sales = db.execute(
-            "SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM sales WHERE staff_id=? AND status NOT IN ('returned','exchanged')",
+            "SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM sales WHERE staff_id=? AND status NOT IN ('returned')",
             (sid,)
         ).fetchone()
 
         today = db.execute(
-            "SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM sales WHERE staff_id=? AND status NOT IN ('returned','exchanged') AND date(created_at)=date('now')",
+            "SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM sales WHERE staff_id=? AND status NOT IN ('returned') AND date(created_at)=date('now')",
             (sid,)
         ).fetchone()
 

@@ -10,7 +10,7 @@ dash_bp = Blueprint('dashboard', __name__, url_prefix='/api')
 def dashboard():
     with get_db() as db:
         today_sales = db.execute(
-            "SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM sales WHERE date(created_at)=date('now') AND status NOT IN ('returned','exchanged')"
+            "SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM sales WHERE date(created_at)=date('now') AND status NOT IN ('returned')"
         ).fetchone()
 
         today_returns = db.execute(
@@ -18,7 +18,7 @@ def dashboard():
         ).fetchone()
 
         month_sales = db.execute(
-            "SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM sales WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now') AND status NOT IN ('returned','exchanged')"
+            "SELECT COUNT(*) as count, COALESCE(SUM(total),0) as total FROM sales WHERE strftime('%Y-%m',created_at)=strftime('%Y-%m','now') AND status NOT IN ('returned')"
         ).fetchone()
 
         low_stock = db.execute(
@@ -42,7 +42,7 @@ def dashboard():
 
         sales_by_day = db.execute(
             "SELECT date(created_at) as day, COALESCE(SUM(total),0) as total, COUNT(*) as count "
-            "FROM sales WHERE created_at >= datetime('now', '-7 days') AND status NOT IN ('returned','exchanged') "
+            "FROM sales WHERE created_at >= datetime('now', '-7 days') AND status NOT IN ('returned') "
             'GROUP BY date(created_at) ORDER BY day'
         ).fetchall()
 

@@ -227,7 +227,7 @@
         </div>
     </div>
     <script>
-        var cart = [], isR = false, isE = false, selC = null, walkIn = false, allP = [], hlIdx = -1, scMode = true, staffList = [], lastStaff = null;
+        var cart = [], isR = false, selC = null, walkIn = false, allP = [], hlIdx = -1, scMode = true, staffList = [], lastStaff = null;
 
         document.getElementById('s').addEventListener('input', function (e) {
             if (e.target.value.length >= 1) search(); else closeDropdown();
@@ -267,7 +267,7 @@
         });
         function add(vid, pr) {
             if (vid == null || isNaN(vid)) return;
-            var e = cart.find(function (x) { return x.vid === vid }); if (e && !isR && !isE) { e.qty++; renderC(); closeDropdown(); document.getElementById('s').value = ''; document.getElementById('s').focus(); return; }
+            var e = cart.find(function (x) { return x.vid === vid }); if (e && !isR) { e.qty++; renderC(); closeDropdown(); document.getElementById('s').value = ''; document.getElementById('s').focus(); return; }
             var p = allP.find(function (x) { return x.vid === vid }); if (!p) { f('Product not found'); return; }
 
             cart.push({ vid: vid, pname: p.name, sku: p.sku, variant: (p.size || '') + ' ' + (p.color || ''), price: pr || p.price, qty: 1, disc: 0, staff: lastStaff, isReturn: false }); renderC();
@@ -276,16 +276,16 @@
         function imgPH(n) { return '<div style="width:32px;height:32px;background:#e2e1de;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6b7280;font-weight:600;flex-shrink:0">' + (n.charAt(0).toUpperCase() || '?') + '</div>'; }
         function renderC() {
             const el = document.getElementById('cart'), cnt = document.getElementById('cnt'); let n = 0, h = '';
-            if (isR) h += '<div class="rb">RETURN MODE</div>'; if (isE) h += '<div class="rb" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a">EXCHANGE MODE (Check "Ret" on items being returned)</div>';
+            if (isR) h += '<div class="rb">RETURN MODE</div>';
             if (!cart.length) { el.innerHTML = h + '<div class="cart-empty">Add items to begin</div>'; cnt.textContent = ''; calc(); return; }
             h += '<table class="ct"><thead><tr><th></th><th>SKU</th><th>Staff</th><th>Disc%</th><th>Product</th><th>Price</th><th>Qty</th><th>Net Total</th><th></th></tr></thead><tbody>';
             cart.forEach(function (c, i) {
                 n += Math.abs(c.qty); var net = c.qty * c.price * (1 - (c.disc || 0) / 100);
                 var sopts = staffList.map(function (s) { return '<option value="' + s.id + '"' + (s.id == c.staff ? ' selected' : '') + '>' + s.name + '</option>'; }).join('');
                 var isReturnItem = c.isReturn === true;
-                var rowStyle = isReturnItem ? 'background:#fef2f2;' : (isE && !isReturnItem ? 'background:#f0fdf4;' : '');
-                var qtyLabel = isReturnItem ? ' (Return)' : (isE && !isReturnItem ? ' (New)' : '');
-                var returnToggle = isE ? '<label style="display:inline-flex;align-items:center;gap:2px;font-size:9px;cursor:pointer;margin-left:4px"><input type="checkbox" ' + (isReturnItem ? 'checked' : '') + ' onchange="toggleReturnItem(' + i + ',this.checked)" style="width:auto;margin:0">Ret</label>' : '';
+                var rowStyle = isReturnItem ? 'background:#fef2f2;' : '';
+                var qtyLabel = isReturnItem ? ' (Return)' : '';
+                var returnToggle = isR ? '' : '';
                 h += '<tr style="' + rowStyle + '"><td>' + imgPH(c.pname) + '</td><td style="font-size:10px;color:#6b7280">' + (c.sku || '-') + '</td>'
                     + '<td><select onchange="setStaff(' + i + ',this.value)" style="font-size:10px;padding:2px;max-width:80px">' + sopts + returnToggle + '</select></td>'
                     + '<td><input type="number" value="' + (c.disc || 0) + '" min="0" max="100" step="0.1" onchange="setDisc(' + i + ',this.value)" style="width:40px;font-size:11px;padding:2px"></td>'
@@ -302,19 +302,13 @@
         function setStaff(i, v) { if (cart[i]) { cart[i].staff = v ? parseInt(v) : null; lastStaff = cart[i].staff; } }
         function setDisc(i, v) { if (cart[i]) { cart[i].disc = parseFloat(v) || 0; renderC(); } }
         function clearCart() {
-            if (!cart.length) return; if (!confirm('Clear?')) return; cart = []; isR = false; isE = false; selC = null; walkIn = false;
+            if (!cart.length) return; if (!confirm('Clear?')) return; cart = []; isR = false; selC = null; walkIn = false;
             document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false; document.getElementById('notes').value = '';
             document.getElementById('disc').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-bl').value = ''; document.getElementById('am-jl').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
             updateModeButton(); renderC(); search();
         }
         function cycleMode() {
-            if (isR) {
-                isR = false; isE = true;
-            } else if (isE) {
-                isR = false; isE = false;
-            } else {
-                isR = true; isE = false;
-            }
+            isR = !isR;
             updateModeButton();
             renderC();
         }
@@ -323,9 +317,6 @@
             if (isR) {
                 b.textContent = 'Return';
                 b.className = 'btn btn-d btn-sm';
-            } else if (isE) {
-                b.textContent = 'Exchange';
-                b.className = 'btn btn-w btn-sm';
             } else {
                 b.textContent = 'Sale';
                 b.className = 'btn btn-ghost btn-sm';
@@ -335,21 +326,12 @@
             let sub = 0;
             cart.forEach(function(c) {
                 let itemTotal = c.qty * c.price * (1 - (c.disc || 0) / 100);
-                if (isE && c.isReturn) {
-                    sub -= itemTotal;
-                } else {
-                    sub += itemTotal;
-                }
+                sub += itemTotal;
             });
             const dp = parseFloat(document.getElementById('disc').value) || 0;
             const d = Math.abs(sub) * dp / 100; const tot = sub - d;
             document.getElementById('sub').textContent = 'Rs ' + sub.toFixed(2);
             document.getElementById('tot').textContent = 'Rs ' + tot.toFixed(2);
-            if(isE) {
-                const returnedTotal = cart.filter(c => c.isReturn).reduce((s, c) => s + c.qty * c.price * (1 - (c.disc || 0) / 100), 0);
-                const newTotal = cart.filter(c => !c.isReturn).reduce((s, c) => s + c.qty * c.price * (1 - (c.disc || 0) / 100), 0);
-                document.getElementById('sub').textContent = 'New: Rs ' + newTotal.toFixed(2) + ' | Return: Rs ' + returnedTotal.toFixed(2);
-            }
             calcSplit(tot);
         }
         var splitTimer; function calcSplit(tot) {
@@ -371,15 +353,7 @@
             else if (otherTotal > tot) { st.textContent = 'Overpayment \u2014 reduce non-cash amounts'; st.style.background = '#fef2f2'; st.style.color = '#dc2626'; }
             else { st.textContent = 'Change Rs ' + diff.toFixed(2); st.style.background = '#f3faf7'; st.style.color = '#16a34a'; }
             var btn = document.getElementById('chg');
-            if(isE && tot < 0) {
-                btn.textContent = 'Refund Rs ' + Math.abs(tot).toFixed(2);
-            } else if(isE && tot > 0) {
-                btn.textContent = 'Charge Rs ' + tot.toFixed(2);
-            } else if(isE && tot === 0) {
-                btn.textContent = 'Even Exchange Rs 0.00';
-            } else {
-                btn.textContent = (isR ? 'Refund ' : 'Charge ') + 'Rs ' + Math.abs(tot).toFixed(2);
-            }
+            btn.textContent = (isR ? 'Refund ' : 'Charge ') + 'Rs ' + Math.abs(tot).toFixed(2);
         }
 
         function getPayments() {
@@ -422,8 +396,6 @@
                 let qty = c.qty;
                 if (isR) {
                     qty = -Math.abs(c.qty);
-                } else if (isE && c.isReturn) {
-                    qty = -Math.abs(c.qty);
                 }
                 return { variant_id: c.vid, quantity: qty, price: c.price, staff: c.staff };
             });
@@ -433,12 +405,12 @@
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     items, payment: primaryMethod, payments: pd.pays, discount: parseFloat(document.getElementById('disc').value) || 0,
-                    is_return: isR, is_exchange: isE, customer_id: selC ? selC.id : null, customer_name: walkIn ? 'Walk In' : (document.getElementById('cName').value.trim() || (selC ? selC.name : '')), customer_phone: document.getElementById('cPhone').value.trim(), walk_in: walkIn, notes: document.getElementById('notes').value, cash_tendered: pd.cashTendered, change_given: pd.change
+                    is_return: isR, customer_id: selC ? selC.id : null, customer_name: walkIn ? 'Walk In' : (document.getElementById('cName').value.trim() || (selC ? selC.name : '')), customer_phone: document.getElementById('cPhone').value.trim(), walk_in: walkIn, notes: document.getElementById('notes').value, cash_tendered: pd.cashTendered, change_given: pd.change
                 })
             })
                 .then(r => r.json()).then(d => {
                     if (d.error) { f(d.error); btn.disabled = false; btn.textContent = 'Charge Rs 0.00'; return; }
-                    showR(d); cart = []; isR = false; isE = false; selC = null; walkIn = false; document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false;
+                    showR(d); cart = []; isR = false; selC = null; walkIn = false; document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false;
                     document.getElementById('notes').value = ''; document.getElementById('disc').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-bl').value = ''; document.getElementById('am-jl').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
                     updateModeButton(); renderC(); btn.disabled = false; document.getElementById('s').value = ''; closeDropdown(); document.getElementById('s').focus();
                 })
@@ -469,20 +441,11 @@
             });
             h += '</div>';
             h += '<div class="rl"><span>Items: ' + d.items.length + '</span><span>Qty: ' + totQty + '</span></div>';
-            h += '<div class="rl" style="margin-bottom:6px"><span>Status/Tag:</span><span style="font-weight:600">' + (d.is_return ? 'Return' : d.is_exchange ? 'Exchange' : d.status) + '</span></div>';
+            h += '<div class="rl" style="margin-bottom:6px"><span>Status/Tag:</span><span style="font-weight:600">' + (d.is_return ? 'Return' : d.status) + '</span></div>';
             h += '<div style="border-top:1px dashed #e2e1de;padding-top:6px">';
-            if(d.is_exchange) {
-                var returnedTotal = d.items.filter(i => i.quantity < 0).reduce((s, i) => s + Math.abs(i.total), 0);
-                var newTotal = d.items.filter(i => i.quantity > 0).reduce((s, i) => s + i.total, 0);
-                h += '<div class="rl"><span>Returned Items:</span><span>-Rs ' + fmt(returnedTotal) + '</span></div>';
-                h += '<div class="rl"><span>New Items:</span><span>Rs ' + fmt(newTotal) + '</span></div>';
-                h += '<div class="rl"><span>Adjustment:</span><span>Rs ' + fmt(d.discount) + '</span></div>';
-                h += '<div class="rl" style="font-weight:700;font-size:14px"><span>Net ' + (d.total < 0 ? 'Refund' : 'Due') + ':</span><span>Rs ' + fmt(Math.abs(d.total)) + '</span></div>';
-            } else {
-                h += '<div class="rl"><span>Sub Total:</span><span>Rs ' + fmt(d.subtotal) + '</span></div>';
-                h += '<div class="rl"><span>Adjustment:</span><span>Rs ' + fmt(d.discount) + '</span></div>';
-                h += '<div class="rl" style="font-weight:700;font-size:14px"><span>Total:</span><span>Rs ' + fmt(d.total) + '</span></div>';
-            }
+            h += '<div class="rl"><span>Sub Total:</span><span>Rs ' + fmt(d.subtotal) + '</span></div>';
+            h += '<div class="rl"><span>Adjustment:</span><span>Rs ' + fmt(d.discount) + '</span></div>';
+            h += '<div class="rl" style="font-weight:700;font-size:14px"><span>Total:</span><span>Rs ' + fmt(d.total) + '</span></div>';
             h += '<div class="rl"><span>Credit:</span><span>Rs ' + fmt(crAmt) + '</span></div>';
             h += '<div class="rl"><span>Cash:</span><span>Rs ' + fmt(netCash) + '</span></div>';
             h += '<div class="rl"><span>Change:</span><span>Rs ' + fmt(d.change_given) + '</span></div></div>';

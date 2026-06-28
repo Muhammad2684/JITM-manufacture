@@ -247,20 +247,36 @@ def get_account_entries(db, account_id, entity):
             sl = db.execute('SELECT receipt FROM sales WHERE id=?', (p['reference_id'],)).fetchone()
             label = sl['receipt'] if sl else ''
 
-        desc = p['description'] or 'Payment'
-        if pname:
-            desc = f"Payment to {pname}"
-        if label:
-            desc += f" ({label})"
+        # Check if this is a sale return
+        if p['reference_type'] == 'sale' and p['description'] and 'Sale return' in p['description']:
+            desc = f"Sale Return Refund"
+            if pname:
+                desc += f" to {pname}"
+            if label:
+                desc += f" ({label})"
+            entries.append({
+                'date': p['date'] or '',
+                'description': desc,
+                'reference': label,
+                'debit': p['amount'],
+                'credit': 0,
+                'type': 'sale_return'
+            })
+        else:
+            desc = p['description'] or 'Payment'
+            if pname:
+                desc = f"Payment to {pname}"
+            if label:
+                desc += f" ({label})"
 
-        entries.append({
-            'date': p['date'] or '',
-            'description': desc,
-            'reference': label,
-            'debit': 0,
-            'credit': p['amount'],
-            'type': 'payment'
-        })
+            entries.append({
+                'date': p['date'] or '',
+                'description': desc,
+                'reference': label,
+                'debit': 0,
+                'credit': p['amount'],
+                'type': 'payment'
+            })
 
     transfers_in = db.execute(
         'SELECT t.*, a.name as from_name FROM account_transfers t JOIN accounts a ON a.id=t.from_account_id WHERE t.to_account_id=? ORDER BY t.date, t.id',

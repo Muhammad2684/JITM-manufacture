@@ -271,7 +271,7 @@
             var e = cart.find(function (x) { return x.vid === vid }); if (e && !isR && !isE) { e.qty++; renderC(); closeDropdown(); document.getElementById('s').value = ''; document.getElementById('s').focus(); return; }
             var p = allP.find(function (x) { return x.vid === vid }); if (!p) { f('Product not found'); return; }
 
-            cart.push({ vid: vid, pname: p.name, sku: p.sku, variant: (p.size || '') + ' ' + (p.color || ''), price: pr || p.price, qty: 1, disc: 0, staff: lastStaff }); renderC();
+            cart.push({ vid: vid, pname: p.name, sku: p.sku, variant: (p.size || '') + ' ' + (p.color || ''), price: pr || p.price, qty: 1, disc: 0, staff: lastStaff, isReturn: false }); renderC();
             closeDropdown(); document.getElementById('s').value = ''; document.getElementById('s').focus();
         }
         function imgPH(n) { return '<div style="width:32px;height:32px;background:#e2e1de;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6b7280;font-weight:600;flex-shrink:0">' + (n.charAt(0).toUpperCase() || '?') + '</div>'; }
@@ -283,20 +283,22 @@
             cart.forEach(function (c, i) {
                 n += Math.abs(c.qty); var net = c.qty * c.price * (1 - (c.disc || 0) / 100);
                 var sopts = staffList.map(function (s) { return '<option value="' + s.id + '"' + (s.id == c.staff ? ' selected' : '') + '>' + s.name + '</option>'; }).join('');
-                var isReturnItem = isE && c.qty < 0;
-                var rowStyle = isReturnItem ? 'background:#fef2f2;' : (isE && c.qty > 0 ? 'background:#f0fdf4;' : '');
-                var qtyLabel = isReturnItem ? ' (Return)' : (isE && c.qty > 0 ? ' (New)' : '');
+                var isReturnItem = c.isReturn === true;
+                var rowStyle = isReturnItem ? 'background:#fef2f2;' : (isE && !isReturnItem ? 'background:#f0fdf4;' : '');
+                var qtyLabel = isReturnItem ? ' (Return)' : (isE && !isReturnItem ? ' (New)' : '');
+                var returnToggle = isE ? '<label style="display:inline-flex;align-items:center;gap:2px;font-size:9px;cursor:pointer;margin-left:4px"><input type="checkbox" ' + (isReturnItem ? 'checked' : '') + ' onchange="toggleReturnItem(' + i + ',this.checked)" style="width:auto;margin:0">Ret</label>' : '';
                 h += '<tr style="' + rowStyle + '"><td>' + imgPH(c.pname) + '</td><td style="font-size:10px;color:#6b7280">' + (c.sku || '-') + '</td>'
-                    + '<td><select onchange="setStaff(' + i + ',this.value)" style="font-size:10px;padding:2px;max-width:80px">' + sopts + '</select></td>'
+                    + '<td><select onchange="setStaff(' + i + ',this.value)" style="font-size:10px;padding:2px;max-width:80px">' + sopts + returnToggle + '</select></td>'
                     + '<td><input type="number" value="' + (c.disc || 0) + '" min="0" max="100" step="0.1" onchange="setDisc(' + i + ',this.value)" style="width:40px;font-size:11px;padding:2px"></td>'
                     + '<td style="font-size:12px;font-weight:600">' + c.pname + (c.variant ? ' <span style="color:#6b7280;font-size:10px">(' + c.variant + ')</span>' : '') + qtyLabel + '</td><td style="font-size:11px">Rs ' + c.price.toFixed(2) + '</td>'
-                    + '<td><input type="number" value="' + c.qty + '" min="' + (isR || isE ? -99 : 1) + '" onchange="uq(' + i + ',this.value)" style="width:40px;font-size:11px;padding:2px"></td>'
+                    + '<td><input type="number" value="' + Math.abs(c.qty) + '" min="1" onchange="uq(' + i + ',this.value)" style="width:40px;font-size:11px;padding:2px"></td>'
                     + '<td style="font-size:11px;font-weight:600">' + (isReturnItem ? '-' : '') + 'Rs ' + Math.abs(net).toFixed(2) + '</td>'
                     + '<td><button class="rm" onclick="ri(' + i + ')">&times;</button></td></tr>';
             });
             h += '</tbody></table>'; el.innerHTML = h; cnt.textContent = n + ' items'; calc();
         }
         function uq(i, v) { v = parseInt(v); if (!v || v === 0) { cart.splice(i, 1); } else { cart[i].qty = v; } renderC(); }
+        function toggleReturnItem(i, checked) { if (cart[i]) { cart[i].isReturn = checked; } renderC(); }
         function ri(i) { cart.splice(i, 1); renderC(); }
         function setStaff(i, v) { if (cart[i]) { cart[i].staff = v ? parseInt(v) : null; lastStaff = cart[i].staff; } }
         function setDisc(i, v) { if (cart[i]) { cart[i].disc = parseFloat(v) || 0; renderC(); } }
@@ -315,16 +317,25 @@
             b.textContent = isE ? 'Sale' : 'Exchange'; b.className = isE ? 'btn btn-w btn-sm' : 'btn btn-ghost btn-sm'; renderC();
         }
         function calc() {
-            const sub = cart.reduce(function (s, c) { return s + c.qty * c.price * (1 - (c.disc || 0) / 100); }, 0); const dp = parseFloat(document.getElementById('disc').value) || 0;
+            let sub = 0;
+            cart.forEach(function(c) {
+                let itemTotal = c.qty * c.price * (1 - (c.disc || 0) / 100);
+                if (isE && c.isReturn) {
+                    sub -= itemTotal;
+                } else {
+                    sub += itemTotal;
+                }
+            });
+            const dp = parseFloat(document.getElementById('disc').value) || 0;
             const d = Math.abs(sub) * dp / 100; const tot = sub - d;
             document.getElementById('sub').textContent = 'Rs ' + sub.toFixed(2);
             document.getElementById('tot').textContent = 'Rs ' + tot.toFixed(2);
             if(isE) {
-                const returnedTotal = cart.filter(c => c.qty < 0).reduce((s, c) => s + Math.abs(c.qty * c.price * (1 - (c.disc || 0) / 100)), 0);
-                const newTotal = cart.filter(c => c.qty > 0).reduce((s, c) => s + c.qty * c.price * (1 - (c.disc || 0) / 100), 0);
+                const returnedTotal = cart.filter(c => c.isReturn).reduce((s, c) => s + c.qty * c.price * (1 - (c.disc || 0) / 100), 0);
+                const newTotal = cart.filter(c => !c.isReturn).reduce((s, c) => s + c.qty * c.price * (1 - (c.disc || 0) / 100), 0);
                 document.getElementById('sub').textContent = 'New: Rs ' + newTotal.toFixed(2) + ' | Return: Rs ' + returnedTotal.toFixed(2);
             }
-            calcSplit(Math.abs(tot));
+            calcSplit(tot);
         }
         var splitTimer; function calcSplit(tot) {
             if (tot === undefined) tot = parseFloat(document.getElementById('tot').textContent.replace('Rs ', '')) || 0;
@@ -345,15 +356,14 @@
             else if (otherTotal > tot) { st.textContent = 'Overpayment \u2014 reduce non-cash amounts'; st.style.background = '#fef2f2'; st.style.color = '#dc2626'; }
             else { st.textContent = 'Change Rs ' + diff.toFixed(2); st.style.background = '#f3faf7'; st.style.color = '#16a34a'; }
             var btn = document.getElementById('chg');
-            var absTot = Math.abs(tot);
             if(isE && tot < 0) {
-                btn.textContent = 'Refund Rs ' + absTot.toFixed(2);
+                btn.textContent = 'Refund Rs ' + Math.abs(tot).toFixed(2);
             } else if(isE && tot > 0) {
-                btn.textContent = 'Charge Rs ' + absTot.toFixed(2);
+                btn.textContent = 'Charge Rs ' + tot.toFixed(2);
             } else if(isE && tot === 0) {
                 btn.textContent = 'Even Exchange Rs 0.00';
             } else {
-                btn.textContent = (isR ? 'Refund ' : 'Charge ') + 'Rs ' + absTot.toFixed(2);
+                btn.textContent = (isR ? 'Refund ' : 'Charge ') + 'Rs ' + Math.abs(tot).toFixed(2);
             }
         }
 
@@ -381,10 +391,27 @@
             var cnm = document.getElementById('cName').value.trim(), cph = document.getElementById('cPhone').value.trim();
             if (!walkIn && !selC && !cnm) { f('Please select or add a customer'); return; }
             var pd = getPayments();
-            if (pd.applied < pd.tot - 0.005) { f('Payment total Rs ' + pd.applied.toFixed(2) + ' is short of total Rs ' + pd.tot.toFixed(2)); return; }
-            if (!pd.pays.length) { f('Enter at least one payment amount'); return; }
-            var otherTotal = pd.applied - pd.cashTendered; if (pd.applied > pd.tot && otherTotal > pd.tot) { f('Non-cash payments exceed total. Please adjust amounts.'); return; }
-            const items = cart.map(c => ({ variant_id: c.vid, quantity: isR ? -Math.abs(c.qty) : c.qty, price: c.price, staff: c.staff }));
+            var absTot = Math.abs(pd.tot);
+            if (pd.tot > 0 && pd.applied < pd.tot - 0.005) {
+                f('Payment total Rs ' + pd.applied.toFixed(2) + ' is short of total Rs ' + pd.tot.toFixed(2));
+                return;
+            }
+            if (pd.tot < 0 && pd.applied > absTot + 0.005) {
+                f('Refund amount Rs ' + pd.applied.toFixed(2) + ' exceeds Rs ' + absTot.toFixed(2));
+                return;
+            }
+            if (!pd.pays.length && Math.abs(pd.tot) > 0.005) { f('Enter at least one payment amount'); return; }
+            var otherTotal = pd.applied - pd.cashTendered;
+            if (pd.tot > 0 && pd.applied > pd.tot && otherTotal > pd.tot) { f('Non-cash payments exceed total. Please adjust amounts.'); return; }
+            const items = cart.map(c => {
+                let qty = c.qty;
+                if (isR) {
+                    qty = -Math.abs(c.qty);
+                } else if (isE && c.isReturn) {
+                    qty = -Math.abs(c.qty);
+                }
+                return { variant_id: c.vid, quantity: qty, price: c.price, staff: c.staff };
+            });
             const btn = document.getElementById('chg'); btn.disabled = true; btn.textContent = 'Processing...';
             var primaryMethod = pd.pays.length === 1 ? pd.pays[0].method : 'split';
             fetch('/api/sale', {

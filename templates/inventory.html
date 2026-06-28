@@ -52,7 +52,8 @@
             <form onsubmit="save(event)">
                 <label>Name</label><input id="pn" required>
                 <label>Size</label>
-                <input id="psize" placeholder="e.g. 3-6M, 18-24M, Large...">
+                <select id="psize" onchange="sizePicker()"></select>
+                <input id="psize_new" style="display:none" placeholder="New size name">
                 <div class="form-row">
                     <div>
                         <label>SKU</label>
@@ -131,13 +132,14 @@
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
-        var editing = null, avId = null, svId = null, all = [], sortIdx = -1, sortDir = 1, catList = [], ccList = [];
+        var editing = null, avId = null, svId = null, all = [], sortIdx = -1, sortDir = 1, catList = [], ccList = [], sizeList = [];
         load();
         function load() {
             const q = document.getElementById('s').value;
             fetch('/api/products?q=' + encodeURIComponent(q)).then(r => r.json()).then(d => { all = d; render(d); });
             fetch('/api/categories').then(r => r.json()).then(d => { catList = d; });
             fetch('/api/commission-classes').then(r => r.json()).then(d => { ccList = d; });
+            fetch('/api/sizes').then(r => r.json()).then(d => { sizeList = d; });
         }
         function sortCol(i){
             if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
@@ -201,6 +203,19 @@
                 document.getElementById('pcat_new').focus();
             }
         }
+        function populateSizes() {
+            const sel = document.getElementById('psize');
+            sel.innerHTML = '<option value="">-- Select --</option>' + sizeList.map(s => '<option value="' + s.name.replace(/"/g, '&quot;') + '">' + s.name + '</option>').join('') + '<option value="__new__">+ Create new size</option>';
+        }
+        function sizePicker() {
+            const sel = document.getElementById('psize');
+            if (sel.value === '__new__') {
+                sel.style.display = 'none';
+                document.getElementById('psize_new').style.display = '';
+                document.getElementById('psize_new').value = '';
+                document.getElementById('psize_new').focus();
+            }
+        }
         function populateCommissionClasses() {
             const sel = document.getElementById('pcc');
             sel.innerHTML = '<option value="">-- Select --</option>' + ccList.map(c => '<option value="' + c.name.replace(/"/g, '&quot;') + '">' + c.name + '</option>').join('') + '<option value="__new__">+ Create new class</option>';
@@ -224,7 +239,8 @@
         function showAdd() {
             editing = null; document.getElementById('ft').textContent = 'New Product';
             document.getElementById('pa').checked = true; document.getElementById('ps').disabled = true; document.getElementById('ps').value = ''; autoSku(true);
-            document.getElementById('psize').value = '';
+            document.getElementById('psize').style.display = ''; document.getElementById('psize_new').style.display = 'none';
+            populateSizes(); document.getElementById('psize').value = '';
             document.getElementById('pcat').style.display = ''; document.getElementById('pcat_new').style.display = 'none';
             document.getElementById('pcc').style.display = ''; document.getElementById('pcc_new').style.display = 'none';
             populateCategories(); document.getElementById('pcat').value = '';
@@ -264,7 +280,20 @@
                 csel.value = '';
             }
             document.getElementById('pl').value = p.low_stock; document.getElementById('pa').checked = false; document.getElementById('ps').disabled = true;
-            document.getElementById('psize').value = (p.variants && p.variants[0] && p.variants[0].size) || '';
+            var psizeVal = (p.variants && p.variants[0] && p.variants[0].size) || '';
+            populateSizes();
+            var szSel = document.getElementById('psize');
+            szSel.style.display = ''; document.getElementById('psize_new').style.display = 'none';
+            if (psizeVal && [...szSel.options].some(o => o.value === psizeVal)) {
+                szSel.value = psizeVal;
+            } else if (psizeVal) {
+                szSel.value = '__new__';
+                document.getElementById('psize_new').value = psizeVal;
+                szSel.style.display = 'none';
+                document.getElementById('psize_new').style.display = '';
+            } else {
+                szSel.value = '';
+            }
             document.getElementById('pm').classList.add('show');
         }
         function save(e) {
@@ -273,15 +302,20 @@
             const cat = sel.value === '__new__' ? document.getElementById('pcat_new').value : sel.value;
             const csel = document.getElementById('pcc');
             const commission_class = csel.value === '__new__' ? document.getElementById('pcc_new').value : csel.value;
+            const szSel = document.getElementById('psize');
+            const psize = szSel.value === '__new__' ? document.getElementById('psize_new').value : szSel.value;
             const data = {
                 name: document.getElementById('pn').value, sku: document.getElementById('ps').value, barcode: document.getElementById('pb').value || null,
                 base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
                 commission_class: commission_class || null,
                 low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0,
-                size: document.getElementById('psize').value || ''
+                size: psize || ''
             };
             if (cat && !catList.some(c => c.name === cat)) {
                 fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: cat}) }).then(r => r.json()).then(() => { catList.push({name: cat}); });
+            }
+            if (psize && !sizeList.some(s => s.name === psize)) {
+                fetch('/api/sizes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: psize}) }).then(r => r.json()).then(() => { sizeList.push({name: psize}); });
             }
             if (commission_class && !ccList.some(c => c.name === commission_class)) {
                 fetch('/api/commission-classes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: commission_class}) }).then(r => r.json()).then(() => { ccList.push({name: commission_class}); });

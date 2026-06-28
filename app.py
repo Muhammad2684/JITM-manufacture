@@ -10,6 +10,7 @@ from routes.suppliers import sup_bp
 from routes.settings import settings_bp
 from routes.summary import summary_bp
 from routes.categories import cat_bp
+from routes.sizes import sizes_bp
 from routes.purchase_invoices import pi_bp
 from routes.accounts import acc_bp
 from routes.transactions import txn_bp
@@ -27,6 +28,7 @@ app.register_blueprint(sup_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(summary_bp)
 app.register_blueprint(cat_bp)
+app.register_blueprint(sizes_bp)
 app.register_blueprint(pi_bp)
 app.register_blueprint(acc_bp)
 app.register_blueprint(txn_bp)

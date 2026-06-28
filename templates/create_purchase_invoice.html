@@ -101,7 +101,8 @@
         <form onsubmit="saveProduct(event)">
             <label>Name</label><input id="pn" required>
             <label>Size</label>
-            <input id="psize" placeholder="e.g. 3-6M, 18-24M, Large...">
+            <select id="psize" onchange="sizePicker()"></select>
+            <input id="psize_new" style="display:none" placeholder="New size name">
             <div class="form-row">
                 <div>
                     <label>SKU</label>
@@ -131,7 +132,7 @@
     </div>
 </div>
 <script>
-var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [];
+var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [], sizeList = [];
 
 function loadSuppliers() {
     fetch('/api/suppliers').then(r=>r.json()).then(d=>{
@@ -275,7 +276,8 @@ function acCreate(rid, name) {
     populateCategories(); document.getElementById('pcat').value = '';
     populateCommissionClasses(); document.getElementById('pcc').value = '';
     document.getElementById('pl').value = 5;
-    document.getElementById('psize').value = '';
+    document.getElementById('psize').style.display = ''; document.getElementById('psize_new').style.display = 'none';
+    populateSizes(); document.getElementById('psize').value = '';
     document.getElementById('ft').textContent = 'New Product';
     document.getElementById('ac-'+rid).style.display = 'none';
     document.getElementById('pm').classList.add('show');
@@ -326,21 +328,39 @@ function commissionPicker() {
         document.getElementById('pcc_new').focus();
     }
 }
+function populateSizes() {
+    var sel = document.getElementById('psize');
+    sel.innerHTML = '<option value="">-- Select --</option>' + sizeList.map(function(s){return '<option value="' + s.name.replace(/"/g, '&quot;') + '">' + s.name + '</option>';}).join('') + '<option value="__new__">+ Create new size</option>';
+}
+function sizePicker() {
+    var sel = document.getElementById('psize');
+    if (sel.value === '__new__') {
+        sel.style.display = 'none';
+        document.getElementById('psize_new').style.display = '';
+        document.getElementById('psize_new').value = '';
+        document.getElementById('psize_new').focus();
+    }
+}
 function saveProduct(e) {
     e.preventDefault();
     var sel = document.getElementById('pcat');
     var cat = sel.value === '__new__' ? document.getElementById('pcat_new').value : sel.value;
     var csel = document.getElementById('pcc');
     var commission_class = csel.value === '__new__' ? document.getElementById('pcc_new').value : csel.value;
+    var szSel = document.getElementById('psize');
+    var psize = szSel.value === '__new__' ? document.getElementById('psize_new').value : szSel.value;
     var data = {
         name: document.getElementById('pn').value, sku: document.getElementById('ps').value, barcode: document.getElementById('pb').value || null,
         base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
         commission_class: commission_class || null,
         low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0,
-        size: document.getElementById('psize').value || ''
+        size: psize || ''
     };
     if (cat && !catList.some(function(c){return c.name === cat;})) {
         fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: cat}) });
+    }
+    if (psize && !sizeList.some(function(s){return s.name === psize;})) {
+        fetch('/api/sizes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: psize}) });
     }
     if (commission_class && !ccList.some(function(c){return c.name === commission_class;})) {
         fetch('/api/commission-classes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: commission_class}) });
@@ -594,6 +614,7 @@ loadSuppliers();
 loadProducts();
 fetch('/api/categories').then(r=>r.json()).then(function(d){catList=d;});
 fetch('/api/commission-classes').then(r=>r.json()).then(function(d){ccList=d;});
+fetch('/api/sizes').then(r=>r.json()).then(function(d){sizeList=d;});
 var params = new URLSearchParams(window.location.search);
 var editIdParam = params.get('id');
 if (editIdParam) {

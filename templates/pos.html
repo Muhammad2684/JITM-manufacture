@@ -46,29 +46,23 @@
                 <div class="tr gt"><span>TOTAL</span><span id="tot">Rs 0.00</span></div>
             </div></div>
             <div class="card"><div class="card-body" style="padding-bottom:8px">
-                <div style="display:grid;grid-template-columns:72px 1fr 1fr;gap:5px;align-items:center;font-size:12px">
+                <div style="display:grid;grid-template-columns:72px 1fr;gap:5px;align-items:center;font-size:12px">
                     <span style="font-size:10px;text-transform:uppercase;color:#6b7280;font-weight:600">Method</span>
                     <span style="font-size:10px;text-transform:uppercase;color:#6b7280;font-weight:600">Amount</span>
-                    <span style="font-size:10px;text-transform:uppercase;color:#6b7280;font-weight:600">Change</span>
                     <span>Cash</span>
                     <input id="am-cash" type="number" step="0.01" min="0" oninput="calcSplit()" style="width:100%;padding:5px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:12px">
-                    <div><span id="changeDisplay" style="font-size:12px;font-weight:600;white-space:nowrap;padding:4px 6px;border-radius:4px">Rs 0.00</span></div>
                     <span>BL</span>
                     <input id="am-bl" type="number" step="0.01" min="0" oninput="calcSplit()" style="width:100%;padding:5px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:12px">
-                    <div></div>
                     <span>JL</span>
                     <input id="am-jl" type="number" step="0.01" min="0" oninput="calcSplit()" style="width:100%;padding:5px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:12px">
-                    <div></div>
                     <span>Z</span>
                     <input id="am-z" type="number" step="0.01" min="0" oninput="calcSplit()" style="width:100%;padding:5px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:12px">
-                    <div></div>
                     <span>Credit</span>
                     <input id="am-credit" type="number" step="0.01" min="0" oninput="calcSplit()" style="width:100%;padding:5px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:12px">
-                    <div></div>
                 </div>
-                <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px">
-                    <span style="color:#6b7280">Applied: Rs <span id="appliedTotal">0.00</span></span>
-                    <span id="splitStatus" style="font-weight:600">Enter amounts</span>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid #e2e1de;font-size:13px">
+                    <span style="color:#6b7280">Applied: <span id="appliedTotal">0.00</span> / <span id="totDisp">0.00</span></span>
+                    <span id="splitStatus" style="font-weight:700;padding:4px 10px;border-radius:6px">Enter amounts</span>
                 </div>
             </div></div>
             <button class="btn btn-s btn-lg" id="chg" onclick="pay()" style="justify-content:center">Charge Rs 0.00</button>
@@ -146,7 +140,7 @@ function setStaff(i,v){if(cart[i]){cart[i].staff=v?parseInt(v):null;lastStaff=ca
 function setDisc(i,v){if(cart[i]){cart[i].disc=parseFloat(v)||0;renderC();}}
 function clearCart(){if(!cart.length)return;if(!confirm('Clear?'))return;cart=[];isR=false;isE=false;selC=null;walkIn=false;
 document.getElementById('sc').innerHTML='';document.getElementById('cPhone').value='';document.getElementById('cName').value='';document.getElementById('cName').readOnly=false;document.getElementById('cName').disabled=false;document.getElementById('cPhone').disabled=false;document.getElementById('walkIn').checked=false;document.getElementById('notes').value='';
-document.getElementById('disc').value='';document.getElementById('am-cash').value='';document.getElementById('am-bl').value='';document.getElementById('am-jl').value='';document.getElementById('am-z').value='';document.getElementById('am-credit').value='';document.getElementById('changeDisplay').textContent='Rs 0.00';document.getElementById('changeDisplay').style.color='#6b7280';document.getElementById('changeDisplay').style.background='transparent';document.getElementById('appliedTotal').textContent='0.00';document.getElementById('splitStatus').textContent='Enter amounts';document.getElementById('splitStatus').style.color='#6b7280';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
+document.getElementById('disc').value='';document.getElementById('am-cash').value='';document.getElementById('am-bl').value='';document.getElementById('am-jl').value='';document.getElementById('am-z').value='';document.getElementById('am-credit').value='';document.getElementById('appliedTotal').textContent='0.00';document.getElementById('totDisp').textContent='0.00';document.getElementById('splitStatus').textContent='Enter amounts';document.getElementById('splitStatus').style.color='#6b7280';document.getElementById('splitStatus').style.background='transparent';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
 document.getElementById('exc').textContent='Exchange';document.getElementById('exc').className='btn btn-ghost btn-sm';renderC();search();}
 function toggleReturn(){isR=!isR;if(isR)isE=false;const b=document.getElementById('rtn');
 b.textContent=isR?'Sale':'Return';b.className=isR?'btn btn-d btn-sm':'btn btn-ghost btn-sm';renderC();}
@@ -166,21 +160,15 @@ var crAmt=parseFloat(document.getElementById('am-credit').value)||0;
 var otherTotal=blAmt+jlAmt+zAmt+crAmt;
 var applied=cashAmt+otherTotal;
 document.getElementById('appliedTotal').textContent=applied.toFixed(2);
-var neededFromCash=Math.max(0,tot-otherTotal);
-var chg=cashAmt>neededFromCash?cashAmt-neededFromCash:0;
-document.getElementById('changeDisplay').textContent='Rs '+chg.toFixed(2);
-document.getElementById('changeDisplay').style.color=chg>0?'#16a34a':'#6b7280';
-document.getElementById('changeDisplay').style.background=chg>0?'#f3faf7':'transparent';
-document.getElementById('changeDisplay').style.borderColor=chg>0?'#bbf7d0':'transparent';
-var diff=applied-tot;
+document.getElementById('totDisp').textContent=tot.toFixed(2);
+var diff=Math.round((applied-tot)*100)/100;
 var st=document.getElementById('splitStatus');
-if(Math.abs(diff)<0.005&&applied>0){st.textContent='\u2713 Ready';st.style.color='#16a34a';}
-else if(diff>0.005&&otherTotal>0){st.textContent='Over by Rs '+diff.toFixed(2);st.style.color='#dc2626';}
-else if(diff< -0.005){st.textContent='Short Rs '+Math.abs(diff).toFixed(2);st.style.color='#dc2626';}
-else if(applied===0){st.textContent='Enter amounts';st.style.color='#6b7280';}
-else{st.textContent='\u2713 Ready';st.style.color='#16a34a';}
+if(applied===0){st.textContent='Enter amounts';st.style.color='#6b7280';st.style.background='transparent';}
+else if(Math.abs(diff)<0.005){st.textContent='\u2713 Ready';st.style.background='#f3faf7';st.style.color='#16a34a';}
+else if(diff<0){st.textContent='Short Rs '+Math.abs(diff).toFixed(2);st.style.background='#fef2f2';st.style.color='#dc2626';}
+else{st.textContent='Change Rs '+diff.toFixed(2);st.style.background='#f3faf7';st.style.color='#16a34a';}
 var btn=document.getElementById('chg');
-btn.textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2)+(chg>0?' \u2022 Change Rs '+chg.toFixed(2):'');}
+btn.textContent=(isR?'Refund ':(isE?'Exchange ':'Charge '))+'Rs '+tot.toFixed(2);}
 
 function getPayments(){var tot=parseFloat(document.getElementById('tot').textContent.replace('Rs ',''))||0;
 var cashAmt=parseFloat(document.getElementById('am-cash').value)||0;
@@ -213,7 +201,7 @@ body:JSON.stringify({items,payment:primaryMethod,payments:pd.pays,discount:parse
 is_return:isR,is_exchange:isE,customer_id:selC?selC.id:null,customer_name:walkIn?'Walk In':(document.getElementById('cName').value.trim()||(selC?selC.name:'')),customer_phone:document.getElementById('cPhone').value.trim(),walk_in:walkIn,notes:document.getElementById('notes').value})})
 .then(r=>r.json()).then(d=>{if(d.error){f(d.error);btn.disabled=false;btn.textContent='Charge Rs 0.00';return;}
 showR(d);cart=[];isR=false;isE=false;selC=null;walkIn=false;document.getElementById('sc').innerHTML='';document.getElementById('cPhone').value='';document.getElementById('cName').value='';document.getElementById('cName').readOnly=false;document.getElementById('cName').disabled=false;document.getElementById('cPhone').disabled=false;document.getElementById('walkIn').checked=false;
-    document.getElementById('notes').value='';document.getElementById('disc').value='';document.getElementById('am-cash').value='';document.getElementById('am-bl').value='';document.getElementById('am-jl').value='';document.getElementById('am-z').value='';document.getElementById('am-credit').value='';document.getElementById('changeDisplay').textContent='Rs 0.00';document.getElementById('changeDisplay').style.color='#6b7280';document.getElementById('changeDisplay').style.background='transparent';document.getElementById('appliedTotal').textContent='0.00';document.getElementById('splitStatus').textContent='Enter amounts';document.getElementById('splitStatus').style.color='#6b7280';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
+    document.getElementById('notes').value='';document.getElementById('disc').value='';document.getElementById('am-cash').value='';document.getElementById('am-bl').value='';document.getElementById('am-jl').value='';document.getElementById('am-z').value='';document.getElementById('am-credit').value='';document.getElementById('appliedTotal').textContent='0.00';document.getElementById('totDisp').textContent='0.00';document.getElementById('splitStatus').textContent='Enter amounts';document.getElementById('splitStatus').style.color='#6b7280';document.getElementById('splitStatus').style.background='transparent';document.getElementById('rtn').textContent='Return';document.getElementById('rtn').className='btn btn-ghost btn-sm';
 document.getElementById('exc').textContent='Exchange';document.getElementById('exc').className='btn btn-ghost btn-sm';renderC();btn.disabled=false;document.getElementById('s').value='';closeDropdown();document.getElementById('s').focus();})
 .catch(()=>{f('Sale failed');btn.disabled=false;});}
 function showR(d){let h='<div class="rh"><h3>JITM Baby Garments</h3><p>'+new Date().toLocaleString()+'</p><p style="font-size:11px">'+d.receipt+'</p></div><div class="ri">';

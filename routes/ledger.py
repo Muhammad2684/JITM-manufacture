@@ -374,7 +374,7 @@ def get_product_entries(db, product_id, entity):
             'description': desc,
             'reference': ref,
             'qty': abs(s['quantity']),
-            'debit': s['total'] if s['is_return'] else 0,
+            'debit': abs(s['total']) if s['is_return'] else 0,
             'credit': 0 if s['is_return'] else s['total'],
             'type': 'sale_return' if s['is_return'] else 'sale'
         })

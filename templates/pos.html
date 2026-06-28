@@ -277,18 +277,21 @@
         function imgPH(n) { return '<div style="width:32px;height:32px;background:#e2e1de;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6b7280;font-weight:600;flex-shrink:0">' + (n.charAt(0).toUpperCase() || '?') + '</div>'; }
         function renderC() {
             const el = document.getElementById('cart'), cnt = document.getElementById('cnt'); let n = 0, h = '';
-            if (isR) h += '<div class="rb">RETURN MODE</div>'; if (isE) h += '<div class="rb" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a">EXCHANGE MODE (10% deduction)</div>';
+            if (isR) h += '<div class="rb">RETURN MODE</div>'; if (isE) h += '<div class="rb" style="background:#fffbeb;color:#b45309;border:1px solid #fde68a">EXCHANGE MODE (Negative qty = Return, Positive qty = New item)</div>';
             if (!cart.length) { el.innerHTML = h + '<div class="cart-empty">Add items to begin</div>'; cnt.textContent = ''; calc(); return; }
             h += '<table class="ct"><thead><tr><th></th><th>SKU</th><th>Staff</th><th>Disc%</th><th>Product</th><th>Price</th><th>Qty</th><th>Net Total</th><th></th></tr></thead><tbody>';
             cart.forEach(function (c, i) {
                 n += Math.abs(c.qty); var net = c.qty * c.price * (1 - (c.disc || 0) / 100);
                 var sopts = staffList.map(function (s) { return '<option value="' + s.id + '"' + (s.id == c.staff ? ' selected' : '') + '>' + s.name + '</option>'; }).join('');
-                h += '<tr><td>' + imgPH(c.pname) + '</td><td style="font-size:10px;color:#6b7280">' + (c.sku || '-') + '</td>'
+                var isReturnItem = isE && c.qty < 0;
+                var rowStyle = isReturnItem ? 'background:#fef2f2;' : (isE && c.qty > 0 ? 'background:#f0fdf4;' : '');
+                var qtyLabel = isReturnItem ? ' (Return)' : (isE && c.qty > 0 ? ' (New)' : '');
+                h += '<tr style="' + rowStyle + '"><td>' + imgPH(c.pname) + '</td><td style="font-size:10px;color:#6b7280">' + (c.sku || '-') + '</td>'
                     + '<td><select onchange="setStaff(' + i + ',this.value)" style="font-size:10px;padding:2px;max-width:80px">' + sopts + '</select></td>'
                     + '<td><input type="number" value="' + (c.disc || 0) + '" min="0" max="100" step="0.1" onchange="setDisc(' + i + ',this.value)" style="width:40px;font-size:11px;padding:2px"></td>'
-                    + '<td style="font-size:12px;font-weight:600">' + c.pname + (c.variant ? ' <span style="color:#6b7280;font-size:10px">(' + c.variant + ')</span>' : '') + '</td><td style="font-size:11px">Rs ' + c.price.toFixed(2) + '</td>'
+                    + '<td style="font-size:12px;font-weight:600">' + c.pname + (c.variant ? ' <span style="color:#6b7280;font-size:10px">(' + c.variant + ')</span>' : '') + qtyLabel + '</td><td style="font-size:11px">Rs ' + c.price.toFixed(2) + '</td>'
                     + '<td><input type="number" value="' + c.qty + '" min="' + (isR || isE ? -99 : 1) + '" onchange="uq(' + i + ',this.value)" style="width:40px;font-size:11px;padding:2px"></td>'
-                    + '<td style="font-size:11px;font-weight:600">Rs ' + net.toFixed(2) + '</td>'
+                    + '<td style="font-size:11px;font-weight:600">' + (isReturnItem ? '-' : '') + 'Rs ' + Math.abs(net).toFixed(2) + '</td>'
                     + '<td><button class="rm" onclick="ri(' + i + ')">&times;</button></td></tr>';
             });
             h += '</tbody></table>'; el.innerHTML = h; cnt.textContent = n + ' items'; calc();
@@ -313,10 +316,15 @@
         }
         function calc() {
             const sub = cart.reduce(function (s, c) { return s + c.qty * c.price * (1 - (c.disc || 0) / 100); }, 0); const dp = parseFloat(document.getElementById('disc').value) || 0;
-            const d = sub * dp / 100; const tot = Math.max(0, sub - d);
+            const d = Math.abs(sub) * dp / 100; const tot = sub - d;
             document.getElementById('sub').textContent = 'Rs ' + sub.toFixed(2);
             document.getElementById('tot').textContent = 'Rs ' + tot.toFixed(2);
-            calcSplit(tot);
+            if(isE) {
+                const returnedTotal = cart.filter(c => c.qty < 0).reduce((s, c) => s + Math.abs(c.qty * c.price * (1 - (c.disc || 0) / 100)), 0);
+                const newTotal = cart.filter(c => c.qty > 0).reduce((s, c) => s + c.qty * c.price * (1 - (c.disc || 0) / 100), 0);
+                document.getElementById('sub').textContent = 'New: Rs ' + newTotal.toFixed(2) + ' | Return: Rs ' + returnedTotal.toFixed(2);
+            }
+            calcSplit(Math.abs(tot));
         }
         var splitTimer; function calcSplit(tot) {
             if (tot === undefined) tot = parseFloat(document.getElementById('tot').textContent.replace('Rs ', '')) || 0;
@@ -337,7 +345,16 @@
             else if (otherTotal > tot) { st.textContent = 'Overpayment \u2014 reduce non-cash amounts'; st.style.background = '#fef2f2'; st.style.color = '#dc2626'; }
             else { st.textContent = 'Change Rs ' + diff.toFixed(2); st.style.background = '#f3faf7'; st.style.color = '#16a34a'; }
             var btn = document.getElementById('chg');
-            btn.textContent = (isR ? 'Refund ' : (isE ? 'Exchange ' : 'Charge ')) + 'Rs ' + tot.toFixed(2);
+            var absTot = Math.abs(tot);
+            if(isE && tot < 0) {
+                btn.textContent = 'Refund Rs ' + absTot.toFixed(2);
+            } else if(isE && tot > 0) {
+                btn.textContent = 'Charge Rs ' + absTot.toFixed(2);
+            } else if(isE && tot === 0) {
+                btn.textContent = 'Even Exchange Rs 0.00';
+            } else {
+                btn.textContent = (isR ? 'Refund ' : 'Charge ') + 'Rs ' + absTot.toFixed(2);
+            }
         }
 
         function getPayments() {
@@ -367,7 +384,7 @@
             if (pd.applied < pd.tot - 0.005) { f('Payment total Rs ' + pd.applied.toFixed(2) + ' is short of total Rs ' + pd.tot.toFixed(2)); return; }
             if (!pd.pays.length) { f('Enter at least one payment amount'); return; }
             var otherTotal = pd.applied - pd.cashTendered; if (pd.applied > pd.tot && otherTotal > pd.tot) { f('Non-cash payments exceed total. Please adjust amounts.'); return; }
-            const items = cart.map(c => ({ variant_id: c.vid, quantity: isR || isE ? -Math.abs(c.qty) : c.qty, price: c.price, staff: c.staff }));
+            const items = cart.map(c => ({ variant_id: c.vid, quantity: isR ? -Math.abs(c.qty) : c.qty, price: c.price, staff: c.staff }));
             const btn = document.getElementById('chg'); btn.disabled = true; btn.textContent = 'Processing...';
             var primaryMethod = pd.pays.length === 1 ? pd.pays[0].method : 'split';
             fetch('/api/sale', {
@@ -402,18 +419,28 @@
             h += '<span style="text-align:center;background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Qty</span><span style="background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Description</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">U.Price</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Total</span></div>';
             h += '<div style="display:grid;grid-template-columns:25px 1fr 55px 55px;column-gap:0px;font-size:10px;padding-top:5px;margin-bottom:5px">';
             d.items.forEach(function (i) {
+                var itemLabel = i.is_return ? ' [RETURN]' : '';
                 h += '<span style="text-align:center">' + Math.abs(i.quantity) + '</span>';
-                h += '<span>' + i.product_name + (i.variant_label ? ' (' + i.variant_label + ')' : '') + '<br><span style="font-size:9px;color:#000">' + (i.sku || '') + '</span></span>';
+                h += '<span>' + i.product_name + (i.variant_label ? ' (' + i.variant_label + ')' : '') + itemLabel + '<br><span style="font-size:9px;color:#000">' + (i.sku || '') + '</span></span>';
                 h += '<span style="text-align:right">' + fmt(i.price) + '</span>';
-                h += '<span style="text-align:right">' + fmt(i.total) + '</span>';
+                h += '<span style="text-align:right">' + fmt(Math.abs(i.total)) + '</span>';
             });
             h += '</div>';
             h += '<div class="rl"><span>Items: ' + d.items.length + '</span><span>Qty: ' + totQty + '</span></div>';
             h += '<div class="rl" style="margin-bottom:6px"><span>Status/Tag:</span><span style="font-weight:600">' + (d.is_return ? 'Return' : d.is_exchange ? 'Exchange' : d.status) + '</span></div>';
             h += '<div style="border-top:1px dashed #e2e1de;padding-top:6px">';
-            h += '<div class="rl"><span>Sub Total:</span><span>Rs ' + fmt(d.subtotal) + '</span></div>';
-            h += '<div class="rl"><span>Adjustment:</span><span>Rs ' + fmt(d.discount) + '</span></div>';
-            h += '<div class="rl" style="font-weight:700;font-size:14px"><span>Total:</span><span>Rs ' + fmt(d.total) + '</span></div>';
+            if(d.is_exchange) {
+                var returnedTotal = d.items.filter(i => i.quantity < 0).reduce((s, i) => s + Math.abs(i.total), 0);
+                var newTotal = d.items.filter(i => i.quantity > 0).reduce((s, i) => s + i.total, 0);
+                h += '<div class="rl"><span>Returned Items:</span><span>-Rs ' + fmt(returnedTotal) + '</span></div>';
+                h += '<div class="rl"><span>New Items:</span><span>Rs ' + fmt(newTotal) + '</span></div>';
+                h += '<div class="rl"><span>Adjustment:</span><span>Rs ' + fmt(d.discount) + '</span></div>';
+                h += '<div class="rl" style="font-weight:700;font-size:14px"><span>Net ' + (d.total < 0 ? 'Refund' : 'Due') + ':</span><span>Rs ' + fmt(Math.abs(d.total)) + '</span></div>';
+            } else {
+                h += '<div class="rl"><span>Sub Total:</span><span>Rs ' + fmt(d.subtotal) + '</span></div>';
+                h += '<div class="rl"><span>Adjustment:</span><span>Rs ' + fmt(d.discount) + '</span></div>';
+                h += '<div class="rl" style="font-weight:700;font-size:14px"><span>Total:</span><span>Rs ' + fmt(d.total) + '</span></div>';
+            }
             h += '<div class="rl"><span>Credit:</span><span>Rs ' + fmt(crAmt) + '</span></div>';
             h += '<div class="rl"><span>Cash:</span><span>Rs ' + fmt(netCash) + '</span></div>';
             h += '<div class="rl"><span>Change:</span><span>Rs ' + fmt(d.change_given) + '</span></div></div>';

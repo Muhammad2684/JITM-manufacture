@@ -77,6 +77,7 @@ def complete_sale():
             line_total = round(price * qty, 2)
             subtotal += line_total
             staff_id = item.get('staff')
+            is_item_return = is_return or (is_exchange and qty < 0)
             return {
                 'product_id': prod['id'],
                 'variant_id': vid,
@@ -86,43 +87,33 @@ def complete_sale():
                 'quantity': qty,
                 'price': price,
                 'total': line_total,
-                'is_return': 1 if (is_return or is_exchange) else 0,
+                'is_return': 1 if is_item_return else 0,
                 'staff_id': staff_id,
             }
 
         for item in items:
-            qty_mult = -1 if (is_return or is_exchange) else 1
+            qty_mult = -1 if is_return else (1 if is_exchange else 1)
             si = process_item(item, qty_mult)
             if si is None:
                 continue
             sale_items.append(si)
 
-            if is_exchange and exchange_items_data is not None:
-                pass
+            if is_exchange:
+                if si['quantity'] < 0:
+                    db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (abs(si['quantity']), si['variant_id']))
+                else:
+                    db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
             elif qty_mult < 0:
                 db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (abs(si['quantity']), si['variant_id']))
             else:
                 db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
 
-        if is_exchange and exchange_items_data is not None:
-            for item in exchange_items_data:
-                si = process_item(item, 1)
-                if si is None:
-                    continue
-                sale_items.append(si)
-                db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
-
         if errors:
             return jsonify({'error': '; '.join(errors)}), 400
 
-        disc_amt = round(subtotal * discount / 100, 2) if discount_type == 'percent' else discount
+        disc_amt = round(abs(subtotal) * discount / 100, 2) if discount_type == 'percent' else discount
         total = round(subtotal - disc_amt, 2)
         tax = 0
-
-        if is_exchange:
-            returned_value = abs(sum(si['total'] for si in sale_items if si['quantity'] < 0))
-            penalty = round(returned_value * 0.10, 2)
-            total = round(total + penalty, 2)
 
         receipt = make_receipt()
 

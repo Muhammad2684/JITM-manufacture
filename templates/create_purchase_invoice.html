@@ -100,6 +100,29 @@
         <h2 id="ft">New Product</h2>
         <form onsubmit="saveProduct(event)">
             <label>Name</label><input id="pn" required>
+            <label>Size</label>
+            <select id="psize">
+                <option value="">-- Select --</option>
+                <option value="oz">oz (Fluid Ounce)</option>
+                <option value="ml">ml (Milliliter)</option>
+                <option value="in">in (Inches)</option>
+                <option value="cm">cm (Centimeters)</option>
+                <option value="lbs">lbs (Pounds)</option>
+                <option value="kg">kg (Kilograms)</option>
+                <option value="NB">NB (Newborn)</option>
+                <option value="0-3M">0-3M (0 to 3 Months)</option>
+                <option value="3-6M">3-6M (3 to 6 Months)</option>
+                <option value="6-9M">6-9M (6 to 9 Months)</option>
+                <option value="9-12M">9-12M (9 to 12 Months)</option>
+                <option value="12-18M">12-18M (12 to 18 Months)</option>
+                <option value="18-24M">18-24M (18 to 24 Months)</option>
+                <option value="Y/T">Y / T (Years / Toddler)</option>
+                <option value="Size 0/P">Size 0 / P (Preemie / Extra-Slow Flow)</option>
+                <option value="Size 1">Size 1 (Slow Flow)</option>
+                <option value="Size 2">Size 2 (Medium Flow)</option>
+                <option value="Size 3/4">Size 3 / Size 4 (Fast Flow)</option>
+                <option value="Y-Cut/X-Cut">Y-Cut / X-Cut (Variable Flow)</option>
+            </select>
             <div class="form-row">
                 <div>
                     <label>SKU</label>
@@ -186,7 +209,11 @@ function acShow(inp, rid) {
         list.innerHTML = '<div data-action="create" data-name="'+inp.value.replace(/'/g,"\\'")+'" onmousedown="acCreate('+rid+',\''+inp.value.replace(/'/g,"\\'")+'\')"><span style="color:#3b4fe2;font-weight:600">+ Create</span> \''+inp.value+'\'</div>';
         list.style.display = 'block'; acHighlightIdx = -1; return;
     }
-    list.innerHTML = matches.map(function(p){return '<div onmousedown="acPick('+rid+','+p.id+',\''+p.name.replace(/'/g,"\\'")+'\','+(p.cost_price||0)+')" data-pid="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+(p.cost_price||0)+'">'+p.name+' <span style="color:#9ca3af;font-size:10px">'+p.sku+'</span></div>';}).join('');
+    list.innerHTML = matches.map(function(p){
+        var sz = (p.variants && p.variants[0] && p.variants[0].size) || '';
+        var label = p.name + (sz ? ' ['+sz+']' : '');
+        return '<div onmousedown="acPick('+rid+','+p.id+',\''+label.replace(/'/g,"\\'")+'\','+(p.cost_price||0)+')" data-pid="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+(p.cost_price||0)+'">'+label+' <span style="color:#9ca3af;font-size:10px">'+p.sku+'</span></div>';
+    }).join('');
     acHighlightIdx = -1;
     list.style.display = 'block';
 }
@@ -269,6 +296,7 @@ function acCreate(rid, name) {
     populateCategories(); document.getElementById('pcat').value = '';
     populateCommissionClasses(); document.getElementById('pcc').value = '';
     document.getElementById('pl').value = 5;
+    document.getElementById('psize').value = '';
     document.getElementById('ft').textContent = 'New Product';
     document.getElementById('ac-'+rid).style.display = 'none';
     document.getElementById('pm').classList.add('show');
@@ -329,7 +357,8 @@ function saveProduct(e) {
         name: document.getElementById('pn').value, sku: document.getElementById('ps').value, barcode: document.getElementById('pb').value || null,
         base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
         commission_class: commission_class || null,
-        low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0
+        low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0,
+        size: document.getElementById('psize').value || ''
     };
     if (cat && !catList.some(function(c){return c.name === cat;})) {
         fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: cat}) });
@@ -346,7 +375,7 @@ function saveProduct(e) {
                 tr.dataset.pid = d.id;
                 tr.querySelector('.up').value = parseFloat(data.cost_price).toFixed(2);
                 var inp = tr.querySelector('.item-wrap .cell');
-                inp.value = data.name;
+                inp.value = data.name + (data.size ? ' ['+data.size+']' : '');
                 calcRow(tr.querySelector('.qty'));
                 if (isLastRow(inp)) { addRow(); }
                 var nextTr = tr.nextElementSibling;

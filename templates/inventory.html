@@ -28,13 +28,14 @@
                         <tr>
                             <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
                             <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Product <span id="si1"></span></th>
-                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">SKU <span id="si2"></span></th>
-                            <th onclick="sortCol(3)" class="text-right" style="cursor:pointer;user-select:none">Stock <span id="si3"></span></th>
-                            <th onclick="sortCol(4)" style="cursor:pointer;user-select:none">Category <span id="si4"></span></th>
-                            <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Sale Price <span id="si5"></span></th>
-                            <th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Avg Cost <span id="si6"></span></th>
-                            <th onclick="sortCol(7)" class="text-right" style="cursor:pointer;user-select:none">Last P.Cost <span id="si7"></span></th>
-                            <th onclick="sortCol(8)" class="text-right" style="cursor:pointer;user-select:none">Total Cost <span id="si8"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Size <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">SKU <span id="si3"></span></th>
+                            <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Stock <span id="si4"></span></th>
+                            <th onclick="sortCol(5)" style="cursor:pointer;user-select:none">Category <span id="si5"></span></th>
+                            <th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Sale Price <span id="si6"></span></th>
+                            <th onclick="sortCol(7)" class="text-right" style="cursor:pointer;user-select:none">Avg Cost <span id="si7"></span></th>
+                            <th onclick="sortCol(8)" class="text-right" style="cursor:pointer;user-select:none">Last P.Cost <span id="si8"></span></th>
+                            <th onclick="sortCol(9)" class="text-right" style="cursor:pointer;user-select:none">Total Cost <span id="si9"></span></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -50,6 +51,29 @@
             <h2 id="ft">Product</h2>
             <form onsubmit="save(event)">
                 <label>Name</label><input id="pn" required>
+                <label>Size</label>
+                <select id="psize">
+                    <option value="">-- Select --</option>
+                    <option value="oz">oz (Fluid Ounce)</option>
+                    <option value="ml">ml (Milliliter)</option>
+                    <option value="in">in (Inches)</option>
+                    <option value="cm">cm (Centimeters)</option>
+                    <option value="lbs">lbs (Pounds)</option>
+                    <option value="kg">kg (Kilograms)</option>
+                    <option value="NB">NB (Newborn)</option>
+                    <option value="0-3M">0-3M (0 to 3 Months)</option>
+                    <option value="3-6M">3-6M (3 to 6 Months)</option>
+                    <option value="6-9M">6-9M (6 to 9 Months)</option>
+                    <option value="9-12M">9-12M (9 to 12 Months)</option>
+                    <option value="12-18M">12-18M (12 to 18 Months)</option>
+                    <option value="18-24M">18-24M (18 to 24 Months)</option>
+                    <option value="Y/T">Y / T (Years / Toddler)</option>
+                    <option value="Size 0/P">Size 0 / P (Preemie / Extra-Slow Flow)</option>
+                    <option value="Size 1">Size 1 (Slow Flow)</option>
+                    <option value="Size 2">Size 2 (Medium Flow)</option>
+                    <option value="Size 3/4">Size 3 / Size 4 (Fast Flow)</option>
+                    <option value="Y-Cut/X-Cut">Y-Cut / X-Cut (Variable Flow)</option>
+                </select>
                 <div class="form-row">
                     <div>
                         <label>SKU</label>
@@ -138,11 +162,12 @@
         }
         function sortCol(i){
             if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
-            for (let j = 0; j < 9; j++) document.getElementById('si' + j).textContent = '';
+            for (let j = 0; j < 10; j++) document.getElementById('si' + j).textContent = '';
             document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
             const vals = [
                 () => 0,
                 p => (p.name || '').toLowerCase(),
+                p => (p.variants && p.variants[0] && p.variants[0].size || '').toLowerCase(),
                 p => (p.sku || '').toLowerCase(),
                 p => p.total_stock || 0,
                 p => (p.category || '').toLowerCase(),
@@ -157,18 +182,19 @@
         function render(l) {
             document.getElementById('tb').innerHTML = l.map((p, idx) => {
                 let vh = ''; if (p.variants && p.variants.length) {
-                    const vc = p.cost_price || 0; vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="10" style="padding:6px 14px 8px;background:#f8f7f4">' +
+                    const vc = p.cost_price || 0; vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="11" style="padding:6px 14px 8px;background:#f8f7f4">' +
                         p.variants.map(v => '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px"><span style="width:95px">' + (v.size || '-') + ' / ' + (v.color || '-') + '</span><span style="width:80px;color:#6b7280">' + v.sku + '</span><span style="width:45px;text-align:right" class="' + (v.stock <= p.low_stock ? 'bdg bdg-err' : '') + '">' + v.stock + '</span><span style="width:70px">' + (v.barcode ? '<code>' + v.barcode + '</code>' : '-') + '</span><span style="width:65px;font-weight:600;text-align:right">Rs ' + (v.price || p.base_price).toFixed(2) + '</span><span style="width:60px;text-align:right">Rs ' + vc.toFixed(2) + '</span><span style="width:65px;text-align:right;color:#6b7280">' + (p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '- -') + '</span><span style="width:65px;text-align:right;color:#374151">Rs ' + (vc * v.stock).toFixed(2) + '</span>' +
                             (ROLE == 'manager' ? '<button class="btn btn-xs" onclick="editStock(' + v.id + ')">Stock</button>' : '') + '</div>').join('') + '</td></tr>';
                 }
         const arrow = p.has_variants ? '<span onclick="toggleV(' + p.id + ')" style="cursor:pointer;font-size:10px;color:#9ca3af;margin-right:6px;user-select:none" id="a-' + p.id + '">&#9654;</span> ' : '';
         const tc = p.cost_price * p.total_stock;
         const lc = p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>';
-        return '<tr><td style="color:#6b7280;font-size:12px">' + (idx + 1) + '</td><td style="font-weight:600">' + arrow + p.name + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td>' +
+        const psize = (p.variants && p.variants[0] && p.variants[0].size) || '-';
+        return '<tr><td style="color:#6b7280;font-size:12px">' + (idx + 1) + '</td><td style="font-weight:600">' + arrow + p.name + '</td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td>' +
             '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button>' : '') + '</td></tr>' + vh;}).join('');
     var totStock=0,totCost=0;
     l.forEach(function(p){totStock+=p.total_stock||0;totCost+=(p.cost_price||0)*(p.total_stock||0);});
-    document.getElementById('tf').innerHTML='<tr><td colspan="3" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td></tr>';}
+    document.getElementById('tf').innerHTML='<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td></tr>';}
         function toggleV(id) { const e = document.getElementById('v-' + id); const a = document.getElementById('a-' + id); if (e.style.display === 'none') { e.style.display = ''; a.innerHTML = '&#9660;'; } else { e.style.display = 'none'; a.innerHTML = '&#9654;'; } }
         function autoSku(on) {
             const inp = document.getElementById('ps');
@@ -219,6 +245,7 @@
         function showAdd() {
             editing = null; document.getElementById('ft').textContent = 'New Product';
             document.getElementById('pa').checked = true; document.getElementById('ps').disabled = true; document.getElementById('ps').value = ''; autoSku(true);
+            document.getElementById('psize').value = '';
             document.getElementById('pcat').style.display = ''; document.getElementById('pcat_new').style.display = 'none';
             document.getElementById('pcc').style.display = ''; document.getElementById('pcc_new').style.display = 'none';
             populateCategories(); document.getElementById('pcat').value = '';
@@ -258,6 +285,7 @@
                 csel.value = '';
             }
             document.getElementById('pl').value = p.low_stock; document.getElementById('pa').checked = false; document.getElementById('ps').disabled = true;
+            document.getElementById('psize').value = (p.variants && p.variants[0] && p.variants[0].size) || '';
             document.getElementById('pm').classList.add('show');
         }
         function save(e) {
@@ -270,7 +298,8 @@
                 name: document.getElementById('pn').value, sku: document.getElementById('ps').value, barcode: document.getElementById('pb').value || null,
                 base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
                 commission_class: commission_class || null,
-                low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0
+                low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0,
+                size: document.getElementById('psize').value || ''
             };
             if (cat && !catList.some(c => c.name === cat)) {
                 fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: cat}) }).then(r => r.json()).then(() => { catList.push({name: cat}); });

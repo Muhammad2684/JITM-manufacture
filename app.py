@@ -55,6 +55,7 @@ def sidebar(active):
             ('/inventory', 'All Products'),
             ('/inventory/categories', 'Categories'),
             ('/inventory/commission-classes', 'Commission Class'),
+            ('/inventory/barcode', 'Barcode Generator'),
         ]),
         (None, 'Cash And Bank Accounts', 'accounts', [
             ('/accounts', 'All Accounts'),
@@ -213,6 +214,12 @@ def inventory_categories():
 @login_required
 def inventory_commission_classes():
     return page('commission_classes.html', '/inventory/commission-classes')
+
+
+@app.route('/inventory/barcode', strict_slashes=False)
+@login_required
+def inventory_barcode():
+    return page('barcode.html', '/inventory/barcode')
 
 
 @app.route('/ledger/<entity_type>/<int:entity_id>', strict_slashes=False)

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head><title>JITM · Barcode Generator</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
+<style>
+.barcode-layout{display:grid;grid-template-columns:320px 1fr;gap:16px;min-height:calc(100vh - 140px);}
+.barcode-left{display:flex;flex-direction:column;gap:12px;}
+.barcode-right{display:flex;flex-direction:column;align-items:center;gap:16px;}
+.barcode-search{position:relative;}
+.barcode-results{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e2e1de;border-radius:8px;max-height:300px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:50;display:none;}
+.barcode-results.show{display:block;}
+.barcode-result-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f2ef;}
+.barcode-result-item:last-child{border-bottom:none;}
+.barcode-result-item:hover,.barcode-result-item.hl{background:#f0effc;}
+.barcode-result-item .br-name{font-size:13px;font-weight:600;color:#1a1c2e;}
+.barcode-result-item .br-detail{font-size:11px;color:#6b7280;}
+.barcode-result-item .br-sku{font-size:11px;color:#3b4fe2;font-weight:600;}
+.selected-variant{padding:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;text-align:center;}
+.selected-variant .sv-name{font-size:16px;font-weight:700;color:#1a1c2e;}
+.selected-variant .sv-sku{font-size:13px;color:#3b4fe2;margin-top:4px;}
+.selected-variant .sv-variant{font-size:12px;color:#6b7280;margin-top:2px;}
+.barcode-display{padding:20px;background:#fff;border:2px solid #000;border-radius:4px;text-align:center;}
+.barcode-display svg{display:block;margin:0 auto;}
+.barcode-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;}
+.barcode-controls label{font-size:12px;color:#6b7280;}
+.barcode-controls input[type=number]{width:60px;padding:6px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:13px;}
+.barcode-controls select{padding:6px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:13px;}
+.print-area{display:none;}
+@media print{
+    body *{visibility:hidden;}
+    .print-area,.print-area *{visibility:visible;}
+    .print-area{display:block;position:absolute;left:0;top:0;width:100%;}
+    .print-label{display:inline-block;padding:8px;text-align:center;vertical-align:top;margin:4px;}
+    .print-label svg{display:block;margin:0 auto;}
+    .print-label .pl-sku{font-size:11px;font-weight:700;font-family:monospace;margin-top:4px;}
+    .print-label .pl-name{font-size:9px;color:#333;margin-top:2px;}
+}
+</style>
+</head>
+<body>
+{{sidebar|safe}}
+<div class="main">
+    <div class="topbar"><h2>Barcode Generator</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
+    <div class="content">
+        <div class="barcode-layout">
+            <div class="barcode-left">
+                <div class="card"><div class="card-body">
+                    <div class="barcode-search">
+                        <input id="bs" placeholder="Search product name or SKU..." autofocus style="width:100%;padding:8px 12px;border:1px solid #e2e1de;border-radius:6px;font-size:13px">
+                        <div class="barcode-results" id="br"></div>
+                    </div>
+                </div></div>
+                <div class="card" style="flex:1"><div class="card-body" id="selectedArea">
+                    <div style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px">Search and select a product to generate its barcode</div>
+                </div></div>
+            </div>
+            <div class="barcode-right">
+                <div class="card" style="width:100%;max-width:500px"><div class="card-body">
+                    <div id="barcodeArea" style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px">Select a product variant to see its barcode</div>
+                </div></div>
+                <div class="card" style="width:100%;max-width:500px"><div class="card-body">
+                    <div class="barcode-controls" id="controlsArea" style="display:none">
+                        <div><label>Copies:</label><input type="number" id="copies" value="1" min="1" max="100"></div>
+                        <div><label>Label Size:</label>
+                            <select id="labelSize">
+                                <option value="small">Small (200x80)</option>
+                                <option value="medium" selected>Medium (300x120)</option>
+                                <option value="large">Large (400x160)</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-p" onclick="printBarcodes()">Print Labels</button>
+                    </div>
+                </div></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="print-area" id="printArea"></div>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+var allP=[],hlIdx=-1,selectedVid=null,selectedSku='',selectedName='',selectedVariant='';
+var labelSizes={small:{w:200,h:80,fs:10},medium:{w:300,h:120,fs:12},large:{w:400,h:160,fs:14}};
+
+document.getElementById('bs').addEventListener('input',function(e){if(e.target.value.length>=1)search();else closeResults();});
+document.getElementById('bs').addEventListener('keydown',function(e){
+    var items=document.querySelectorAll('.barcode-result-item');
+    if(e.key==='ArrowDown'){e.preventDefault();hlIdx=Math.min(hlIdx+1,items.length-1);highlight(items);}
+    else if(e.key==='ArrowUp'){e.preventDefault();hlIdx=Math.max(hlIdx-1,0);highlight(items);}
+    else if(e.key==='Enter'&&hlIdx>=0&&hlIdx<items.length){var it=items[hlIdx];selectVariant(parseInt(it.dataset.vid),it.dataset.sku,it.dataset.name,it.dataset.variant);}
+});
+document.getElementById('bs').addEventListener('blur',function(){setTimeout(closeResults,200);});
+
+function highlight(items){items.forEach(function(el,i){el.classList.toggle('hl',i===hlIdx);});var h=items[hlIdx];if(h)h.scrollIntoView({block:'nearest'});}
+function closeResults(){var r=document.getElementById('br');r.innerHTML='';r.classList.remove('show');hlIdx=-1;}
+
+function search(){fetch('/api/products/search?q='+encodeURIComponent(document.getElementById('bs').value)).then(function(r){return r.json();}).then(function(d){allP=d;renderResults(d);}).catch(function(){allP=[];});}
+
+function renderResults(l){var r=document.getElementById('br');hlIdx=-1;if(!l.length){r.classList.remove('show');r.innerHTML='';return;}
+r.classList.add('show');
+r.innerHTML=l.map(function(p,i){return'<div class="barcode-result-item" data-vid="'+p.vid+'" data-sku="'+p.sku+'" data-name="'+p.name+'" data-variant="'+((p.size||'')+' '+(p.color||'')).trim()+'"><div class="br-name">'+p.name+'</div><div class="br-detail">'+((p.size||'')+' '+(p.color||'')).trim()+(p.stock?' &middot; '+p.stock+' in stock':'')+'</div><div class="br-sku">'+p.sku+'</div></div>';}).join('');}
+
+document.getElementById('br').addEventListener('click',function(e){var item=e.target.closest('.barcode-result-item');if(!item)return;selectVariant(parseInt(item.dataset.vid),item.dataset.sku,item.dataset.name,item.dataset.variant);});
+
+function selectVariant(vid,sku,name,variant){
+    selectedVid=vid;selectedSku=sku;selectedName=name;selectedVariant=variant;
+    closeResults();document.getElementById('bs').value=name;
+    document.getElementById('selectedArea').innerHTML='<div class="selected-variant"><div class="sv-name">'+name+'</div><div class="sv-variant">'+(variant||'')+'</div><div class="sv-sku">'+sku+'</div></div>';
+    renderBarcode();
+}
+
+function renderBarcode(){
+    if(!selectedSku)return;
+    var area=document.getElementById('barcodeArea');
+    area.innerHTML='<div class="barcode-display"><svg id="barcodeSvg"></svg></div>';
+    var sz=labelSizes[document.getElementById('labelSize').value];
+    try{
+        JsBarcode('#barcodeSvg',selectedSku,{format:'CODE128',width:2,height:sz.h*0.4,fontSize:sz.fs,margin:10,textMargin:4});
+    }catch(e){area.innerHTML='<div style="color:#dc2626;padding:20px">Invalid barcode value: '+selectedSku+'</div>';return;}
+    document.getElementById('controlsArea').style.display='flex';
+}
+
+document.getElementById('labelSize').addEventListener('change',renderBarcode);
+
+function printBarcodes(){
+    if(!selectedSku)return;
+    var copies=parseInt(document.getElementById('copies').value)||1;
+    var sz=labelSizes[document.getElementById('labelSize').value];
+    var pa=document.getElementById('printArea');
+    pa.innerHTML='';
+    for(var i=0;i<copies;i++){
+        var div=document.createElement('div');div.className='print-label';div.style.width=sz.w+'px';
+        var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('id','pl-'+i);svg.setAttribute('width',sz.w);svg.setAttribute('height',sz.h);
+        div.appendChild(svg);
+        var skuDiv=document.createElement('div');skuDiv.className='pl-sku';skuDiv.textContent=selectedSku;div.appendChild(skuDiv);
+        var nameDiv=document.createElement('div');nameDiv.className='pl-name';nameDiv.textContent=selectedName+(selectedVariant?' ('+selectedVariant+')':'');div.appendChild(nameDiv);
+        pa.appendChild(div);
+    }
+    setTimeout(function(){
+        for(var i=0;i<copies;i++){
+            try{JsBarcode('#pl-'+i,selectedSku,{format:'CODE128',width:1.5,height:sz.h*0.35,fontSize:sz.fs*0.85,margin:4,textMargin:2});}catch(e){}
+        }
+        window.print();
+    },100);
+}
+</script>
+</body>
+</html>

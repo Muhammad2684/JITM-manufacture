@@ -286,8 +286,8 @@
             fetch('/api/customers')
                 .then(r => r.json())
                 .then(function(d) {
-                    customers = d;
-                    var o = d.map(function(c) {
+                    customers = d.items || d;
+                    var o = customers.map(function(c) {
                         return '<option value="c_' + c.id + '">' + c.name + '</option>';
                     }).join('');
                     document.getElementById('aparty').innerHTML = o;

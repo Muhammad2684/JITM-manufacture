@@ -244,15 +244,9 @@
             </div>
         </div>
         <div class="content">
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px">
-                <label style="margin:0;font-size:12px">From</label>
-                <input type="date" id="df" style="width:150px" onchange="loadSummary()">
-                <label style="margin:0;font-size:12px">To</label>
-                <input type="date" id="dt" style="width:150px" onchange="loadSummary()">
-                <button class="btn btn-sm" onclick="clearDates()" style="margin:0">Clear</button>
-            </div>
             <div class="dashboard-grid">
                 <div class="grid-column">
+                    <h3 style="font-size:14px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Balance Sheet</h3>
                     <div class="manager-card">
                         <div class="card-header">
                             <span>Assets</span>
@@ -276,6 +270,16 @@
                     </div>
                 </div>
                 <div class="grid-column">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <h3 style="font-size:14px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin:0">Income Statement</h3>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <label style="margin:0;font-size:12px">From</label>
+                            <input type="date" id="df" style="width:140px" onchange="loadIncomeStatement()">
+                            <label style="margin:0;font-size:12px">To</label>
+                            <input type="date" id="dt" style="width:140px" onchange="loadIncomeStatement()">
+                            <button class="btn btn-sm" onclick="clearDates()" style="margin:0">Clear</button>
+                        </div>
+                    </div>
                     <div class="manager-card">
                         <div class="card-header">
                             <span>Net profit (loss)</span>
@@ -319,14 +323,8 @@
             return '<div class="card-body-row"><span>' + label + '</span><span class="value-null">&ndash;</span></div>';
         }
         
-        function loadSummary() {
-            var df = document.getElementById('df').value;
-            var dt = document.getElementById('dt').value;
-            var url = '/api/summary?';
-            if (df) url += 'date_from=' + df + '&';
-            if (dt) url += 'date_to=' + dt;
-            
-            fetch(url)
+        function loadBalanceSheet() {
+            fetch('/api/summary?section=balance_sheet')
                 .then(r => r.json())
                 .then(d => {
                     const bs = d.balance_sheet;
@@ -349,7 +347,19 @@
                     
                     document.getElementById('equity').innerHTML = bs.equity.map(e => activeRow(e.label, e.amount, '')).join('');
                     document.getElementById('equity-total').textContent = fmt(bs.total_equity);
-                    
+                });
+        }
+        
+        function loadIncomeStatement() {
+            var df = document.getElementById('df').value;
+            var dt = document.getElementById('dt').value;
+            var url = '/api/summary?section=income_statement';
+            if (df) url += '&date_from=' + df;
+            if (dt) url += '&date_to=' + dt;
+            
+            fetch(url)
+                .then(r => r.json())
+                .then(d => {
                     const pnl = d.pnl;
                     let h = '';
                     h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Income</div>';
@@ -374,14 +384,19 @@
                 });
         }
         
+        function loadSummary() {
+            loadBalanceSheet();
+            loadIncomeStatement();
+        }
+        
         function clearDates() {
             document.getElementById('df').value = '';
             document.getElementById('dt').value = '';
-            loadSummary();
+            loadIncomeStatement();
         }
         
         function showDetails(type) {
-            // Redirect to actual pages for certain types
+            // Redirect to actual pages for balance sheet items (no date filtering)
             const redirects = {
                 'cash_bank': '/accounts',
                 'inventory': '/inventory',
@@ -394,6 +409,7 @@
                 return;
             }
             
+            // For income statement items, apply date filtering
             var df = document.getElementById('df').value;
             var dt = document.getElementById('dt').value;
             var url = '/api/summary/details/' + type + '?';

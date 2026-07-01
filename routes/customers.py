@@ -8,78 +8,84 @@ cust_bp = Blueprint('customers', __name__, url_prefix='/api')
 @cust_bp.route('/customers')
 @login_required
 def list_customers():
-    q = request.args.get('q', '')
+    """List all customers with optional search filter."""
+    search_query = request.args.get('q', '')
     with get_db() as db:
-        if q:
+        if search_query:
             rows = db.execute(
                 'SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name',
-                (f'%{q}%', f'%{q}%')
+                (f'%{search_query}%', f'%{search_query}%')
             ).fetchall()
         else:
             rows = db.execute('SELECT * FROM customers ORDER BY name').fetchall()
-        return jsonify([dict(r) for r in rows])
+        return jsonify([dict(row) for row in rows])
 
 
 @cust_bp.route('/customers', methods=['POST'])
 @login_required
 def add_customer():
-    d = request.get_json()
+    """Create a new customer."""
+    request_data = request.get_json()
     with get_db() as db:
         try:
-            cur = db.execute(
+            cursor = db.execute(
                 'INSERT INTO customers (name, phone, email, address, baby_name, baby_birth, notes, credit) VALUES (?,?,?,?,?,?,?,?)',
-                (d['name'], d.get('phone', ''), d.get('email', ''), d.get('address', ''),
-                 d.get('baby_name', ''), d.get('baby_birth', ''), d.get('notes', ''),
-                 float(d.get('credit', 0)))
+                (request_data['name'], request_data.get('phone', ''), request_data.get('email', ''), request_data.get('address', ''),
+                 request_data.get('baby_name', ''), request_data.get('baby_birth', ''), request_data.get('notes', ''),
+                 float(request_data.get('credit', 0)))
             )
-            return jsonify({'ok': True, 'id': cur.lastrowid})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 400
+            return jsonify({'ok': True, 'id': cursor.lastrowid})
+        except Exception as error:
+            return jsonify({'error': str(error)}), 400
 
 
-@cust_bp.route('/customers/<int:cid>', methods=['PUT'])
+@cust_bp.route('/customers/<int:customer_id>', methods=['PUT'])
 @login_required
-def update_customer(cid):
-    d = request.get_json()
+def update_customer(customer_id):
+    """Update name, phone, email, address, baby info, notes, and credit for a customer."""
+    request_data = request.get_json()
     with get_db() as db:
         db.execute(
             'UPDATE customers SET name=?, phone=?, email=?, address=?, baby_name=?, baby_birth=?, notes=?, credit=? WHERE id=?',
-            (d['name'], d.get('phone', ''), d.get('email', ''), d.get('address', ''),
-             d.get('baby_name', ''), d.get('baby_birth', ''), d.get('notes', ''),
-             float(d.get('credit', 0)), cid)
+            (request_data['name'], request_data.get('phone', ''), request_data.get('email', ''), request_data.get('address', ''),
+             request_data.get('baby_name', ''), request_data.get('baby_birth', ''), request_data.get('notes', ''),
+             float(request_data.get('credit', 0)), customer_id)
         )
         return jsonify({'ok': True})
 
 
-@cust_bp.route('/customers/<int:cid>', methods=['DELETE'])
+@cust_bp.route('/customers/<int:customer_id>', methods=['DELETE'])
 @login_required
-def delete_customer(cid):
+def delete_customer(customer_id):
+    """Delete a customer and nullify their references in sales."""
     with get_db() as db:
-        db.execute('UPDATE sales SET customer_id=NULL, customer_name="Deleted" WHERE customer_id=?', (cid,))
-        db.execute('DELETE FROM customers WHERE id=?', (cid,))
+        db.execute('UPDATE sales SET customer_id=NULL, customer_name="Deleted" WHERE customer_id=?', (customer_id,))
+        db.execute('DELETE FROM customers WHERE id=?', (customer_id,))
         return jsonify({'ok': True})
 
 
-@cust_bp.route('/customers/<int:cid>/history')
+@cust_bp.route('/customers/<int:customer_id>/history')
 @login_required
-def customer_history(cid):
+def customer_history(customer_id):
+    """Get recent sales history for a customer."""
     with get_db() as db:
         sales = db.execute(
             'SELECT * FROM sales WHERE customer_id=? ORDER BY id DESC LIMIT 50',
-            (cid,)
+            (customer_id,)
         ).fetchall()
         return jsonify({
-            'sales': [dict(r) for r in sales],
+            'sales': [dict(row) for row in sales],
         })
 
 
-@cust_bp.route('/customers/<int:cid>/invoices')
+@cust_bp.route('/customers/<int:customer_id>/invoices')
 @login_required
-def customer_invoices(cid):
+def customer_invoices(customer_id):
+    """Get outstanding (unpaid/partial) invoices for a customer."""
     with get_db() as db:
         rows = db.execute(
             "SELECT id, receipt, subtotal, total, paid, (total-paid) as outstanding, created_at "
             "FROM sales WHERE customer_id=? AND status IN ('Unpaid','Partial') AND total>paid "
-            "ORDER BY created_at", (cid,)
+            "ORDER BY created_at", (customer_id,)
         ).fetchall()
-        return jsonify([dict(r) for r in rows])
+        return jsonify([dict(row) for row in rows])

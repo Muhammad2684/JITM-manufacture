@@ -1,3 +1,28 @@
+"""
+Database schema for JITM POS system.
+
+Tables:
+- users: System users (managers, staff) with authentication
+- products: Product catalog with pricing and categorization
+- variants: Product variants (size/color combinations) with stock levels
+- sales: Sales transactions (invoices) with customer and payment info
+- sale_items: Line items for each sale
+- payments: Payment records for sales (supports split payments)
+- customers: Customer records with contact info and credit tracking
+- suppliers: Supplier records with contact info and balance tracking
+- purchase_invoices: Purchase invoices from suppliers
+- purchase_invoice_items: Line items for purchase invoices
+- accounts: Cash and bank accounts for tracking money
+- account_transfers: Transfers between accounts
+- transactions: Financial transactions (receipts/payments) linked to accounts
+- restock_log: History of stock changes with cost tracking
+- expenses: Business expenses
+- commission_classes: Commission rate classes for products
+- categories: Product categories
+- sizes: Available product sizes
+- settings: System configuration key-value pairs
+"""
+
 import sqlite3
 import os
 from werkzeug.security import generate_password_hash
@@ -279,6 +304,48 @@ def init_db():
             pass
 
         try:
+            db.execute('ALTER TABLE sale_items ADD COLUMN cost_price REAL DEFAULT 0')
+        except Exception:
+            pass
+
+        # Backfill cost_price for existing sale_items using historical weighted average cost
+        try:
+            # First, try to calculate from restock_log (historical cost)
+            db.execute('''
+                UPDATE sale_items 
+                SET cost_price = COALESCE(
+                    (SELECT 
+                        CASE 
+                            WHEN SUM(rl.qty_added) > 0 
+                            THEN SUM(rl.qty_added * rl.cost) / SUM(rl.qty_added)
+                            ELSE 0 
+                        END
+                     FROM restock_log rl 
+                     JOIN variants v ON v.id = rl.variant_id
+                     WHERE v.id = sale_items.variant_id 
+                       AND rl.created_at < (SELECT created_at FROM sales WHERE id = sale_items.sale_id)
+                    ),
+                    0
+                )
+                WHERE cost_price = 0 OR cost_price IS NULL
+            ''')
+            
+            # For any still missing, fall back to product's current cost_price
+            db.execute('''
+                UPDATE sale_items 
+                SET cost_price = COALESCE(
+                    (SELECT p.cost_price 
+                     FROM products p 
+                     JOIN variants v ON v.product_id = p.id 
+                     WHERE v.id = sale_items.variant_id),
+                    0
+                )
+                WHERE cost_price = 0 OR cost_price IS NULL
+            ''')
+        except Exception:
+            pass
+
+        try:
             db.execute('ALTER TABLE customers ADD COLUMN credit_limit REAL DEFAULT NULL')
         except Exception:
             pass
@@ -305,6 +372,16 @@ def init_db():
             pass
         try:
             db.execute('ALTER TABLE transactions ADD COLUMN expense_category TEXT DEFAULT NULL')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE users ADD COLUMN nick_name TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT \'[]\'')
         except Exception:
             pass
 

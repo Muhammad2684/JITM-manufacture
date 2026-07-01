@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, session, jsonif
 from database import get_db
 from functools import wraps
 from werkzeug.security import check_password_hash, generate_password_hash
+import json
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -26,9 +27,39 @@ def manager_required(f):
     return wrap
 
 
+def permission_required(permission):
+    """Decorator to check if user has a specific permission."""
+    def decorator(f):
+        @wraps(f)
+        def wrap(*a, **kw):
+            user_role = session.get('role')
+            user_id = session.get('user_id')
+            
+            # Managers have all permissions
+            if user_role == 'manager':
+                return f(*a, **kw)
+            
+            # Check user permissions
+            if user_id:
+                with get_db() as db:
+                    user = db.execute('SELECT permissions FROM users WHERE id=?', (user_id,)).fetchone()
+                    if user and user['permissions']:
+                        try:
+                            user_permissions = json.loads(user['permissions'])
+                            if permission in user_permissions:
+                                return f(*a, **kw)
+                        except:
+                            pass
+            
+            # No permission - return 403 page
+            return render_template('403.html', sidebar='', role=user_role, name=session.get('name', '')), 403
+        return wrap
+    return decorator
+
+
 def get_staff():
     with get_db() as db:
-        return db.execute('SELECT id, username, role, name, active FROM users ORDER BY name').fetchall()
+        return db.execute('SELECT id, username, role, name, nick_name, permissions, active FROM users ORDER BY name').fetchall()
 
 
 @auth_bp.route('/login', strict_slashes=False, methods=['GET', 'POST'])
@@ -69,8 +100,9 @@ def api_add_staff():
     d = request.get_json()
     with get_db() as db:
         try:
-            db.execute('INSERT INTO users (username, password, role, name) VALUES (?,?,?,?)',
-                       (d['username'], generate_password_hash(d['password']), d.get('role', 'staff'), d['name']))
+            db.execute('INSERT INTO users (username, password, role, name, nick_name, permissions) VALUES (?,?,?,?,?,?)',
+                       (d['username'], generate_password_hash(d['password']), d.get('role', 'staff'), d['name'],
+                        d.get('nick_name', ''), d.get('permissions', '[]')))
             return jsonify({'ok': True})
         except Exception as e:
             return jsonify({'error': str(e)}), 400
@@ -83,11 +115,37 @@ def api_update_staff(sid):
     d = request.get_json()
     with get_db() as db:
         if d.get('password'):
-            db.execute('UPDATE users SET username=?, password=?, role=?, name=?, active=? WHERE id=?',
-                       (d['username'], generate_password_hash(d['password']), d.get('role', 'staff'), d['name'], int(d.get('active', 1)), sid))
+            db.execute('UPDATE users SET username=?, password=?, role=?, name=?, nick_name=?, permissions=?, active=? WHERE id=?',
+                       (d['username'], generate_password_hash(d['password']), d.get('role', 'staff'), d['name'],
+                        d.get('nick_name', ''), d.get('permissions', '[]'), int(d.get('active', 1)), sid))
         else:
-            db.execute('UPDATE users SET username=?, role=?, name=?, active=? WHERE id=?',
-                       (d['username'], d.get('role', 'staff'), d['name'], int(d.get('active', 1)), sid))
+            db.execute('UPDATE users SET username=?, role=?, name=?, nick_name=?, permissions=?, active=? WHERE id=?',
+                       (d['username'], d.get('role', 'staff'), d['name'],
+                        d.get('nick_name', ''), d.get('permissions', '[]'), int(d.get('active', 1)), sid))
+        return jsonify({'ok': True})
+
+
+@auth_bp.route('/api/staff/<int:sid>', methods=['DELETE'])
+@login_required
+@manager_required
+def api_delete_staff(sid):
+    """Delete a staff account."""
+    current_user_id = session.get('user_id')
+    
+    if sid == current_user_id:
+        return jsonify({'error': 'Cannot delete your own account'}), 400
+    
+    with get_db() as db:
+        user = db.execute('SELECT role FROM users WHERE id=?', (sid,)).fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        if user['role'] == 'manager':
+            manager_count = db.execute('SELECT COUNT(*) as count FROM users WHERE role=?', ('manager',)).fetchone()['count']
+            if manager_count <= 1:
+                return jsonify({'error': 'Cannot delete the last manager'}), 400
+        
+        db.execute('DELETE FROM users WHERE id=?', (sid,))
         return jsonify({'ok': True})
 
 

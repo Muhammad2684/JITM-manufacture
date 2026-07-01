@@ -1,7 +1,7 @@
 import os
 from flask import Flask, render_template, redirect, session
 from database import init_db
-from routes.auth import auth_bp, login_required
+from routes.auth import auth_bp, login_required, permission_required
 from routes.products import prod_bp
 from routes.pos import pos_bp
 from routes.customers import cust_bp
@@ -35,208 +35,234 @@ app.register_blueprint(txn_bp)
 app.register_blueprint(ledger_bp)
 
 
-def sidebar(active):
-    name = session.get('name', '')
-    role = session.get('role', '')
-    items = [
-        ('/', 'Dashboard', 'dashboard'),
-        ('/pos', 'POS', 'pos'),
-        (None, 'Purchase', 'purchase', [
-            ('/suppliers', 'Suppliers'),
-            ('/purchase-invoices', 'Purchase Invoices'),
-            ('/purchase-invoices/create', 'Create Invoice'),
-        ]),
-        (None, 'Sales', 'sales', [
-            ('/customers', 'Customers'),
-            ('/sales-invoices', 'Sale Invoices'),
-            ('/sales-invoices/create', 'Create Invoice'),
-        ]),
-        (None, 'Inventory', 'inventory', [
-            ('/inventory', 'All Products'),
-            ('/inventory/categories', 'Categories'),
-            ('/inventory/commission-classes', 'Commission Class'),
-            ('/inventory/barcode', 'Barcode Generator'),
-        ]),
-        (None, 'Cash And Bank Accounts', 'accounts', [
-            ('/accounts', 'All Accounts'),
-            ('/accounts/payments', 'Payments'),
-            ('/accounts/receipts', 'Receipts'),
-            ('/accounts/transfers', 'Inter Account Transfers'),
-        ]),
-        ('/staff', 'Staff', 'staff'),
-        ('/summary', 'Summary', 'summary'),
+def render_sidebar(active_page):
+    """Render the sidebar navigation with the active page highlighted."""
+    user_name = session.get('name', '')
+    user_role = session.get('role', '')
+    user_id = session.get('user_id')
+    
+    # Get user permissions
+    user_permissions = []
+    if user_role == 'manager':
+        # Managers have all permissions
+        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary']
+    elif user_id:
+        from database import get_db
+        import json
+        with get_db() as db:
+            user = db.execute('SELECT permissions FROM users WHERE id=?', (user_id,)).fetchone()
+            if user and user['permissions']:
+                try:
+                    user_permissions = json.loads(user['permissions'])
+                except:
+                    user_permissions = []
+    
+    menu_items = [
+        {'url': '/', 'label': 'Dashboard', 'permission': 'dashboard'},
+        {'url': '/pos', 'label': 'POS', 'permission': 'pos'},
+        {'label': 'Purchase', 'permission': 'purchase', 'subs': [
+            {'url': '/suppliers', 'label': 'Suppliers'},
+            {'url': '/purchase-invoices', 'label': 'Purchase Invoices'},
+            {'url': '/purchase-invoices/create', 'label': 'Create Invoice'},
+        ]},
+        {'label': 'Sales', 'permission': 'sales', 'subs': [
+            {'url': '/customers', 'label': 'Customers'},
+            {'url': '/sales-invoices', 'label': 'Sale Invoices'},
+            {'url': '/sales-invoices/create', 'label': 'Create Invoice'},
+        ]},
+        {'label': 'Inventory', 'permission': 'inventory', 'subs': [
+            {'url': '/inventory', 'label': 'All Products'},
+            {'url': '/inventory/categories', 'label': 'Categories'},
+            {'url': '/inventory/commission-classes', 'label': 'Commission Class'},
+            {'url': '/inventory/barcode', 'label': 'Barcode Generator'},
+        ]},
+        {'label': 'Cash And Bank Accounts', 'permission': 'accounts', 'subs': [
+            {'url': '/accounts', 'label': 'All Accounts'},
+            {'url': '/accounts/payments', 'label': 'Payments'},
+            {'url': '/accounts/receipts', 'label': 'Receipts'},
+            {'url': '/accounts/transfers', 'label': 'Inter Account Transfers'},
+        ]},
+        {'url': '/staff', 'label': 'Accounts', 'permission': 'staff'},
+        {'url': '/summary', 'label': 'Summary', 'permission': 'summary'},
     ]
-    links = ''
-    for item in items:
-        if len(item) == 4:
-            url, label, key, subs = item
-            sub_active = any(active == s[0] or active.startswith(s[0] + '/') for s in subs)
-            is_open = 'true' if sub_active else 'false'
-            arrow = '&#9660;' if is_open else '&#9654;'
-            if url:
-                prefix = url + '/'
-                is_active = active == url or active.startswith(prefix)
-                links += f'<div class="nav-group"><a href="{url}" class=' + ('"active"' if is_active else '""') + f'>{label} <span class="arrow">{arrow}</span></a>'
-            else:
-                links += f'<div class="nav-group"><span class="group-heading" style="display:flex;align-items:center;gap:4px;padding:10px 16px;font-size:13px;font-weight:600;color:#9ca3af;cursor:pointer">{label} <span class="arrow" style="margin-left:auto;font-size:10px">{arrow}</span></span>'
-            links += f'<div class="sub-group {"show" if sub_active else ""}">'
-            for sub_url, sub_label in subs:
-                target = ' target="_blank"' if '/create' in sub_url else ''
-                links += f'<a href="{sub_url}" class="sub {"active" if active == sub_url else ""}"{target}>{sub_label}</a>'
-            links += '</div></div>'
-        else:
-            url, label, key = item
-            target = ' target="_blank"' if url == '/pos' else ''
-            links += f'<a href="{url}" class=' + ('"active"' if url == active else '""') + f'{target}>{label}</a>'
-    sidebar_js = '''<script>
-    document.querySelector('.sidebar').addEventListener('click',function(e){
-        var heading = e.target.closest('.group-heading');
-        if(heading){
-            var g = heading.closest('.nav-group');var s = g.querySelector('.sub-group');var ar = g.querySelector('.arrow');
-            s.classList.toggle('show');ar.innerHTML = s.classList.contains('show')?'&#9660;':'&#9654;';
-        }else if(e.target.classList.contains('arrow')){
-            var g = e.target.closest('.nav-group');var s = g.querySelector('.sub-group');var ar = g.querySelector('.arrow');
-            s.classList.toggle('show');ar.innerHTML = s.classList.contains('show')?'&#9660;':'&#9654;';e.preventDefault();
-        }
-    });
-    </script>'''
-    return f'''<div class="sidebar">
-        <div class="brand">JITM <span>POS</span></div>
-        <div class="sec">Main Menu</div>
-        {links}
-        <div class="spacer"></div>
-        <div class="user"><span>{name}</span><span class="role">{role}</span></div>
-    </div>
-    {sidebar_js}'''
+    
+    # Filter menu items based on permissions
+    filtered_items = [item for item in menu_items if item.get('permission') in user_permissions]
+    
+    return render_template('sidebar.html', items=filtered_items, active=active_page, name=user_name, role=user_role)
 
 
-def page(template, active='/'):
-    return render_template(template, role=session.get('role'), name=session.get('name'), sidebar=sidebar(active))
+def render_page(template_name, active_page='/'):
+    """Render a page template with sidebar and user context."""
+    return render_template(
+        template_name,
+        role=session.get('role'),
+        name=session.get('name'),
+        sidebar=render_sidebar(active_page)
+    )
 
 
 @app.route('/', strict_slashes=False)
 @login_required
-def index():
-    return page('dashboard.html', '/')
+@permission_required('dashboard')
+def dashboard():
+    """Display the main dashboard."""
+    return render_page('dashboard.html', '/')
 
 
 @app.route('/pos', strict_slashes=False)
 @login_required
+@permission_required('pos')
 def pos():
-    return page('pos.html', '/pos')
+    """Display the point-of-sale terminal."""
+    return render_page('pos.html', '/pos')
 
 
 @app.route('/suppliers', strict_slashes=False)
 @login_required
+@permission_required('purchase')
 def suppliers():
-    return page('suppliers.html', '/suppliers')
+    """Display the suppliers list."""
+    return render_page('suppliers.html', '/suppliers')
 
 
 @app.route('/purchase-invoices', strict_slashes=False)
 @login_required
+@permission_required('purchase')
 def purchase_invoices():
-    return page('purchase_invoices.html', '/purchase-invoices')
+    """Display the purchase invoices list."""
+    return render_page('purchase_invoices.html', '/purchase-invoices')
 
 
 @app.route('/purchase-invoices/create', strict_slashes=False)
 @login_required
+@permission_required('purchase')
 def create_purchase_invoice():
-    return page('create_purchase_invoice.html', '/purchase-invoices/create')
+    """Display the create purchase invoice form."""
+    return render_page('create_purchase_invoice.html', '/purchase-invoices/create')
 
 
 @app.route('/inventory', strict_slashes=False)
 @login_required
+@permission_required('inventory')
 def inventory():
-    return page('inventory.html', '/inventory')
+    """Display the inventory product list."""
+    return render_page('inventory.html', '/inventory')
 
 
 @app.route('/customers', strict_slashes=False)
 @login_required
+@permission_required('sales')
 def customers():
-    return page('customers.html', '/customers')
+    """Display the customers list."""
+    return render_page('customers.html', '/customers')
 
 
 @app.route('/staff', strict_slashes=False)
 @login_required
+@permission_required('staff')
 def staff():
-    return page('staff.html', '/staff')
+    """Display the staff management page."""
+    return render_page('staff.html', '/staff')
 
 
 @app.route('/accounts', strict_slashes=False)
 @login_required
+@permission_required('accounts')
 def accounts():
-    return page('accounts.html', '/accounts')
+    """Display the accounts list."""
+    return render_page('accounts.html', '/accounts')
 
 
 @app.route('/accounts/receipts', strict_slashes=False)
 @login_required
+@permission_required('accounts')
 def receipts():
-    return page('receipts.html', '/accounts/receipts')
+    """Display the account receipts page."""
+    return render_page('receipts.html', '/accounts/receipts')
 
 
 @app.route('/accounts/payments', strict_slashes=False)
 @login_required
+@permission_required('accounts')
 def payments():
-    return page('payments.html', '/accounts/payments')
+    """Display the account payments page."""
+    return render_page('payments.html', '/accounts/payments')
 
 
 @app.route('/accounts/transfers', strict_slashes=False)
 @login_required
+@permission_required('accounts')
 def transfers():
-    return page('transfers.html', '/accounts/transfers')
+    """Display the inter-account transfers page."""
+    return render_page('transfers.html', '/accounts/transfers')
 
 
 @app.route('/sales-invoices', strict_slashes=False)
 @login_required
+@permission_required('sales')
 def sales_invoices():
-    return page('sales_invoices.html', '/sales-invoices')
+    """Display the sales invoices list."""
+    return render_page('sales_invoices.html', '/sales-invoices')
 
 
 @app.route('/sales-invoices/create', strict_slashes=False)
 @login_required
+@permission_required('sales')
 def create_sales_invoice_page():
-    return page('create_sales_invoice.html', '/sales-invoices/create')
+    """Display the create sales invoice form."""
+    return render_page('create_sales_invoice.html', '/sales-invoices/create')
 
 
-@app.route('/sales-invoices/<int:sid>', strict_slashes=False)
+@app.route('/sales-invoices/<int:sale_id>', strict_slashes=False)
 @login_required
-def view_sales_invoice(sid):
+@permission_required('sales')
+def view_sales_invoice(sale_id):
+    """Display a detailed view of a sales invoice."""
     from database import get_db
     with get_db() as db:
-        sale = db.execute('SELECT * FROM sales WHERE id=?', (sid,)).fetchone()
+        sale = db.execute('SELECT * FROM sales WHERE id=?', (sale_id,)).fetchone()
         if not sale:
             return 'Not found', 404
         sale = dict(sale)
-        items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sid,)).fetchall()
-        payments = db.execute('SELECT * FROM payments WHERE sale_id=?', (sid,)).fetchall()
+        
+        sale_items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale_id,)).fetchall()
+        sale_payments = db.execute('SELECT * FROM payments WHERE sale_id=?', (sale_id,)).fetchall()
+        
         customer_phone = ''
         if sale.get('customer_id'):
-            cust = db.execute('SELECT phone FROM customers WHERE id=?', (sale['customer_id'],)).fetchone()
-            customer_phone = cust['phone'] if cust else ''
+            customer = db.execute('SELECT phone FROM customers WHERE id=?', (sale['customer_id'],)).fetchone()
+            customer_phone = customer['phone'] if customer else ''
+        
         is_return = sale.get('status') == 'returned'
-        fmt = lambda n: 'Rs {:,.2f}'.format(n or 0)
-        dt = (sale.get('created_at') or '').split(' ')
+        format_amount = lambda n: 'Rs {:,.2f}'.format(n or 0)
+        datetime_parts = (sale.get('created_at') or '').split(' ')
+        
         item_rows = []
-        for i in items:
-            desc = i['product_name']
-            if i['variant_label']:
-                desc += ' (' + i['variant_label'] + ')'
-            if i['sku']:
-                desc += '<br><span style="font-size:10px;color:#9ca3af">' + i['sku'] + '</span>'
-            item_rows.append([desc, abs(i['quantity']), fmt(i['price']), fmt(i['total'])])
+        for item in sale_items:
+            description = item['product_name']
+            if item['variant_label']:
+                description += ' (' + item['variant_label'] + ')'
+            if item['sku']:
+                description += '<br><span style="font-size:10px;color:#9ca3af">' + item['sku'] + '</span>'
+            item_rows.append([description, abs(item['quantity']), format_amount(item['price']), format_amount(item['total'])])
+        
         totals = [
-            ('Sub Total', fmt(sale['subtotal']), False),
-            ('Adjustment', fmt(sale['discount']), False),
-            ('Total', fmt(sale['total']), True),
+            ('Sub Total', format_amount(sale['subtotal']), False),
+            ('Adjustment', format_amount(sale['discount']), False),
+            ('Total', format_amount(sale['total']), True),
         ]
-        cr_amt = sum(p['amount'] for p in payments if p['method'] == 'credit')
-        if cr_amt > 0:
-            totals.append(('Credit', fmt(cr_amt), False))
+        
+        credit_amount = sum(payment['amount'] for payment in sale_payments if payment['method'] == 'credit')
+        if credit_amount > 0:
+            totals.append(('Credit', format_amount(credit_amount), False))
+        
         net_cash = (sale.get('cash_tendered') or 0) - (sale.get('change_given') or 0)
         if net_cash > 0:
-            totals.append(('Cash', fmt(net_cash), False))
+            totals.append(('Cash', format_amount(net_cash), False))
         if sale.get('change_given'):
-            totals.append(('Change', fmt(sale['change_given']), False))
+            totals.append(('Change', format_amount(sale['change_given']), False))
+        
         status_class = ''
         status_label = sale.get('status', '')
         if status_label == 'Paid':
@@ -250,18 +276,21 @@ def view_sales_invoice(sid):
         elif status_label == 'returned':
             status_class = 'unpaid'
             status_label = 'Returned'
+        
         paid_info = ''
         if sale.get('paid') and sale['paid'] > 0:
-            paid_info = 'Paid: ' + fmt(sale['paid'])
+            paid_info = 'Paid: ' + format_amount(sale['paid'])
+        
         details = [
-            ('Date', dt[0] if dt else ''),
-            ('Time', (dt[1] + ' ' + dt[2]) if len(dt) > 2 and len(dt) > 1 else (dt[1] if len(dt) > 1 else '')),
+            ('Date', datetime_parts[0] if datetime_parts else ''),
+            ('Time', (datetime_parts[1] + ' ' + datetime_parts[2]) if len(datetime_parts) > 2 and len(datetime_parts) > 1 else (datetime_parts[1] if len(datetime_parts) > 1 else '')),
             ('Receipt No', sale['receipt']),
             ('Payment', sale.get('payment', '')),
             ('Staff', sale.get('staff_name', '')),
         ]
+        
         return render_template('view_invoice.html',
-            role=session.get('role'), name=session.get('name'), sidebar=sidebar('/sales-invoices'),
+            role=session.get('role'), name=session.get('name'), sidebar=render_sidebar('/sales-invoices'),
             title='Sale Invoice',
             head_sub='Sale Invoice',
             inv_type_label='Sale Invoice',
@@ -282,32 +311,39 @@ def view_sales_invoice(sid):
         )
 
 
-@app.route('/purchase-invoices/<int:piid>', strict_slashes=False)
+@app.route('/purchase-invoices/<int:invoice_id>', strict_slashes=False)
 @login_required
-def view_purchase_invoice(piid):
+@permission_required('purchase')
+def view_purchase_invoice(invoice_id):
+    """Display a detailed view of a purchase invoice."""
     from database import get_db
     with get_db() as db:
-        inv = db.execute(
+        invoice = db.execute(
             'SELECT pi.*, s.name as supplier_name FROM purchase_invoices pi '
-            'LEFT JOIN suppliers s ON s.id=pi.supplier_id WHERE pi.id=?', (piid,)
+            'LEFT JOIN suppliers s ON s.id=pi.supplier_id WHERE pi.id=?', (invoice_id,)
         ).fetchone()
-        if not inv:
+        if not invoice:
             return 'Not found', 404
-        inv = dict(inv)
-        items = db.execute(
-            'SELECT * FROM purchase_invoice_items WHERE invoice_id=? ORDER BY line_number', (piid,)
+        invoice = dict(invoice)
+        
+        invoice_items = db.execute(
+            'SELECT * FROM purchase_invoice_items WHERE invoice_id=? ORDER BY line_number', (invoice_id,)
         ).fetchall()
-        fmt = lambda n: 'Rs {:,.2f}'.format(n or 0)
+        
+        format_amount = lambda n: 'Rs {:,.2f}'.format(n or 0)
+        
         item_rows = []
-        for i in items:
-            item_rows.append([i['item'] or '', i['qty'], fmt(i['unit_price']), fmt(i['total'])])
+        for item in invoice_items:
+            item_rows.append([item['item'] or '', item['qty'], format_amount(item['unit_price']), format_amount(item['total'])])
+        
         totals = [
-            ('Invoice Amount', fmt(inv['invoice_amount']), True),
+            ('Invoice Amount', format_amount(invoice['invoice_amount']), True),
         ]
-        if inv.get('balance_due'):
-            totals.append(('Balance Due', fmt(inv['balance_due']), False))
+        if invoice.get('balance_due'):
+            totals.append(('Balance Due', format_amount(invoice['balance_due']), False))
+        
         status_class = ''
-        status_label = inv.get('status', '')
+        status_label = invoice.get('status', '')
         if status_label == 'Paid':
             status_class = 'paid'
         elif status_label == 'Unpaid':
@@ -316,31 +352,34 @@ def view_purchase_invoice(piid):
             status_class = 'partial'
         elif status_label == 'Overpaid':
             status_class = 'overpaid'
+        
         paid_info = ''
-        if inv.get('invoice_amount') and inv.get('balance_due') is not None:
-            paid_amt = inv['invoice_amount'] - inv['balance_due']
-            if paid_amt > 0:
-                paid_info = 'Paid: ' + fmt(paid_amt)
+        if invoice.get('invoice_amount') and invoice.get('balance_due') is not None:
+            paid_amount = invoice['invoice_amount'] - invoice['balance_due']
+            if paid_amount > 0:
+                paid_info = 'Paid: ' + format_amount(paid_amount)
+        
         details = [
-            ('Issue Date', inv.get('issue_date') or ''),
-            ('Due Date', inv.get('due_date') or ''),
-            ('Invoice No', inv['invoice_no']),
+            ('Issue Date', invoice.get('issue_date') or ''),
+            ('Due Date', invoice.get('due_date') or ''),
+            ('Invoice No', invoice['invoice_no']),
         ]
+        
         return render_template('view_invoice.html',
-            role=session.get('role'), name=session.get('name'), sidebar=sidebar('/purchase-invoices'),
+            role=session.get('role'), name=session.get('name'), sidebar=render_sidebar('/purchase-invoices'),
             title='Purchase Invoice',
             head_sub='Purchase Invoice',
             inv_type_label='Purchase Invoice',
-            inv_number=inv['invoice_no'],
+            inv_number=invoice['invoice_no'],
             party_label='From Supplier',
-            party_name=inv.get('supplier_name') or '-',
+            party_name=invoice.get('supplier_name') or '-',
             party_phone='',
             party_extra='',
             details=details,
             item_cols=['Item', 'Qty', 'Unit Price', 'Total'],
             items=item_rows,
             totals=totals,
-            notes=inv.get('description', ''),
+            notes=invoice.get('description', ''),
             status_class=status_class,
             status_label=status_label,
             paid_info=paid_info,
@@ -350,33 +389,74 @@ def view_purchase_invoice(piid):
 
 @app.route('/summary', strict_slashes=False)
 @login_required
+@permission_required('summary')
 def summary():
-    return page('summary.html', '/summary')
+    """Display the business summary page."""
+    return render_page('summary.html', '/summary')
 
 
 @app.route('/inventory/categories', strict_slashes=False)
 @login_required
+@permission_required('inventory')
 def inventory_categories():
-    return page('categories.html', '/inventory/categories')
+    """Display the product categories management page."""
+    return render_page('categories.html', '/inventory/categories')
 
 
 @app.route('/inventory/commission-classes', strict_slashes=False)
 @login_required
+@permission_required('inventory')
 def inventory_commission_classes():
-    return page('commission_classes.html', '/inventory/commission-classes')
+    """Display the commission classes management page."""
+    return render_page('commission_classes.html', '/inventory/commission-classes')
 
 
 @app.route('/inventory/barcode', strict_slashes=False)
 @login_required
+@permission_required('inventory')
 def inventory_barcode():
-    return page('barcode.html', '/inventory/barcode')
+    """Display the barcode generator page."""
+    return render_page('barcode.html', '/inventory/barcode')
 
 
 @app.route('/ledger/<entity_type>/<int:entity_id>', strict_slashes=False)
 @login_required
 def ledger_page(entity_type, entity_id):
+    """Display the ledger for a specific entity (customer or supplier)."""
+    # Map entity type to permission
+    permission_map = {
+        'customer': 'sales',
+        'supplier': 'purchase',
+        'account': 'accounts',
+        'product': 'inventory'
+    }
+    required_permission = permission_map.get(entity_type, 'dashboard')
+    
+    # Check permission manually for ledger
+    user_role = session.get('role')
+    user_id = session.get('user_id')
+    
+    has_permission = False
+    if user_role == 'manager':
+        has_permission = True
+    elif user_id:
+        from database import get_db
+        import json
+        with get_db() as db:
+            user = db.execute('SELECT permissions FROM users WHERE id=?', (user_id,)).fetchone()
+            if user and user['permissions']:
+                try:
+                    user_permissions = json.loads(user['permissions'])
+                    if required_permission in user_permissions:
+                        has_permission = True
+                except:
+                    pass
+    
+    if not has_permission:
+        return render_template('403.html', sidebar=render_sidebar('/'), role=user_role, name=session.get('name', '')), 403
+    
     return render_template('ledger.html', role=session.get('role'), name=session.get('name'),
-                           sidebar=sidebar('/ledger/' + entity_type + '/' + str(entity_id)),
+                           sidebar=render_sidebar('/ledger/' + entity_type + '/' + str(entity_id)),
                            entity_type=entity_type, entity_id=entity_id)
 
 

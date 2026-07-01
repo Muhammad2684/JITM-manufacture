@@ -1,186 +1,464 @@
 <!DOCTYPE html>
 <html>
-<head><title>JITM · Barcode Generator</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
-<style>
-.bc-layout{display:grid;grid-template-columns:320px 1fr;gap:16px;min-height:calc(100vh - 140px);}
-.bc-left{display:flex;flex-direction:column;gap:12px;}
-.bc-right{display:flex;flex-direction:column;gap:12px;}
-.bc-search{position:relative;}
-.bc-results{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e2e1de;border-radius:8px;max-height:300px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:50;display:none;}
-.bc-results.show{display:block;}
-.bc-result-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f2ef;}
-.bc-result-item:last-child{border-bottom:none;}
-.bc-result-item:hover,.bc-result-item.hl{background:#f0effc;}
-.bc-result-item .br-name{font-size:13px;font-weight:600;color:#1a1c2e;}
-.bc-result-item .br-detail{font-size:11px;color:#6b7280;}
-.bc-result-item .br-sku{font-size:11px;color:#3b4fe2;font-weight:600;}
-.queue-list{max-height:400px;overflow-y:auto;}
-.queue-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f3f2ef;font-size:12px;}
-.queue-item:last-child{border-bottom:none;}
-.queue-item .qi-name{flex:1;font-weight:600;}
-.queue-item .qi-sku{color:#3b4fe2;font-family:monospace;}
-.queue-item .qi-copies{color:#6b7280;min-width:40px;text-align:center;}
-.queue-item .qi-remove{color:#dc2626;cursor:pointer;font-size:14px;padding:2px 6px;}
-.queue-item .qi-remove:hover{background:#fef2f2;border-radius:4px;}
-.bc-preview{display:grid;gap:6px;padding:12px;justify-content:center;}
-.bc-preview-item{border:1px solid #e2e1de;border-radius:4px;padding:6px;text-align:center;background:#fff;}
-.bc-preview-item svg{display:block;margin:0 auto;}
-.bc-preview-item .bp-sku{font-size:10px;font-weight:700;font-family:monospace;margin-top:2px;}
-.bc-preview-item .bp-name{font-size:8px;color:#6b7280;margin-top:1px;}
-.bc-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-.bc-controls label{font-size:12px;color:#6b7280;}
-.bc-controls input[type=number]{width:60px;padding:6px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:13px;}
-.bc-controls select{padding:6px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:13px;}
-.print-area{display:none;}
-@media print{
-    body *{visibility:hidden;}
-    .print-area,.print-area *{visibility:visible;}
-    .print-area{display:block;position:absolute;left:0;top:0;width:100%;}
-    .print-grid{display:grid;gap:4px;padding:8px;}
-    .print-label{border:1px dashed #ccc;padding:4px;text-align:center;}
-    .print-label svg{display:block;margin:0 auto;}
-    .print-label .pl-sku{font-size:10px;font-weight:700;font-family:monospace;margin-top:2px;}
-    .print-label .pl-name{font-size:8px;color:#333;margin-top:1px;}
-}
-</style>
+<head>
+    <title>JITM · Barcode Generator</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .bc-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 16px;
+            min-height: calc(100vh - 140px);
+        }
+        .bc-left {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .bc-right {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .bc-search { position: relative; }
+        .bc-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #e2e1de;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
+            z-index: 50;
+            display: none;
+        }
+        .bc-results.show { display: block; }
+        .bc-result-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f2ef;
+        }
+        .bc-result-item:last-child { border-bottom: none; }
+        .bc-result-item:hover, .bc-result-item.hl { background: #f0effc; }
+        .bc-result-item .br-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1a1c2e;
+        }
+        .bc-result-item .br-detail {
+            font-size: 11px;
+            color: #6b7280;
+        }
+        .bc-result-item .br-sku {
+            font-size: 11px;
+            color: #3b4fe2;
+            font-weight: 600;
+        }
+        .queue-list { max-height: 400px; overflow-y: auto; }
+        .queue-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #f3f2ef;
+            font-size: 12px;
+        }
+        .queue-item:last-child { border-bottom: none; }
+        .queue-item .qi-name { flex: 1; font-weight: 600; }
+        .queue-item .qi-sku { color: #3b4fe2; font-family: monospace; }
+        .queue-item .qi-copies { color: #6b7280; min-width: 40px; text-align: center; }
+        .queue-item .qi-remove {
+            color: #dc2626;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 6px;
+        }
+        .queue-item .qi-remove:hover { background: #fef2f2; border-radius: 4px; }
+        .bc-preview {
+            display: grid;
+            gap: 6px;
+            padding: 12px;
+            justify-content: center;
+        }
+        .bc-preview-item {
+            border: 1px solid #e2e1de;
+            border-radius: 4px;
+            padding: 6px;
+            text-align: center;
+            background: #fff;
+        }
+        .bc-preview-item svg { display: block; margin: 0 auto; }
+        .bc-preview-item .bp-sku {
+            font-size: 10px;
+            font-weight: 700;
+            font-family: monospace;
+            margin-top: 2px;
+        }
+        .bc-preview-item .bp-name {
+            font-size: 8px;
+            color: #6b7280;
+            margin-top: 1px;
+        }
+        .bc-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .bc-controls label { font-size: 12px; color: #6b7280; }
+        .bc-controls input[type=number] {
+            width: 60px;
+            padding: 6px 8px;
+            border: 1px solid #e2e1de;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .bc-controls select {
+            padding: 6px 8px;
+            border: 1px solid #e2e1de;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .print-area { display: none; }
+        
+        @media print {
+            body * { visibility: hidden; }
+            .print-area, .print-area * { visibility: visible; }
+            .print-area {
+                display: block;
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .print-grid {
+                display: grid;
+                gap: 4px;
+                padding: 8px;
+            }
+            .print-label {
+                border: 1px dashed #ccc;
+                padding: 4px;
+                text-align: center;
+            }
+            .print-label svg { display: block; margin: 0 auto; }
+            .print-label .pl-sku {
+                font-size: 10px;
+                font-weight: 700;
+                font-family: monospace;
+                margin-top: 2px;
+            }
+            .print-label .pl-name {
+                font-size: 8px;
+                color: #333;
+                margin-top: 1px;
+            }
+        }
+    </style>
 </head>
 <body>
-{{sidebar|safe}}
-<div class="main">
-    <div class="topbar"><h2>Barcode Generator</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
-    <div class="content">
-        <div class="bc-layout">
-            <div class="bc-left">
-                <div class="card"><div class="card-body">
-                    <div class="bc-search">
-                        <input id="bs" placeholder="Search product name or SKU..." autofocus style="width:100%;padding:8px 12px;border:1px solid #e2e1de;border-radius:6px;font-size:13px">
-                        <div class="bc-results" id="br"></div>
-                    </div>
-                </div></div>
-                <div class="card" style="flex:1"><div class="card-body">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <h3 style="margin:0;font-size:14px;">Barcode Queue</h3>
-                        <button class="btn btn-ghost btn-sm" onclick="clearQueue()" style="font-size:11px;">Clear All</button>
-                    </div>
-                    <div class="queue-list" id="queueList">
-                        <div style="text-align:center;color:#9ca3af;padding:20px 0;font-size:12px;">Search and add products to queue</div>
-                    </div>
-                </div></div>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Barcode Generator</h2>
+            <div class="actions">
+                <span class="text-muted">{{name}}</span>
             </div>
-            <div class="bc-right">
-                <div class="card"><div class="card-body">
-                    <div class="bc-controls">
-                        <div><label>Copies per item:</label><input type="number" id="copies" value="1" min="1" max="100" onchange="renderPreview()"></div>
-                        <div><label>Columns:</label><input type="number" id="cols" value="4" min="1" max="10" onchange="renderPreview()"></div>
-                        <div><label>Rows:</label><input type="number" id="rows" value="3" min="1" max="20" onchange="renderPreview()"></div>
-                        <div><label>Label Size:</label>
-                            <select id="labelSize" onchange="renderPreview()">
-                                <option value="small">Small (200x80)</option>
-                                <option value="medium" selected>Medium (300x120)</option>
-                                <option value="large">Large (400x160)</option>
-                            </select>
+        </div>
+        <div class="content">
+            <div class="bc-layout">
+                <div class="bc-left">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="bc-search">
+                                <input id="bs" placeholder="Search product name or SKU..." autofocus 
+                                    style="width:100%;padding:8px 12px;border:1px solid #e2e1de;border-radius:6px;font-size:13px">
+                                <div class="bc-results" id="br"></div>
+                            </div>
                         </div>
-                        <button class="btn btn-p" onclick="printBarcodes()" style="margin-left:auto;">Print All</button>
                     </div>
-                </div></div>
-                <div class="card" style="flex:1"><div class="card-body">
-                    <div id="previewArea" style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px;">Add products to queue to preview barcodes</div>
-                </div></div>
+                    <div class="card" style="flex:1">
+                        <div class="card-body">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <h3 style="margin:0;font-size:14px;">Barcode Queue</h3>
+                                <button class="btn btn-ghost btn-sm" onclick="clearQueue()" style="font-size:11px;">Clear All</button>
+                            </div>
+                            <div class="queue-list" id="queueList">
+                                <div style="text-align:center;color:#9ca3af;padding:20px 0;font-size:12px;">
+                                    Search and add products to queue
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bc-right">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="bc-controls">
+                                <div>
+                                    <label>Copies per item:</label>
+                                    <input type="number" id="copies" value="1" min="1" max="100" onchange="renderPreview()">
+                                </div>
+                                <div>
+                                    <label>Columns:</label>
+                                    <input type="number" id="cols" value="4" min="1" max="10" onchange="renderPreview()">
+                                </div>
+                                <div>
+                                    <label>Rows:</label>
+                                    <input type="number" id="rows" value="3" min="1" max="20" onchange="renderPreview()">
+                                </div>
+                                <div>
+                                    <label>Label Size:</label>
+                                    <select id="labelSize" onchange="renderPreview()">
+                                        <option value="small">Small (200x80)</option>
+                                        <option value="medium" selected>Medium (300x120)</option>
+                                        <option value="large">Large (400x160)</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-p" onclick="printBarcodes()" style="margin-left:auto;">Print All</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card" style="flex:1">
+                        <div class="card-body">
+                            <div id="previewArea" style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px;">
+                                Add products to queue to preview barcodes
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
-<div class="print-area" id="printArea"></div>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script>
-var allP=[],hlIdx=-1,queue=[],queueId=0;
-var labelSizes={small:{w:200,h:80,fs:10},medium:{w:300,h:120,fs:12},large:{w:400,h:160,fs:14}};
-
-document.getElementById('bs').addEventListener('input',function(e){if(e.target.value.length>=1)search();else closeResults();});
-document.getElementById('bs').addEventListener('keydown',function(e){
-    var items=document.querySelectorAll('.bc-result-item');
-    if(e.key==='ArrowDown'){e.preventDefault();hlIdx=Math.min(hlIdx+1,items.length-1);highlight(items);}
-    else if(e.key==='ArrowUp'){e.preventDefault();hlIdx=Math.max(hlIdx-1,0);highlight(items);}
-    else if(e.key==='Enter'&&hlIdx>=0&&hlIdx<items.length){var it=items[hlIdx];addToQueue(parseInt(it.dataset.vid),it.dataset.sku,it.dataset.name,it.dataset.variant);}
-});
-document.getElementById('bs').addEventListener('blur',function(){setTimeout(closeResults,200);});
-
-function highlight(items){items.forEach(function(el,i){el.classList.toggle('hl',i===hlIdx);});var h=items[hlIdx];if(h)h.scrollIntoView({block:'nearest'});}
-function closeResults(){var r=document.getElementById('br');r.innerHTML='';r.classList.remove('show');hlIdx=-1;}
-
-function search(){fetch('/api/products/search?q='+encodeURIComponent(document.getElementById('bs').value)).then(function(r){return r.json();}).then(function(d){allP=d;renderResults(d);}).catch(function(){allP=[];});}
-
-function renderResults(l){var r=document.getElementById('br');hlIdx=-1;if(!l.length){r.classList.remove('show');r.innerHTML='';return;}
-r.classList.add('show');
-r.innerHTML=l.map(function(p,i){return'<div class="bc-result-item" data-vid="'+p.vid+'" data-sku="'+p.sku+'" data-name="'+p.name+'" data-variant="'+((p.size||'')+' '+(p.color||'')).trim()+'"><div class="br-name">'+p.name+'</div><div class="br-detail">'+((p.size||'')+' '+(p.color||'')).trim()+(p.stock?' &middot; '+p.stock+' in stock':'')+'</div><div class="br-sku">'+p.sku+'</div></div>';}).join('');}
-
-document.getElementById('br').addEventListener('click',function(e){var item=e.target.closest('.bc-result-item');if(!item)return;addToQueue(parseInt(item.dataset.vid),item.dataset.sku,item.dataset.name,item.dataset.variant);});
-
-function addToQueue(vid,sku,name,variant){
-    var existing=queue.find(function(q){return q.sku===sku;});
-    if(existing){existing.copies+=parseInt(document.getElementById('copies').value)||1;}
-    else{queue.push({id:queueId++,vid:vid,sku:sku,name:name,variant:variant,copies:parseInt(document.getElementById('copies').value)||1});}
-    closeResults();document.getElementById('bs').value='';
-    renderQueue();renderPreview();
-}
-
-function removeFromQueue(id){queue=queue.filter(function(q){return q.id!==id;});renderQueue();renderPreview();}
-function clearQueue(){if(queue.length&&confirm('Clear all items from queue?')){queue=[];renderQueue();renderPreview();}}
-
-function renderQueue(){
-    var el=document.getElementById('queueList');
-    if(!queue.length){el.innerHTML='<div style="text-align:center;color:#9ca3af;padding:20px 0;font-size:12px;">Search and add products to queue</div>';return;}
-    el.innerHTML=queue.map(function(q){return'<div class="queue-item"><span class="qi-name">'+q.name+'</span><span class="qi-sku">'+q.sku+'</span><span class="qi-copies">x'+q.copies+'</span><span class="qi-remove" onclick="removeFromQueue('+q.id+')">&times;</span></div>';}).join('');
-}
-
-function renderPreview(){
-    var area=document.getElementById('previewArea');
-    if(!queue.length){area.innerHTML='<div style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px;">Add products to queue to preview barcodes</div>';return;}
-    var sz=labelSizes[document.getElementById('labelSize').value];
-    var cols=parseInt(document.getElementById('cols').value)||4;
-    var html='<div class="bc-preview" style="grid-template-columns:repeat('+cols+','+sz.w+'px);">';
-    queue.forEach(function(q){
-        html+='<div class="bc-preview-item" style="width:'+sz.w+'px;height:'+sz.h+'px;">';
-        html+='<svg id="pv-'+q.id+'" width="'+sz.w+'" height="'+Math.round(sz.h*0.65)+'"></svg>';
-        html+='<div class="bp-sku">'+q.sku+'</div>';
-        html+='<div class="bp-name">'+q.name+'</div>';
-        html+='</div>';
-    });
-    html+='</div>';
-    area.innerHTML=html;
-    setTimeout(function(){queue.forEach(function(q){try{JsBarcode('#pv-'+q.id,q.sku,{format:'CODE128',width:1.5,height:Math.round(sz.h*0.3),fontSize:sz.fs*0.8,margin:4,textMargin:2});}catch(e){console.error('Barcode error for '+q.sku,e);}});},100);
-}
-
-function printBarcodes(){
-    if(!queue.length)return;
-    var sz=labelSizes[document.getElementById('labelSize').value];
-    var cols=parseInt(document.getElementById('cols').value)||4;
-    var rows=parseInt(document.getElementById('rows').value)||3;
-    var pa=document.getElementById('printArea');
-    pa.innerHTML='<div class="print-grid" style="grid-template-columns:repeat('+cols+',1fr);"></div>';
-    var grid=pa.querySelector('.print-grid');
-    var maxLabels=cols*rows;
-    var labelCount=0;
-    queue.forEach(function(q){
-        for(var c=0;c<q.copies&&labelCount<maxLabels;c++){
-            var div=document.createElement('div');div.className='print-label';div.style.width=sz.w+'px';
-            var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('id','pl-'+q.id+'-'+c);svg.setAttribute('width',sz.w);svg.setAttribute('height',sz.h);
-            div.appendChild(svg);
-            var skuDiv=document.createElement('div');skuDiv.className='pl-sku';skuDiv.textContent=q.sku;div.appendChild(skuDiv);
-            var nameDiv=document.createElement('div');nameDiv.className='pl-name';nameDiv.textContent=q.name;div.appendChild(nameDiv);
-            grid.appendChild(div);
-            labelCount++;
-        }
-    });
-    setTimeout(function(){
-        queue.forEach(function(q){
-            for(var c=0;c<q.copies&&c<maxLabels;c++){
-                try{JsBarcode('#pl-'+q.id+'-'+c,q.sku,{format:'CODE128',width:1.5,height:sz.h*0.3,fontSize:sz.fs*0.8,margin:4,textMargin:2});}catch(e){}
+    <div class="print-area" id="printArea"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script>
+        var allP = [], hlIdx = -1, queue = [], queueId = 0;
+        var labelSizes = {
+            small: { w: 200, h: 80, fs: 10 },
+            medium: { w: 300, h: 120, fs: 12 },
+            large: { w: 400, h: 160, fs: 14 }
+        };
+        
+        document.getElementById('bs').addEventListener('input', function(e) {
+            if (e.target.value.length >= 1) search();
+            else closeResults();
+        });
+        
+        document.getElementById('bs').addEventListener('keydown', function(e) {
+            var items = document.querySelectorAll('.bc-result-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                hlIdx = Math.min(hlIdx + 1, items.length - 1);
+                highlight(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                hlIdx = Math.max(hlIdx - 1, 0);
+                highlight(items);
+            } else if (e.key === 'Enter' && hlIdx >= 0 && hlIdx < items.length) {
+                var it = items[hlIdx];
+                addToQueue(parseInt(it.dataset.vid), it.dataset.sku, it.dataset.name, it.dataset.variant);
             }
         });
-        window.print();
-    },100);
-}
-</script>
+        
+        document.getElementById('bs').addEventListener('blur', function() {
+            setTimeout(closeResults, 200);
+        });
+        
+        function highlight(items) {
+            items.forEach(function(el, i) { el.classList.toggle('hl', i === hlIdx); });
+            var h = items[hlIdx];
+            if (h) h.scrollIntoView({ block: 'nearest' });
+        }
+        
+        function closeResults() {
+            var r = document.getElementById('br');
+            r.innerHTML = '';
+            r.classList.remove('show');
+            hlIdx = -1;
+        }
+        
+        function search() {
+            fetch('/api/products/search?q=' + encodeURIComponent(document.getElementById('bs').value))
+                .then(function(r) { return r.json(); })
+                .then(function(d) { allP = d; renderResults(d); })
+                .catch(function() { allP = []; });
+        }
+        
+        function renderResults(l) {
+            var r = document.getElementById('br');
+            hlIdx = -1;
+            if (!l.length) { r.classList.remove('show'); r.innerHTML = ''; return; }
+            
+            r.classList.add('show');
+            r.innerHTML = l.map(function(p, i) {
+                return '<div class="bc-result-item" data-vid="' + p.vid + '" data-sku="' + p.sku + '" ' +
+                    'data-name="' + p.name + '" data-variant="' + ((p.size || '') + ' ' + (p.color || '')).trim() + '">' +
+                    '<div class="br-name">' + p.name + '</div>' +
+                    '<div class="br-detail">' + ((p.size || '') + ' ' + (p.color || '')).trim() + 
+                    (p.stock ? ' &middot; ' + p.stock + ' in stock' : '') + '</div>' +
+                    '<div class="br-sku">' + p.sku + '</div>' +
+                    '</div>';
+            }).join('');
+        }
+        
+        document.getElementById('br').addEventListener('click', function(e) {
+            var item = e.target.closest('.bc-result-item');
+            if (!item) return;
+            addToQueue(parseInt(item.dataset.vid), item.dataset.sku, item.dataset.name, item.dataset.variant);
+        });
+        
+        function addToQueue(vid, sku, name, variant) {
+            var existing = queue.find(function(q) { return q.sku === sku; });
+            if (existing) {
+                existing.copies += parseInt(document.getElementById('copies').value) || 1;
+            } else {
+                queue.push({
+                    id: queueId++,
+                    vid: vid,
+                    sku: sku,
+                    name: name,
+                    variant: variant,
+                    copies: parseInt(document.getElementById('copies').value) || 1
+                });
+            }
+            closeResults();
+            document.getElementById('bs').value = '';
+            renderQueue();
+            renderPreview();
+        }
+        
+        function removeFromQueue(id) {
+            queue = queue.filter(function(q) { return q.id !== id; });
+            renderQueue();
+            renderPreview();
+        }
+        
+        function clearQueue() {
+            if (queue.length && confirm('Clear all items from queue?')) {
+                queue = [];
+                renderQueue();
+                renderPreview();
+            }
+        }
+        
+        function renderQueue() {
+            var el = document.getElementById('queueList');
+            if (!queue.length) {
+                el.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px 0;font-size:12px;">Search and add products to queue</div>';
+                return;
+            }
+            el.innerHTML = queue.map(function(q) {
+                return '<div class="queue-item">' +
+                    '<span class="qi-name">' + q.name + '</span>' +
+                    '<span class="qi-sku">' + q.sku + '</span>' +
+                    '<span class="qi-copies">x' + q.copies + '</span>' +
+                    '<span class="qi-remove" onclick="removeFromQueue(' + q.id + ')">&times;</span>' +
+                    '</div>';
+            }).join('');
+        }
+        
+        function renderPreview() {
+            var area = document.getElementById('previewArea');
+            if (!queue.length) {
+                area.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px;">Add products to queue to preview barcodes</div>';
+                return;
+            }
+            var sz = labelSizes[document.getElementById('labelSize').value];
+            var cols = parseInt(document.getElementById('cols').value) || 4;
+            var html = '<div class="bc-preview" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px);">';
+            
+            queue.forEach(function(q) {
+                html += '<div class="bc-preview-item" style="width:' + sz.w + 'px;height:' + sz.h + 'px;">';
+                html += '<svg id="pv-' + q.id + '" width="' + sz.w + '" height="' + Math.round(sz.h * 0.65) + '"></svg>';
+                html += '<div class="bp-sku">' + q.sku + '</div>';
+                html += '<div class="bp-name">' + q.name + '</div>';
+                html += '</div>';
+            });
+            
+            html += '</div>';
+            area.innerHTML = html;
+            
+            setTimeout(function() {
+                queue.forEach(function(q) {
+                    try {
+                        JsBarcode('#pv-' + q.id, q.sku, {
+                            format: 'CODE128',
+                            width: 1.5,
+                            height: Math.round(sz.h * 0.3),
+                            fontSize: sz.fs * 0.8,
+                            margin: 4,
+                            textMargin: 2
+                        });
+                    } catch (e) {
+                        console.error('Barcode error for ' + q.sku, e);
+                    }
+                });
+            }, 100);
+        }
+        
+        function printBarcodes() {
+            if (!queue.length) return;
+            var sz = labelSizes[document.getElementById('labelSize').value];
+            var cols = parseInt(document.getElementById('cols').value) || 4;
+            var rows = parseInt(document.getElementById('rows').value) || 3;
+            var pa = document.getElementById('printArea');
+            
+            pa.innerHTML = '<div class="print-grid" style="grid-template-columns:repeat(' + cols + ',1fr);"></div>';
+            var grid = pa.querySelector('.print-grid');
+            var maxLabels = cols * rows;
+            var labelCount = 0;
+            
+            queue.forEach(function(q) {
+                for (var c = 0; c < q.copies && labelCount < maxLabels; c++) {
+                    var div = document.createElement('div');
+                    div.className = 'print-label';
+                    div.style.width = sz.w + 'px';
+                    
+                    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    svg.setAttribute('id', 'pl-' + q.id + '-' + c);
+                    svg.setAttribute('width', sz.w);
+                    svg.setAttribute('height', sz.h);
+                    div.appendChild(svg);
+                    
+                    var skuDiv = document.createElement('div');
+                    skuDiv.className = 'pl-sku';
+                    skuDiv.textContent = q.sku;
+                    div.appendChild(skuDiv);
+                    
+                    var nameDiv = document.createElement('div');
+                    nameDiv.className = 'pl-name';
+                    nameDiv.textContent = q.name;
+                    div.appendChild(nameDiv);
+                    
+                    grid.appendChild(div);
+                    labelCount++;
+                }
+            });
+            
+            setTimeout(function() {
+                queue.forEach(function(q) {
+                    for (var c = 0; c < q.copies && c < maxLabels; c++) {
+                        try {
+                            JsBarcode('#pl-' + q.id + '-' + c, q.sku, {
+                                format: 'CODE128',
+                                width: 1.5,
+                                height: sz.h * 0.3,
+                                fontSize: sz.fs * 0.8,
+                                margin: 4,
+                                textMargin: 2
+                            });
+                        } catch (e) {}
+                    }
+                });
+                window.print();
+            }, 100);
+        }
+    </script>
 </body>
 </html>

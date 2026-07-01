@@ -1,128 +1,204 @@
 <!DOCTYPE html>
 <html>
-<head><title>JITM · Ledger</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
-<style>
-.text-right{text-align:right}
-.text-muted{color:#888;font-size:13px}
-.search{max-width:300px;margin-bottom:12px}
-.search input{width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px}
-.bdg{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
-.bdg-sale{background:#d4edda;color:#155724}
-.bdg-sale_return{background:#f8d7da;color:#721c24}
-.bdg-receipt{background:#cce5ff;color:#004085}
-.bdg-payment{background:#fff3cd;color:#856404}
-.bdg-purchase{background:#fff3cd;color:#856404}
-.bdg-restock{background:#d4edda;color:#155724}
-.bdg-transfer_in{background:#d4edda;color:#155724}
-.bdg-transfer_out{background:#f8d7da;color:#721c24}
-.bdg-opening{background:#e2e3e5;color:#383d41}
-.entity-header{display:flex;gap:16px;align-items:center;margin-bottom:16px;padding:12px 16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px}
-.entity-header .name{font-size:18px;font-weight:700}
-.entity-header .current-bal{font-size:15px;margin-left:auto}
-</style>
+<head>
+    <title>JITM · Ledger</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .text-right { text-align: right; }
+        .text-muted { color: #888; font-size: 13px; }
+        .search { max-width: 300px; margin-bottom: 12px; }
+        .search input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .bdg {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .bdg-sale { background: #d4edda; color: #155724; }
+        .bdg-sale_return { background: #f8d7da; color: #721c24; }
+        .bdg-receipt { background: #cce5ff; color: #004085; }
+        .bdg-payment { background: #fff3cd; color: #856404; }
+        .bdg-purchase { background: #fff3cd; color: #856404; }
+        .bdg-restock { background: #d4edda; color: #155724; }
+        .bdg-transfer_in { background: #d4edda; color: #155724; }
+        .bdg-transfer_out { background: #f8d7da; color: #721c24; }
+        .bdg-opening { background: #e2e3e5; color: #383d41; }
+        .entity-header {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: #fcfbf8;
+            border: 1px solid #e2e1de;
+            border-radius: 10px;
+        }
+        .entity-header .name { font-size: 18px; font-weight: 700; }
+        .entity-header .current-bal { font-size: 15px; margin-left: auto; }
+    </style>
 </head>
 <body>
-{{sidebar|safe}}
-<div class="main">
-    <div class="topbar"><h2>Ledger</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
-    <div class="content">
-        <div id="einfo" class="entity-header">
-            <span class="name" id="ename"></span>
-            <span id="etype_badge"></span>
-            <span class="current-bal">Balance: <strong id="ebal"></strong></span>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Ledger</h2>
+            <div class="actions">
+                <span class="text-muted">{{name}}</span>
+            </div>
         </div>
-        <div class="search"><input id="s" placeholder="Search entries..." oninput="load()"></div>
-        <div class="table-wrap"><table>
-            <thead><tr>
-                <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
-                <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Date <span id="si1"></span></th>
-                <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Description <span id="si2"></span></th>
-                <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Reference <span id="si3"></span></th>
-                {% if entity_type == 'product' %}<th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Qty <span id="si4"></span></th>{% endif %}
-                <th onclick="sortCol({{ 5 if entity_type == 'product' else 4 }})" class="text-right" style="cursor:pointer;user-select:none">Debit <span id="si{{ 5 if entity_type == 'product' else 4 }}"></span></th>
-                <th onclick="sortCol({{ 6 if entity_type == 'product' else 5 }})" class="text-right" style="cursor:pointer;user-select:none">Credit <span id="si{{ 6 if entity_type == 'product' else 5 }}"></span></th>
-                <th onclick="sortCol({{ 7 if entity_type == 'product' else 6 }})" class="text-right" style="cursor:pointer;user-select:none">Balance <span id="si{{ 7 if entity_type == 'product' else 6 }}"></span></th>
-            </tr></thead>
-            <tbody id="tb"></tbody>
-            <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
-        </table></div>
-        <div style="margin-top:12px;text-align:right"><button class="btn btn-sm btn-print" onclick="printTable()">Print</button></div>
+        <div class="content">
+            <div id="einfo" class="entity-header">
+                <span class="name" id="ename"></span>
+                <span id="etype_badge"></span>
+                <span class="current-bal">Balance: <strong id="ebal"></strong></span>
+            </div>
+            <div class="search">
+                <input id="s" placeholder="Search entries..." oninput="load()">
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Date <span id="si1"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Description <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Reference <span id="si3"></span></th>
+                            {% if entity_type == 'product' %}
+                                <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Qty <span id="si4"></span></th>
+                                <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Debit <span id="si5"></span></th>
+                                <th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Credit <span id="si6"></span></th>
+                                <th onclick="sortCol(7)" class="text-right" style="cursor:pointer;user-select:none">Balance <span id="si7"></span></th>
+                            {% else %}
+                                <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Debit <span id="si4"></span></th>
+                                <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Credit <span id="si5"></span></th>
+                                <th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Balance <span id="si6"></span></th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody id="tb"></tbody>
+                    <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
+                </table>
+            </div>
+            <div style="margin-top:12px;text-align:right">
+                <button class="btn btn-sm btn-print" onclick="printTable()">Print</button>
+            </div>
+        </div>
     </div>
-</div>
-<script>
-var list = [], sortIdx = -1, sortDir = 1;
-var entityType = '{{entity_type}}', entityId = {{entity_id}};
-
-function load(){
-    var q=document.getElementById('s').value.toLowerCase();
-    fetch('/api/ledger?type='+entityType+'&id='+entityId).then(r=>r.json()).then(d=>{
-        document.getElementById('ename').textContent = d.entity.name||d.entity.id;
-        var typeLabel = {customer:'Customer',supplier:'Supplier',account:'Account',product:'Product'}[entityType]||entityType;
-        document.getElementById('etype_badge').innerHTML = '<span class="bdg">'+typeLabel+'</span>';
-        var bal = 0;
-        if(entityType === 'product') {
-            bal = (d.entity.cost_price || 0) * (d.entity.total_stock || 0);
-            document.getElementById('ebal').textContent = 'Rs '+bal.toFixed(2);
-        } else {
-            bal = d.entity.credit !== undefined ? d.entity.credit : (d.entity.balance !== undefined ? d.entity.balance : 0);
-            document.getElementById('ebal').textContent = 'Rs '+bal.toFixed(2);
+    
+    <script>
+        var list = [], sortIdx = -1, sortDir = 1;
+        var entityType = '{{entity_type}}', entityId = parseInt('{{entity_id}}', 10);
+        
+        function load() {
+            var q = document.getElementById('s').value.toLowerCase();
+            fetch('/api/ledger?type=' + entityType + '&id=' + entityId)
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('ename').textContent = d.entity.name || d.entity.id;
+                    var typeLabel = { customer: 'Customer', supplier: 'Supplier', account: 'Account', product: 'Product' }[entityType] || entityType;
+                    document.getElementById('etype_badge').innerHTML = '<span class="bdg">' + typeLabel + '</span>';
+                    
+                    var bal = 0;
+                    if (entityType === 'product') {
+                        // Use the final balance from entries (historical cost basis)
+                        bal = d.entries.length > 0 ? d.entries[d.entries.length - 1].balance : 0;
+                        document.getElementById('ebal').textContent = 'Rs ' + bal.toFixed(2);
+                    } else {
+                        bal = d.entity.credit !== undefined ? d.entity.credit : (d.entity.balance !== undefined ? d.entity.balance : 0);
+                        document.getElementById('ebal').textContent = 'Rs ' + bal.toFixed(2);
+                    }
+                    
+                    list = d.entries;
+                    render(list.filter(function(e) {
+                        return !q || (e.date || '').includes(q) || (e.description || '').toLowerCase().includes(q) || (e.reference || '').toLowerCase().includes(q);
+                    }));
+                });
         }
-        list = d.entries;
-        render(list.filter(function(e){return!q||(e.date||'').includes(q)||(e.description||'').toLowerCase().includes(q)||(e.reference||'').toLowerCase().includes(q);}));
-    });
-}
-
-function render(l){
-    document.getElementById('tb').innerHTML=l.map(function(e,i){
-        var tClass = 'bdg-'+e.type;
-        var qtyCol = '{{ entity_type }}' === 'product' ? '<td class="text-right">'+(e.qty||'')+'</td>' : '';
-        return '<tr><td style="color:#6b7280;font-size:12px">'+(i+1)+'</td>'
-            +'<td>'+(e.date||'')+'</td>'
-            +'<td><span class="bdg '+tClass+'">'+e.description+'</span></td>'
-            +'<td>'+(e.reference||'')+'</td>'
-            +qtyCol
-            +'<td class="text-right">'+(e.debit>0?'Rs '+e.debit.toFixed(2):'')+'</td>'
-            +'<td class="text-right">'+(e.credit>0?'Rs '+e.credit.toFixed(2):'')+'</td>'
-            +'<td class="text-right" style="font-weight:600">Rs '+e.balance.toFixed(2)+'</td></tr>';
-    }).join('');
-    var totD=0,totC=0;
-    l.forEach(function(e){totD+=e.debit||0;totC+=e.credit||0;});
-    var cols = '{{ entity_type }}' === 'product' ? 5 : 4;
-    document.getElementById('tf').innerHTML='<tr><td colspan="'+cols+'" class="text-right" style="padding:6px 8px">Total</td>'
-        +'<td class="text-right" style="padding:6px 8px">Rs '+totD.toFixed(2)+'</td>'
-        +'<td class="text-right" style="padding:6px 8px">Rs '+totC.toFixed(2)+'</td>'
-        +'<td></td></tr>';
-}
-
-function sortCol(i){
-    if(sortIdx===i){sortDir*=-1;}else{sortIdx=i;sortDir=1;}
-    var colCount = '{{ entity_type }}' === 'product' ? 8 : 7;
-    for(let j=0;j<colCount;j++)document.getElementById('si'+j).textContent='';
-    document.getElementById('si'+i).textContent=sortDir===1?' \u25B2':' \u25BC';
-    const vals=[
-        function(){return 0;},
-        function(e){return e.date||'';},
-        function(e){return (e.description||'').toLowerCase();},
-        function(e){return (e.reference||'').toLowerCase();},
-    ];
-    if('{{ entity_type }}' === 'product') {
-        vals.push(function(e){return e.qty||0;});
-        vals.push(function(e){return e.debit||0;});
-        vals.push(function(e){return e.credit||0;});
-        vals.push(function(e){return e.balance||0;});
-    } else {
-        vals.push(function(e){return e.debit||0;});
-        vals.push(function(e){return e.credit||0;});
-        vals.push(function(e){return e.balance||0;});
-    }
-    list.sort(function(a,b){var va=vals[i](a),vb=vals[i](b);return va<vb?-sortDir:va>vb?sortDir:0;});
-    var q=document.getElementById('s').value.toLowerCase();
-    render(list.filter(function(e){return!q||(e.date||'').includes(q)||(e.description||'').toLowerCase().includes(q)||(e.reference||'').toLowerCase().includes(q);}));
-}
-
-load();
-function printTable(){document.body.classList.add('printing');window.print();}
-window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
-</script>
+        
+        function render(l) {
+            document.getElementById('tb').innerHTML = l.map(function(e, i) {
+                var tClass = 'bdg-' + e.type;
+                var qtyCol = '{{ entity_type }}' === 'product' ? '<td class="text-right">' + (e.qty || '') + '</td>' : '';
+                
+                return '<tr>' +
+                    '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                    '<td>' + (e.date || '') + '</td>' +
+                    '<td><span class="bdg ' + tClass + '">' + e.description + '</span></td>' +
+                    '<td>' + (e.reference || '') + '</td>' +
+                    qtyCol +
+                    '<td class="text-right">' + (e.debit > 0 ? 'Rs ' + e.debit.toFixed(2) : '') + '</td>' +
+                    '<td class="text-right">' + (e.credit > 0 ? 'Rs ' + e.credit.toFixed(2) : '') + '</td>' +
+                    '<td class="text-right" style="font-weight:600">Rs ' + e.balance.toFixed(2) + '</td>' +
+                    '</tr>';
+            }).join('');
+            
+            var totD = 0, totC = 0;
+            l.forEach(function(e) { totD += e.debit || 0; totC += e.credit || 0; });
+            
+            var cols = '{{ entity_type }}' === 'product' ? 5 : 4;
+            document.getElementById('tf').innerHTML = 
+                '<tr>' +
+                '<td colspan="' + cols + '" class="text-right" style="padding:6px 8px">Total</td>' +
+                '<td class="text-right" style="padding:6px 8px">Rs ' + totD.toFixed(2) + '</td>' +
+                '<td class="text-right" style="padding:6px 8px">Rs ' + totC.toFixed(2) + '</td>' +
+                '<td></td>' +
+                '</tr>';
+        }
+        
+        function sortCol(i) {
+            if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
+            
+            var colCount = '{{ entity_type }}' === 'product' ? 8 : 7;
+            for (let j = 0; j < colCount; j++) document.getElementById('si' + j).textContent = '';
+            document.getElementById('si' + i).textContent = sortDir === 1 ? ' ▲' : ' ▼';
+            
+            const vals = [
+                function() { return 0; },
+                function(e) { return e.date || ''; },
+                function(e) { return (e.description || '').toLowerCase(); },
+                function(e) { return (e.reference || '').toLowerCase(); },
+            ];
+            
+            if ('{{ entity_type }}' === 'product') {
+                vals.push(function(e) { return e.qty || 0; });
+                vals.push(function(e) { return e.debit || 0; });
+                vals.push(function(e) { return e.credit || 0; });
+                vals.push(function(e) { return e.balance || 0; });
+            } else {
+                vals.push(function(e) { return e.debit || 0; });
+                vals.push(function(e) { return e.credit || 0; });
+                vals.push(function(e) { return e.balance || 0; });
+            }
+            
+            list.sort(function(a, b) {
+                var va = vals[i](a), vb = vals[i](b);
+                return va < vb ? -sortDir : va > vb ? sortDir : 0;
+            });
+            
+            var q = document.getElementById('s').value.toLowerCase();
+            render(list.filter(function(e) {
+                return !q || (e.date || '').includes(q) || (e.description || '').toLowerCase().includes(q) || (e.reference || '').toLowerCase().includes(q);
+            }));
+        }
+        
+        load();
+        
+        function printTable() {
+            document.body.classList.add('printing');
+            window.print();
+        }
+        
+        window.addEventListener('afterprint', function() {
+            document.body.classList.remove('printing');
+        });
+    </script>
 </body>
 </html>

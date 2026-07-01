@@ -113,23 +113,28 @@ def get_customer_entries(db, customer_id, entity):
         })
 
     entries.sort(key=lambda e: e['date'])
+    
+    # Reverse compute: subtract all entries from current balance to get opening balance
+    current_balance = entity.get('credit', 0)
+    total_change = sum(e['debit'] - e['credit'] for e in entries)
+    opening = round(current_balance - total_change, 2)
+    
+    if opening != 0 or entries:
+        entries.insert(0, {
+            'date': '',
+            'description': 'Opening Balance',
+            'reference': '',
+            'debit': opening if opening > 0 else 0,
+            'credit': -opening if opening < 0 else 0,
+            'balance': opening,
+            'type': 'opening'
+        })
+
+    # Calculate running balance
     balance = 0
     for e in entries:
         balance += e['debit'] - e['credit']
         e['balance'] = round(balance, 2)
-
-    # If there's a credit but no entries, show opening balance
-    if not entries and entity['credit']:
-        entity_credit = entity.get('credit', 0)
-        entries.append({
-            'date': '',
-            'description': 'Opening Balance',
-            'reference': '',
-            'debit': entity_credit,
-            'credit': 0,
-            'balance': entity_credit,
-            'type': 'opening'
-        })
 
     return entries
 
@@ -355,7 +360,7 @@ def get_product_entries(db, product_id, entity):
     entries = []
 
     sales = db.execute(
-        'SELECT si.id, si.quantity, si.price, si.total, si.is_return, si.sku, '
+        'SELECT si.id, si.quantity, si.price, si.total, si.cost_price, si.is_return, si.sku, '
         's.receipt, s.created_at, s.customer_name '
         'FROM sale_items si JOIN sales s ON s.id=si.sale_id '
         'WHERE si.product_id=? ORDER BY s.created_at',
@@ -369,13 +374,17 @@ def get_product_entries(db, product_id, entity):
         ref = s['receipt'] or ''
         if s['customer_name']:
             desc += ' - ' + s['customer_name']
+        
+        # Use cost_price for inventory value tracking (not sale price)
+        cost_value = abs(s['quantity']) * (s['cost_price'] or 0)
+        
         entries.append({
             'date': (s['created_at'] or '')[:10],
             'description': desc,
             'reference': ref,
             'qty': abs(s['quantity']),
-            'debit': abs(s['total']) if s['is_return'] else 0,
-            'credit': 0 if s['is_return'] else s['total'],
+            'debit': cost_value if s['is_return'] else 0,
+            'credit': 0 if s['is_return'] else cost_value,
             'type': 'sale_return' if s['is_return'] else 'sale'
         })
 
@@ -400,28 +409,6 @@ def get_product_entries(db, product_id, entity):
             'debit': total_cost,
             'credit': 0,
             'type': 'restock'
-        })
-
-    purchases = db.execute(
-        'SELECT pii.id, pii.qty, pii.unit_price, pii.total, pii.item, '
-        'pi.invoice_no, pi.issue_date, pi.created_at '
-        'FROM purchase_invoice_items pii JOIN purchase_invoices pi ON pi.id=pii.invoice_id '
-        'WHERE pii.product_id=? ORDER BY pi.created_at',
-        (product_id,)
-    ).fetchall()
-    for p in purchases:
-        p = dict(p)
-        desc = 'Purchase'
-        if p['item']:
-            desc += ' - ' + p['item']
-        entries.append({
-            'date': p['issue_date'] or (p['created_at'] or '')[:10],
-            'description': desc,
-            'reference': p['invoice_no'] or '',
-            'qty': abs(p['qty']),
-            'debit': p['total'],
-            'credit': 0,
-            'type': 'purchase'
         })
 
     entries.sort(key=lambda e: e['date'])

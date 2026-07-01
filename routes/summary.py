@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from database import get_db
 from routes.auth import login_required
 
@@ -31,11 +31,9 @@ def summary():
         ).fetchone()
 
         cogs_raw = db.execute(
-            'SELECT COALESCE(SUM(si.quantity * p.cost_price),0) as total '
+            'SELECT COALESCE(SUM(si.quantity * si.cost_price),0) as total '
             'FROM sale_items si '
             'JOIN sales s ON s.id=si.sale_id '
-            'JOIN variants v ON v.id=si.variant_id '
-            'JOIN products p ON p.id=v.product_id '
             "WHERE s.status NOT IN ('returned') AND si.is_return=0"
         ).fetchone()
 
@@ -102,3 +100,159 @@ def summary():
                 'uncategorized': 0,
             },
         })
+
+
+@summary_bp.route('/summary/details/<detail_type>')
+@login_required
+def summary_details(detail_type):
+    """Get transaction details for summary items."""
+    with get_db() as db:
+        if detail_type == 'cash_bank':
+            rows = db.execute(
+                'SELECT a.name, a.type, a.balance FROM accounts a ORDER BY a.name'
+            ).fetchall()
+            return jsonify({
+                'title': 'Cash / Bank Accounts',
+                'columns': ['Account', 'Type', 'Balance'],
+                'rows': [
+                    [r['name'], r['type'].capitalize(), f"Rs {r['balance']:.2f}"]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type == 'inventory':
+            rows = db.execute(
+                'SELECT p.name, p.sku, v.stock, p.cost_price, (v.stock * p.cost_price) as value '
+                'FROM products p '
+                'JOIN variants v ON v.product_id = p.id '
+                'WHERE v.stock > 0 '
+                'ORDER BY p.name'
+            ).fetchall()
+            return jsonify({
+                'title': 'Inventory Value',
+                'columns': ['Product', 'SKU', 'Stock', 'Cost', 'Value'],
+                'rows': [
+                    [r['name'], r['sku'], str(r['stock']), f"Rs {r['cost_price']:.2f}", f"Rs {r['value']:.2f}"]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type == 'customer_receivables':
+            rows = db.execute(
+                'SELECT name, phone, credit FROM customers WHERE credit > 0 ORDER BY credit DESC'
+            ).fetchall()
+            return jsonify({
+                'title': 'Customer Receivables',
+                'columns': ['Customer', 'Phone', 'Outstanding'],
+                'rows': [
+                    [r['name'], r['phone'] or '-', f"Rs {r['credit']:.2f}"]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type == 'supplier_payables':
+            rows = db.execute(
+                'SELECT name, phone, balance FROM suppliers WHERE balance > 0 ORDER BY balance DESC'
+            ).fetchall()
+            return jsonify({
+                'title': 'Supplier Payables',
+                'columns': ['Supplier', 'Phone', 'Payable'],
+                'rows': [
+                    [r['name'], r['phone'] or '-', f"Rs {r['balance']:.2f}"]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type == 'total_revenue':
+            rows = db.execute(
+                "SELECT receipt, customer_name, total, created_at FROM sales "
+                "WHERE status NOT IN ('returned') "
+                "ORDER BY created_at DESC LIMIT 50"
+            ).fetchall()
+            return jsonify({
+                'title': 'Total Revenue (Last 50 Sales)',
+                'columns': ['Receipt', 'Customer', 'Total', 'Date'],
+                'rows': [
+                    [r['receipt'], r['customer_name'] or 'Walk-in', f"Rs {r['total']:.2f}", (r['created_at'] or '')[:10]]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type == 'returns':
+            rows = db.execute(
+                "SELECT receipt, customer_name, ABS(total) as amount, created_at FROM sales "
+                "WHERE status='returned' "
+                "ORDER BY created_at DESC LIMIT 50"
+            ).fetchall()
+            return jsonify({
+                'title': 'Sales Returns (Last 50)',
+                'columns': ['Receipt', 'Customer', 'Amount', 'Date'],
+                'rows': [
+                    [r['receipt'], r['customer_name'] or 'Walk-in', f"Rs {r['amount']:.2f}", (r['created_at'] or '')[:10]]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type == 'discounts':
+            rows = db.execute(
+                "SELECT receipt, customer_name, discount, created_at FROM sales "
+                "WHERE discount > 0 AND status NOT IN ('returned') "
+                "ORDER BY created_at DESC LIMIT 50"
+            ).fetchall()
+            return jsonify({
+                'title': 'Discounts Given (Last 50)',
+                'columns': ['Receipt', 'Customer', 'Discount', 'Date'],
+                'rows': [
+                    [r['receipt'], r['customer_name'] or 'Walk-in', f"Rs {r['discount']:.2f}", (r['created_at'] or '')[:10]]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type == 'cogs':
+            rows = db.execute(
+                'SELECT p.name, si.quantity, si.cost_price, (si.quantity * si.cost_price) as total_cost, s.receipt '
+                'FROM sale_items si '
+                'JOIN sales s ON s.id=si.sale_id '
+                'JOIN products p ON p.id=si.product_id '
+                "WHERE s.status NOT IN ('returned') AND si.is_return=0 "
+                'ORDER BY s.created_at DESC LIMIT 50'
+            ).fetchall()
+            return jsonify({
+                'title': 'Cost of Goods Sold (Last 50 Items)',
+                'columns': ['Product', 'Qty', 'Cost', 'Total Cost', 'Receipt'],
+                'rows': [
+                    [r['name'], str(r['quantity']), f"Rs {r['cost_price']:.2f}", f"Rs {r['total_cost']:.2f}", r['receipt']]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type.startswith('expense_'):
+            category = detail_type.replace('expense_', '').replace('_', ' ').title()
+            rows = db.execute(
+                'SELECT category, amount, note, created_at FROM expenses '
+                'WHERE category=? ORDER BY created_at DESC LIMIT 50',
+                (category,)
+            ).fetchall()
+            return jsonify({
+                'title': f'{category} Expenses',
+                'columns': ['Category', 'Amount', 'Note', 'Date'],
+                'rows': [
+                    [r['category'], f"Rs {r['amount']:.2f}", r['note'] or '-', (r['created_at'] or '')[:10]]
+                    for r in rows
+                ]
+            })
+        
+        elif detail_type == 'total_expenses':
+            rows = db.execute(
+                'SELECT category, SUM(amount) as total FROM expenses GROUP BY category ORDER BY total DESC'
+            ).fetchall()
+            return jsonify({
+                'title': 'Total Expenses by Category',
+                'columns': ['Category', 'Total'],
+                'rows': [
+                    [r['category'], f"Rs {r['total']:.2f}"]
+                    for r in rows
+                ]
+            })
+        
+        return jsonify({'error': 'Invalid detail type'}), 400

@@ -6,6 +6,7 @@ pi_bp = Blueprint('purchase_invoices', __name__, url_prefix='/api')
 
 
 def find_default_variant(db, product_id):
+    """Find the default (first) variant for a product."""
     return db.execute(
         'SELECT id, stock FROM variants WHERE product_id=? ORDER BY id LIMIT 1',
         (product_id,)
@@ -13,6 +14,7 @@ def find_default_variant(db, product_id):
 
 
 def update_weighted_avg_cost(db, product_id):
+    """Recalculate and update the weighted average cost for a product based on restock history."""
     total_row = db.execute(
         'SELECT COALESCE(SUM(r.qty_added * r.cost),0) as total_cost, COALESCE(SUM(r.qty_added),0) as total_qty '
         'FROM restock_log r JOIN variants v ON v.id=r.variant_id '
@@ -20,20 +22,21 @@ def update_weighted_avg_cost(db, product_id):
         (product_id,)
     ).fetchone()
     if total_row and total_row['total_qty'] > 0:
-        avg = round(total_row['total_cost'] / total_row['total_qty'], 2)
-        db.execute('UPDATE products SET cost_price=? WHERE id=?', (avg, product_id))
+        average_cost = round(total_row['total_cost'] / total_row['total_qty'], 2)
+        db.execute('UPDATE products SET cost_price=? WHERE id=?', (average_cost, product_id))
 
 
-def apply_stock_change(db, product_id, qty, cost, ref, staff_name):
+def apply_stock_change(db, product_id, quantity, cost, reference_note, staff_name):
+    """Apply a stock change for a product: update variant stock, log the change, and recalculate avg cost."""
     variant = find_default_variant(db, product_id)
     if not variant:
         return
     old_stock = variant['stock']
-    new_stock = old_stock + qty
+    new_stock = old_stock + quantity
     db.execute('UPDATE variants SET stock=? WHERE id=?', (new_stock, variant['id']))
     db.execute(
         'INSERT INTO restock_log (variant_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?)',
-        (variant['id'], old_stock, new_stock, qty, cost, ref, staff_name)
+        (variant['id'], old_stock, new_stock, quantity, cost, reference_note, staff_name)
     )
     update_weighted_avg_cost(db, product_id)
 
@@ -42,42 +45,44 @@ def auto_link_product(db, item):
     """Resolve product_id by exact name match (case-insensitive) when not explicitly set."""
     if item.get('product_id'):
         return item['product_id']
-    name = (item.get('item') or '').strip()
-    if not name:
+    product_name = (item.get('item') or '').strip()
+    if not product_name:
         return None
-    row = db.execute(
+    product_row = db.execute(
         'SELECT id FROM products WHERE LOWER(TRIM(name)) = LOWER(?)',
-        (name,)
+        (product_name,)
     ).fetchone()
-    return row['id'] if row else None
+    return product_row['id'] if product_row else None
 
 
 @pi_bp.route('/purchase-invoices')
 @login_required
 def list_purchase_invoices():
+    """List all purchase invoices with supplier names."""
     with get_db() as db:
         rows = db.execute(
             'SELECT pi.*, s.name as supplier_name FROM purchase_invoices pi '
             'LEFT JOIN suppliers s ON s.id=pi.supplier_id ORDER BY pi.id DESC'
         ).fetchall()
-        return jsonify([dict(r) for r in rows])
+        return jsonify([dict(row) for row in rows])
 
 
-@pi_bp.route('/purchase-invoices/<int:piid>')
+@pi_bp.route('/purchase-invoices/<int:invoice_id>')
 @login_required
-def get_purchase_invoice(piid):
+def get_purchase_invoice(invoice_id):
+    """Get a specific purchase invoice with its line items."""
     with get_db() as db:
-        inv = db.execute(
+        invoice = db.execute(
             'SELECT pi.*, s.name as supplier_name FROM purchase_invoices pi '
-            'LEFT JOIN suppliers s ON s.id=pi.supplier_id WHERE pi.id=?', (piid,)
+            'LEFT JOIN suppliers s ON s.id=pi.supplier_id WHERE pi.id=?', (invoice_id,)
         ).fetchone()
-        if not inv:
+        if not invoice:
             return jsonify({'error': 'Not found'}), 404
-        items = db.execute(
-            'SELECT * FROM purchase_invoice_items WHERE invoice_id=? ORDER BY line_number', (piid,)
+        invoice_items = db.execute(
+            'SELECT * FROM purchase_invoice_items WHERE invoice_id=? ORDER BY line_number', (invoice_id,)
         ).fetchall()
-        result = dict(inv)
-        result['items'] = [dict(i) for i in items]
+        result = dict(invoice)
+        result['items'] = [dict(item) for item in invoice_items]
         return jsonify(result)
 
 
@@ -85,93 +90,106 @@ def get_purchase_invoice(piid):
 @login_required
 @manager_required
 def create_purchase_invoice():
-    d = request.get_json()
+    """Create a new purchase invoice, add line items, update stock, and adjust supplier balance."""
+    request_data = request.get_json()
     with get_db() as db:
         try:
-            cur = db.execute(
+            cursor = db.execute(
                 'INSERT INTO purchase_invoices (invoice_no, issue_date, due_date, supplier_id, description, invoice_amount, balance_due, status) VALUES (?,?,?,?,?,?,?,?)',
-                (d['invoice_no'], d.get('issue_date', ''), d.get('due_date', ''),
-                 d.get('supplier_id'), d.get('description', ''),
-                 float(d.get('invoice_amount', 0)), float(d.get('balance_due', 0)),
-                 d.get('status', 'Unpaid'))
+                (request_data['invoice_no'], request_data.get('issue_date', ''), request_data.get('due_date', ''),
+                 request_data.get('supplier_id'), request_data.get('description', ''),
+                 float(request_data.get('invoice_amount', 0)), float(request_data.get('balance_due', 0)),
+                 request_data.get('status', 'Unpaid'))
             )
-            piid = cur.lastrowid
-            staff = session.get('name', '')
-            ref = 'PI #' + d['invoice_no']
-            for item in d.get('items', []):
-                pid = auto_link_product(db, item)
+            invoice_id = cursor.lastrowid
+            staff_member = session.get('name', '')
+            reference = 'PI #' + request_data['invoice_no']
+            
+            for item in request_data.get('items', []):
+                product_id = auto_link_product(db, item)
                 db.execute(
                     'INSERT INTO purchase_invoice_items (invoice_id, line_number, item, product_id, qty, unit_price, total) VALUES (?,?,?,?,?,?,?)',
-                    (piid, int(item.get('line_number', 0)), item.get('item', ''),
-                     pid, float(item.get('qty', 1)),
+                    (invoice_id, int(item.get('line_number', 0)), item.get('item', ''),
+                     product_id, float(item.get('qty', 1)),
                      float(item.get('unit_price', 0)), float(item.get('total', 0)))
                 )
-                if pid:
-                    qty = float(item.get('qty', 1))
+                if product_id:
+                    quantity = float(item.get('qty', 1))
                     cost = float(item.get('unit_price', 0))
-                    apply_stock_change(db, pid, int(qty), cost, ref, staff)
-            if d.get('supplier_id') and float(d.get('balance_due', 0)):
+                    apply_stock_change(db, product_id, int(quantity), cost, reference, staff_member)
+            
+            if request_data.get('supplier_id') and float(request_data.get('balance_due', 0)):
                 db.execute('UPDATE suppliers SET balance = COALESCE(balance,0) + ? WHERE id=?',
-                           (float(d['balance_due']), d['supplier_id']))
-            return jsonify({'ok': True, 'id': piid})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 400
+                           (float(request_data['balance_due']), request_data['supplier_id']))
+            
+            return jsonify({'ok': True, 'id': invoice_id})
+        except Exception as error:
+            return jsonify({'error': str(error)}), 400
 
 
-@pi_bp.route('/purchase-invoices/<int:piid>', methods=['PUT'])
+@pi_bp.route('/purchase-invoices/<int:invoice_id>', methods=['PUT'])
 @login_required
 @manager_required
-def update_purchase_invoice(piid):
-    d = request.get_json()
+def update_purchase_invoice(invoice_id):
+    """Update a purchase invoice and adjust supplier balance accordingly."""
+    request_data = request.get_json()
     with get_db() as db:
         try:
-            old = db.execute('SELECT balance_due, supplier_id FROM purchase_invoices WHERE id=?', (piid,)).fetchone()
+            old_invoice = db.execute('SELECT balance_due, supplier_id FROM purchase_invoices WHERE id=?', (invoice_id,)).fetchone()
             db.execute(
                 'UPDATE purchase_invoices SET invoice_no=?, issue_date=?, due_date=?, supplier_id=?, description=?, invoice_amount=?, balance_due=?, status=? WHERE id=?',
-                (d['invoice_no'], d.get('issue_date', ''), d.get('due_date', ''),
-                 d.get('supplier_id'), d.get('description', ''),
-                 float(d.get('invoice_amount', 0)), float(d.get('balance_due', 0)),
-                 d.get('status', 'Unpaid'), piid)
+                (request_data['invoice_no'], request_data.get('issue_date', ''), request_data.get('due_date', ''),
+                 request_data.get('supplier_id'), request_data.get('description', ''),
+                 float(request_data.get('invoice_amount', 0)), float(request_data.get('balance_due', 0)),
+                 request_data.get('status', 'Unpaid'), invoice_id)
             )
-            if old and old['supplier_id']:
-                old_bal = float(old['balance_due'] or 0)
-                new_bal = float(d.get('balance_due', 0))
-                new_sid = d.get('supplier_id')
-                if old['supplier_id'] == new_sid:
-                    if old_bal != new_bal:
+            
+            if old_invoice and old_invoice['supplier_id']:
+                old_balance = float(old_invoice['balance_due'] or 0)
+                new_balance = float(request_data.get('balance_due', 0))
+                new_supplier_id = request_data.get('supplier_id')
+                
+                if old_invoice['supplier_id'] == new_supplier_id:
+                    if old_balance != new_balance:
                         db.execute('UPDATE suppliers SET balance = COALESCE(balance,0) + ? WHERE id=?',
-                                   (round(new_bal - old_bal, 2), old['supplier_id']))
+                                   (round(new_balance - old_balance, 2), old_invoice['supplier_id']))
                 else:
-                    if old_bal:
+                    if old_balance:
                         db.execute('UPDATE suppliers SET balance = COALESCE(balance,0) - ? WHERE id=?',
-                                   (old_bal, old['supplier_id']))
-                    if new_sid and new_bal:
+                                   (old_balance, old_invoice['supplier_id']))
+                    if new_supplier_id and new_balance:
                         db.execute('UPDATE suppliers SET balance = COALESCE(balance,0) + ? WHERE id=?',
-                                   (new_bal, new_sid))
+                                   (new_balance, new_supplier_id))
+            
             return jsonify({'ok': True})
-        except Exception as e:
-            return jsonify({'error': str(e)}), 400
+        except Exception as error:
+            return jsonify({'error': str(error)}), 400
 
 
-@pi_bp.route('/purchase-invoices/<int:piid>', methods=['DELETE'])
+@pi_bp.route('/purchase-invoices/<int:invoice_id>', methods=['DELETE'])
 @login_required
 @manager_required
-def delete_purchase_invoice(piid):
+def delete_purchase_invoice(invoice_id):
+    """Delete a purchase invoice: reverse stock changes, remove items, and adjust supplier balance."""
     with get_db() as db:
-        inv = db.execute('SELECT invoice_no, balance_due, supplier_id FROM purchase_invoices WHERE id=?', (piid,)).fetchone()
-        if inv:
-            items = db.execute(
-                'SELECT product_id, qty, unit_price FROM purchase_invoice_items WHERE invoice_id=?', (piid,)
+        invoice = db.execute('SELECT invoice_no, balance_due, supplier_id FROM purchase_invoices WHERE id=?', (invoice_id,)).fetchone()
+        if invoice:
+            invoice_items = db.execute(
+                'SELECT product_id, qty, unit_price FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,)
             ).fetchall()
-            staff = session.get('name', '')
-            ref = 'DEL #' + inv['invoice_no']
-            for item in items:
-                pid = item['product_id']
-                if pid:
-                    apply_stock_change(db, pid, -int(item['qty']), float(item['unit_price'] or 0), ref, staff)
-        db.execute('DELETE FROM purchase_invoice_items WHERE invoice_id=?', (piid,))
-        db.execute('DELETE FROM purchase_invoices WHERE id=?', (piid,))
-        if inv and inv['supplier_id'] and float(inv['balance_due'] or 0):
+            staff_member = session.get('name', '')
+            reference = 'DEL #' + invoice['invoice_no']
+            
+            for item in invoice_items:
+                product_id = item['product_id']
+                if product_id:
+                    apply_stock_change(db, product_id, -int(item['qty']), float(item['unit_price'] or 0), reference, staff_member)
+        
+        db.execute('DELETE FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,))
+        db.execute('DELETE FROM purchase_invoices WHERE id=?', (invoice_id,))
+        
+        if invoice and invoice['supplier_id'] and float(invoice['balance_due'] or 0):
             db.execute('UPDATE suppliers SET balance = COALESCE(balance,0) - ? WHERE id=?',
-                       (float(inv['balance_due']), inv['supplier_id']))
+                       (float(invoice['balance_due']), invoice['supplier_id']))
+        
         return jsonify({'ok': True})

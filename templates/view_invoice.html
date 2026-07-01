@@ -1,94 +1,312 @@
 <!DOCTYPE html>
-<html><head><title>JITM · {{ title }}</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css"></head><body>
-{{sidebar|safe}}
-<style>
-.inv-wrap{max-width:800px;margin:0 auto;background:#fff;border:1px solid #e2e1de;border-radius:10px;overflow:hidden}
-.inv-head{background:#1a1c2e;color:#fff;padding:28px 32px;display:flex;justify-content:space-between;align-items:flex-start}
-.inv-head h2{font-size:22px;font-weight:700;letter-spacing:-.3px}
-.inv-head .sub{font-size:12px;color:#9ca3af;margin-top:4px}
-.inv-head .inv-no{font-size:18px;font-weight:600;text-align:right}
-.inv-head .inv-type{font-size:11px;color:#818cf8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
-.inv-meta{display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid #e2e1de}
-.inv-meta-col{padding:20px 32px}
-.inv-meta-col:first-child{border-right:1px solid #e2e1de}
-.inv-meta-col h4{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;font-weight:700;margin-bottom:8px}
-.inv-meta-col p{font-size:13px;color:#1e293b;margin:3px 0}
-.inv-meta-col .lbl{font-size:11px;color:#9ca3af;margin-top:6px}
-.inv-table{width:100%;border-collapse:collapse}
-.inv-table th{background:#f8f7f4;padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #e2e1de}
-.inv-table td{padding:10px 16px;font-size:12px;border-bottom:1px solid #f0efec;color:#374151}
-.inv-table tr:last-child td{border-bottom:none}
-.inv-totals{padding:16px 32px;border-top:1px solid #e2e1de;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
-.inv-totals .row{display:flex;justify-content:space-between;width:260px;font-size:13px;padding:3px 0}
-.inv-totals .row .lbl{color:#6b7280}
-.inv-totals .row .val{font-weight:600;color:#1e293b}
-.inv-totals .grand{border-top:2px solid #1a1c2e;padding-top:8px;margin-top:4px}
-.inv-totals .grand .val{font-size:18px;font-weight:700;color:#3b4fe2}
-.inv-footer{padding:16px 32px;border-top:1px solid #e2e1de;display:flex;justify-content:space-between;align-items:flex-start}
-.inv-footer .notes{font-size:12px;color:#6b7280;max-width:50%}
-.inv-footer .notes strong{color:#374151;display:block;margin-bottom:4px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
-.inv-footer .status-block{text-align:right}
-.inv-status{display:inline-block;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600}
-.inv-status.paid{background:#ecfdf5;color:#059669}
-.inv-status.unpaid{background:#fef2f2;color:#dc2626}
-.inv-status.partial{background:#fffbeb;color:#d97706}
-.inv-status.overpaid{background:#eef2ff;color:#3b4fe2}
-.inv-actions{padding:12px 32px;border-top:1px solid #e2e1de;display:flex;gap:8px;justify-content:flex-end;background:#f8f7f4}
-@media print{.sidebar,.inv-actions,.topbar{display:none!important}.main{margin-left:0!important}.inv-wrap{border:none;box-shadow:none}body *{visibility:visible!important}.inv-wrap,.inv-wrap *{visibility:visible!important}}
-</style>
-<div class="main">
-    <div class="topbar"><h2>{{ title }}</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
-    <div class="content">
-        <div class="inv-wrap" id="inv">
-            <div class="inv-head">
-                <div><h2>Nafees Nomolood</h2><div class="sub">{{ head_sub }}</div></div>
-                <div><div class="inv-type">{{ inv_type_label }}</div><div class="inv-no">{{ inv_number }}</div></div>
+<html>
+<head>
+    <title>JITM · {{ title }}</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .inv-wrap {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border: 1px solid #e2e1de;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .inv-head {
+            background: #1a1c2e;
+            color: #fff;
+            padding: 28px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .inv-head h2 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -.3px;
+        }
+        .inv-head .sub {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
+        .inv-head .inv-no {
+            font-size: 18px;
+            font-weight: 600;
+            text-align: right;
+        }
+        .inv-head .inv-type {
+            font-size: 11px;
+            color: #818cf8;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 2px;
+        }
+        .inv-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            border-bottom: 1px solid #e2e1de;
+        }
+        .inv-meta-col {
+            padding: 20px 32px;
+        }
+        .inv-meta-col:first-child {
+            border-right: 1px solid #e2e1de;
+        }
+        .inv-meta-col h4 {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #6b7280;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .inv-meta-col p {
+            font-size: 13px;
+            color: #1e293b;
+            margin: 3px 0;
+        }
+        .inv-meta-col .lbl {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 6px;
+        }
+        .inv-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .inv-table th {
+            background: #f8f7f4;
+            padding: 10px 16px;
+            text-align: left;
+            font-size: 10px;
+            font-weight: 700;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            border-bottom: 1px solid #e2e1de;
+        }
+        .inv-table td {
+            padding: 10px 16px;
+            font-size: 12px;
+            border-bottom: 1px solid #f0efec;
+            color: #374151;
+        }
+        .inv-table tr:last-child td {
+            border-bottom: none;
+        }
+        .inv-totals {
+            padding: 16px 32px;
+            border-top: 1px solid #e2e1de;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: flex-end;
+        }
+        .inv-totals .row {
+            display: flex;
+            justify-content: space-between;
+            width: 260px;
+            font-size: 13px;
+            padding: 3px 0;
+        }
+        .inv-totals .row .lbl {
+            color: #6b7280;
+        }
+        .inv-totals .row .val {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .inv-totals .grand {
+            border-top: 2px solid #1a1c2e;
+            padding-top: 8px;
+            margin-top: 4px;
+        }
+        .inv-totals .grand .val {
+            font-size: 18px;
+            font-weight: 700;
+            color: #3b4fe2;
+        }
+        .inv-footer {
+            padding: 16px 32px;
+            border-top: 1px solid #e2e1de;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .inv-footer .notes {
+            font-size: 12px;
+            color: #6b7280;
+            max-width: 50%;
+        }
+        .inv-footer .notes strong {
+            color: #374151;
+            display: block;
+            margin-bottom: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .inv-footer .status-block {
+            text-align: right;
+        }
+        .inv-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .inv-status.paid {
+            background: #ecfdf5;
+            color: #059669;
+        }
+        .inv-status.unpaid {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        .inv-status.partial {
+            background: #fffbeb;
+            color: #d97706;
+        }
+        .inv-status.overpaid {
+            background: #eef2ff;
+            color: #3b4fe2;
+        }
+        .inv-actions {
+            padding: 12px 32px;
+            border-top: 1px solid #e2e1de;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            background: #f8f7f4;
+        }
+        
+        @media print {
+            .sidebar, .inv-actions, .topbar {
+                display: none !important;
+            }
+            .main {
+                margin-left: 0 !important;
+            }
+            .inv-wrap {
+                border: none;
+                box-shadow: none;
+            }
+            body * {
+                visibility: visible !important;
+            }
+            .inv-wrap, .inv-wrap * {
+                visibility: visible !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>{{ title }}</h2>
+            <div class="actions">
+                <span class="text-muted">{{name}}</span>
             </div>
-            <div class="inv-meta">
-                <div class="inv-meta-col">
-                    <h4>{{ party_label }}</h4>
-                    <p style="font-weight:600;font-size:15px">{{ party_name }}</p>
-                    {% if party_phone %}<p>{{ party_phone }}</p>{% endif %}
-                    {% if party_extra %}<div class="lbl">{{ party_extra }}</div>{% endif %}
+        </div>
+        <div class="content">
+            <div class="inv-wrap" id="inv">
+                <div class="inv-head">
+                    <div>
+                        <h2>Nafees Nomolood</h2>
+                        <div class="sub">{{ head_sub }}</div>
+                    </div>
+                    <div>
+                        <div class="inv-type">{{ inv_type_label }}</div>
+                        <div class="inv-no">{{ inv_number }}</div>
+                    </div>
                 </div>
-                <div class="inv-meta-col">
-                    <h4>Details</h4>
-                    {% for d in details %}
-                    <div class="lbl">{{ d[0] }}</div><p>{{ d[1] }}</p>
+                
+                <div class="inv-meta">
+                    <div class="inv-meta-col">
+                        <h4>{{ party_label }}</h4>
+                        <p style="font-weight:600;font-size:15px">{{ party_name }}</p>
+                        {% if party_phone %}
+                            <p>{{ party_phone }}</p>
+                        {% endif %}
+                        {% if party_extra %}
+                            <div class="lbl">{{ party_extra }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="inv-meta-col">
+                        <h4>Details</h4>
+                        {% for d in details %}
+                            <div class="lbl">{{ d[0] }}</div>
+                            <p>{{ d[1] }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <table class="inv-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px">#</th>
+                            <th>{{ item_cols[0] }}</th>
+                            {% for c in item_cols[1:] %}
+                                <th class="text-right">{{ c }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td style="color:#6b7280;font-size:11px">{{ loop.index }}</td>
+                                {% for val in item %}
+                                    <td{% if not loop.first %} class="text-right"{% endif %}>
+                                        {% if loop.first %}
+                                            {{ val|safe }}
+                                        {% else %}
+                                            {{ val }}
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                <div class="inv-totals">
+                    {% for t in totals %}
+                        <div class="row{% if t[2] %} grand{% endif %}">
+                            <span class="lbl">{{ t[0] }}</span>
+                            <span class="val">{{ t[1] }}</span>
+                        </div>
                     {% endfor %}
                 </div>
-            </div>
-            <table class="inv-table"><thead><tr>
-                <th style="width:40px">#</th>
-                <th>{{ item_cols[0] }}</th>
-                {% for c in item_cols[1:] %}<th class="text-right">{{ c }}</th>{% endfor %}
-            </tr></thead><tbody>
-                {% for item in items %}
-                <tr>
-                    <td style="color:#6b7280;font-size:11px">{{ loop.index }}</td>
-                    {% for val in item %}<td{% if not loop.first %} class="text-right"{% endif %}>{% if loop.first %}{{ val|safe }}{% else %}{{ val }}{% endif %}</td>{% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody></table>
-            <div class="inv-totals">
-                {% for t in totals %}
-                <div class="row{% if t[2] %} grand{% endif %}"><span class="lbl">{{ t[0] }}</span><span class="val">{{ t[1] }}</span></div>
-                {% endfor %}
-            </div>
-            {% if notes or status_class %}
-            <div class="inv-footer">
-                <div class="notes">{% if notes %}<strong>Notes</strong>{{ notes }}{% endif %}</div>
-                <div class="status-block">
-                    {% if status_class %}<span class="inv-status {{ status_class }}">{{ status_label }}</span>{% endif %}
-                    {% if paid_info %}<div style="font-size:12px;color:#6b7280;margin-top:6px">{{ paid_info }}</div>{% endif %}
+                
+                {% if notes or status_class %}
+                    <div class="inv-footer">
+                        <div class="notes">
+                            {% if notes %}
+                                <strong>Notes</strong>{{ notes }}
+                            {% endif %}
+                        </div>
+                        <div class="status-block">
+                            {% if status_class %}
+                                <span class="inv-status {{ status_class }}">{{ status_label }}</span>
+                            {% endif %}
+                            {% if paid_info %}
+                                <div style="font-size:12px;color:#6b7280;margin-top:6px">{{ paid_info }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <div class="inv-actions">
+                    <a class="btn btn-sm" href="{{ back_url }}">Back</a>
+                    <button class="btn btn-p btn-sm" onclick="window.print()">Print</button>
                 </div>
-            </div>
-            {% endif %}
-            <div class="inv-actions">
-                <a class="btn btn-sm" href="{{ back_url }}">Back</a>
-                <button class="btn btn-p btn-sm" onclick="window.print()">Print</button>
             </div>
         </div>
     </div>
-</div>
-</body></html>
+</body>
+</html>

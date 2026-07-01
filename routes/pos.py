@@ -9,203 +9,286 @@ from routes.auth import login_required, manager_required
 pos_bp = Blueprint('pos', __name__, url_prefix='/api')
 
 
-def make_receipt():
-    ts = int(time.time() * 1000) % 10000000
-    rand = random.randint(100, 999)
-    return f"JITM-{ts}{rand}"
+def compute_sale_status(paid, total):
+    """Compute sale status dynamically from paid and total amounts."""
+    if paid >= total:
+        return 'Paid'
+    elif paid > 0:
+        return 'Partial'
+    else:
+        return 'Unpaid'
+
+
+def generate_receipt_number():
+    """Generate a unique receipt number using timestamp and random suffix."""
+    timestamp = int(time.time() * 1000) % 10000000
+    random_suffix = random.randint(100, 999)
+    return f"JITM-{timestamp}{random_suffix}"
+
+
+def resolve_customer(db, request_data, is_walk_in):
+    """Find or create customer based on request data. Returns (customer_id, customer_name)."""
+    customer_phone = request_data.get('customer_phone', '')
+    customer_name = request_data.get('customer_name', '')
+    customer_id = request_data.get('customer_id')
+    
+    if is_walk_in:
+        customer_name = 'Walk In'
+        customer = db.execute('SELECT * FROM customers WHERE name=?', ('Walk In',)).fetchone()
+        if customer:
+            customer_id = customer['id']
+        else:
+            cursor = db.execute('INSERT INTO customers (name, phone) VALUES (?,?)', ('Walk In', ''))
+            customer_id = cursor.lastrowid
+    elif customer_phone:
+        customer = db.execute('SELECT * FROM customers WHERE phone=?', (customer_phone,)).fetchone()
+        if customer:
+            customer_id = customer['id']
+            customer_name = customer['name']
+        elif customer_name:
+            cursor = db.execute('INSERT INTO customers (name, phone) VALUES (?,?)', (customer_name, customer_phone))
+            customer_id = cursor.lastrowid
+    
+    return customer_id, customer_name
+
+
+def process_sale_items(db, items, is_return):
+    """Validate items, calculate totals, and update stock. Returns (sale_items, subtotal, errors)."""
+    errors = []
+    sale_items = []
+    subtotal = 0
+    quantity_multiplier = -1 if is_return else 1
+    
+    for item in items:
+        variant_id = item.get('variant_id') or item.get('vid')
+        quantity = int(item['quantity']) * quantity_multiplier
+        
+        variant = db.execute('SELECT * FROM variants WHERE id=?', (variant_id,)).fetchone()
+        if not variant:
+            errors.append(f'Variant {variant_id} not found')
+            continue
+        
+        product = db.execute('SELECT * FROM products WHERE id=?', (variant['product_id'],)).fetchone()
+        price = float(item.get('price', variant['price'] or product['base_price']))
+        line_total = round(price * quantity, 2)
+        subtotal += line_total
+        
+        staff_id = item.get('staff')
+        is_item_return = is_return
+        
+        sale_item = {
+            'product_id': product['id'],
+            'variant_id': variant_id,
+            'product_name': product['name'],
+            'variant_label': f'{variant["size"]} {variant["color"]}'.strip(),
+            'sku': variant['sku'],
+            'quantity': quantity,
+            'price': price,
+            'total': line_total,
+            'is_return': 1 if is_item_return else 0,
+            'staff_id': staff_id,
+            'cost_price': product['cost_price'],
+        }
+        sale_items.append(sale_item)
+        
+        if quantity_multiplier < 0:
+            db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (abs(sale_item['quantity']), sale_item['variant_id']))
+        else:
+            db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (sale_item['quantity'], sale_item['variant_id']))
+    
+    return sale_items, subtotal, errors
+
+
+def reverse_sale_transactions(db, sale_id):
+    """Reverse account balances and delete transaction rows for a sale."""
+    transactions = db.execute(
+        "SELECT * FROM transactions WHERE reference_type='sale' AND reference_id=?",
+        (sale_id,)
+    ).fetchall()
+    
+    for transaction in transactions:
+        balance_change = -transaction['amount'] if transaction['type'] == 'receipt' else transaction['amount']
+        db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (balance_change, transaction['account_id']))
+    
+    db.execute("DELETE FROM transactions WHERE reference_type='sale' AND reference_id=?", (sale_id,))
+
+
+def record_payments(db, sale_id, payments, is_return, customer_id, receipt_number):
+    """Record payment rows and update account balances for a completed sale.
+    
+    Each payment leg creates:
+    - One row in payments table
+    - One row in transactions table (if method maps to an account)
+    
+    Allocations link each transaction to the sale for proper tracking.
+    """
+    account_map = {
+        'cash': ('POS Petty Cash', 'cash'),
+        'bl': ('Bilal', 'bank'),
+        'jl': ('Jamal', 'bank'),
+        'z': ('Zahid', 'bank')
+    }
+    
+    total_recorded = 0
+    
+    for payment in payments:
+        payment_amount = float(payment['amount'])
+        
+        # Record payment leg
+        db.execute(
+            'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
+            (sale_id, payment['method'], payment_amount)
+        )
+        
+        # Only create account transactions for non-credit payment methods
+        if payment['method'] in account_map:
+            account_name, account_type = account_map[payment['method']]
+            account = db.execute('SELECT * FROM accounts WHERE name=?', (account_name,)).fetchone()
+            if not account:
+                cursor = db.execute('INSERT INTO accounts (name, type, balance) VALUES (?,?,?)',
+                                  (account_name, account_type, 0))
+                account_id = cursor.lastrowid
+            else:
+                account_id = account['id']
+            
+            transaction_type = 'payment' if is_return else 'receipt'
+            transaction_description = f'Sale return: {receipt_number}' if is_return else f'Sale receipt: {receipt_number}'
+            
+            # Create allocation linking this transaction to the sale
+            allocation = [{'ref_type': 'sale', 'ref_id': sale_id, 'amount': abs(payment_amount)}]
+            allocations_json = json.dumps(allocation)
+            
+            db.execute(
+                "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
+                "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
+                (account_id, transaction_type, abs(payment_amount), transaction_description,
+                 'customer', customer_id, 'sale', sale_id, allocations_json)
+            )
+            
+            balance_change = -abs(payment_amount) if is_return else payment_amount
+            db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (balance_change, account_id))
+            
+            total_recorded += abs(payment_amount)
+    
+    return total_recorded
 
 
 @pos_bp.route('/sale', methods=['POST'])
 @login_required
 def complete_sale():
-    d = request.get_json()
-    items = d.get('items', [])
+    """Process a POS sale or return. Handles split payments, credit, and stock updates."""
+    request_data = request.get_json()
+    items = request_data.get('items', [])
     if not items:
         return jsonify({'error': 'No items'}), 400
-
-    is_return = d.get('is_return', False)
-    discount = float(d.get('discount', 0))
-    discount_type = d.get('discount_type', 'percent')
-    payment = d.get('payment', 'cash')
-    customer_phone = d.get('customer_phone', '')
-    walk_in = d.get('walk_in', False)
-    customer_id = d.get('customer_id')
-    customer_name = d.get('customer_name', '')
-    notes = d.get('notes', '')
-
-    if not walk_in and not customer_phone and not customer_name and not customer_id:
+    
+    is_return = request_data.get('is_return', False)
+    discount = float(request_data.get('discount', 0))
+    discount_type = request_data.get('discount_type', 'percent')
+    payment_method = request_data.get('payment', 'cash')
+    customer_phone = request_data.get('customer_phone', '')
+    is_walk_in = request_data.get('walk_in', False)
+    customer_id = request_data.get('customer_id')
+    customer_name = request_data.get('customer_name', '')
+    notes = request_data.get('notes', '')
+    
+    if not is_walk_in and not customer_phone and not customer_name and not customer_id:
         return jsonify({'error': 'Customer information required'}), 400
-
-    cash_tendered = d.get('cash_tendered', 0) or 0
-    change_given = d.get('change_given', 0) or 0
-
+    
+    cash_tendered = request_data.get('cash_tendered', 0) or 0
+    change_given = request_data.get('change_given', 0) or 0
+    
     with get_db() as db:
         db.execute('BEGIN IMMEDIATE')
-        if walk_in:
-            customer_name = 'Walk In'
-            c = db.execute('SELECT * FROM customers WHERE name=?', ('Walk In',)).fetchone()
-            if c:
-                customer_id = c['id']
-            else:
-                cur = db.execute('INSERT INTO customers (name, phone) VALUES (?,?)', ('Walk In', ''))
-                customer_id = cur.lastrowid
-        elif customer_phone:
-            c = db.execute('SELECT * FROM customers WHERE phone=?', (customer_phone,)).fetchone()
-            if c:
-                customer_id = c['id']
-                customer_name = c['name']
-            elif customer_name:
-                cur = db.execute('INSERT INTO customers (name, phone) VALUES (?,?)', (customer_name, customer_phone))
-                customer_id = cur.lastrowid
-
-        errors = []
-        sale_items = []
-        subtotal = 0
-
-        def process_item(item, qty_mult=1):
-            nonlocal subtotal
-            vid = item.get('variant_id') or item.get('vid')
-            qty = int(item['quantity']) * qty_mult
-            variant = db.execute('SELECT * FROM variants WHERE id=?', (vid,)).fetchone()
-            if not variant:
-                errors.append(f'Variant {vid} not found')
-                return None
-            prod = db.execute('SELECT * FROM products WHERE id=?', (variant['product_id'],)).fetchone()
-            price = float(item.get('price', variant['price'] or prod['base_price']))
-            line_total = round(price * qty, 2)
-            subtotal += line_total
-            staff_id = item.get('staff')
-            is_item_return = is_return
-            return {
-                'product_id': prod['id'],
-                'variant_id': vid,
-                'product_name': prod['name'],
-                'variant_label': f'{variant["size"]} {variant["color"]}'.strip(),
-                'sku': variant['sku'],
-                'quantity': qty,
-                'price': price,
-                'total': line_total,
-                'is_return': 1 if is_item_return else 0,
-                'staff_id': staff_id,
-            }
-
-        for item in items:
-            qty_mult = -1 if is_return else 1
-            si = process_item(item, qty_mult)
-            if si is None:
-                continue
-            sale_items.append(si)
-
-            if qty_mult < 0:
-                db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (abs(si['quantity']), si['variant_id']))
-            else:
-                db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
-
+        
+        customer_id, customer_name = resolve_customer(db, request_data, is_walk_in)
+        
+        sale_items, subtotal, errors = process_sale_items(db, items, is_return)
         if errors:
             return jsonify({'error': '; '.join(errors)}), 400
-
-        disc_amt = round(abs(subtotal) * discount / 100, 2) if discount_type == 'percent' else discount
+        
+        discount_amount = round(abs(subtotal) * discount / 100, 2) if discount_type == 'percent' else discount
         if subtotal < 0:
-            total = round(subtotal + disc_amt, 2)
+            total = round(subtotal + discount_amount, 2)
         else:
-            total = round(subtotal - disc_amt, 2)
+            total = round(subtotal - discount_amount, 2)
         tax = 0
-
-        receipt = make_receipt()
-
-        pymt_list = d.get('payments', [])
-        if not pymt_list:
-            pymt_list = [{'method': payment, 'amount': total}]
-
-        paid_amt = 0
-        has_credit = False
-        for p in pymt_list:
-            if p['method'] == 'credit':
-                has_credit = True
-            else:
-                paid_amt += p['amount']
-
+        
+        receipt_number = generate_receipt_number()
+        
+        payment_list = request_data.get('payments', [])
+        if not payment_list:
+            payment_list = [{'method': payment_method, 'amount': total}]
+        
+        has_credit = any(payment['method'] == 'credit' for payment in payment_list)
+        
         if has_credit and customer_id:
-            cust = db.execute('SELECT credit, credit_limit FROM customers WHERE id=?', (customer_id,)).fetchone()
-            if cust and cust['credit_limit'] is not None:
-                total_credit_after = cust['credit'] + sum(p['amount'] for p in pymt_list if p['method'] == 'credit')
-                if total_credit_after > cust['credit_limit']:
-                    return jsonify({'error': f'Credit limit of Rs {cust["credit_limit"]:.2f} would be exceeded'}), 400
-
+            customer = db.execute('SELECT credit, credit_limit FROM customers WHERE id=?', (customer_id,)).fetchone()
+            if customer and customer['credit_limit'] is not None:
+                total_credit_after = customer['credit'] + sum(payment['amount'] for payment in payment_list if payment['method'] == 'credit')
+                if total_credit_after > customer['credit_limit']:
+                    return jsonify({'error': f'Credit limit of Rs {customer["credit_limit"]:.2f} would be exceeded'}), 400
+        
+        # Compute status dynamically based on payment amounts
         if is_return:
             status = 'returned'
-        elif has_credit and paid_amt >= total:
-            status = 'Paid'
-        elif has_credit and paid_amt > 0:
-            status = 'Partial'
-        elif has_credit:
-            status = 'Unpaid'
         else:
-            status = 'Paid'
-
-        due_date = d.get('due_date') if has_credit else None
+            non_credit_paid = sum(payment['amount'] for payment in payment_list if payment['method'] != 'credit')
+            status = compute_sale_status(non_credit_paid, total)
+        
+        due_date = request_data.get('due_date') if has_credit else None
+        
+        paid_amount = sum(payment['amount'] for payment in payment_list if payment['method'] != 'credit')
+        
         sale_id = db.execute(
             'INSERT INTO sales (receipt, subtotal, discount, discount_type, tax, total, payment, status, customer_id, customer_name, staff_id, staff_name, notes, due_date, paid, cash_tendered, change_given) '
             'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            (receipt, round(subtotal, 2), disc_amt, discount_type, tax, total, 'split' if len(pymt_list) > 1 else payment, status,
-             customer_id, customer_name, session['user_id'], session['name'], notes, due_date, paid_amt, cash_tendered, change_given)
+            (receipt_number, round(subtotal, 2), discount_amount, discount_type, tax, total,
+             'split' if len(payment_list) > 1 else payment_method, status,
+             customer_id, customer_name, session['user_id'], session['name'], notes, due_date,
+             paid_amount, cash_tendered, change_given)
         ).lastrowid
-
-        for si in sale_items:
-            si['sale_id'] = sale_id
+        
+        for sale_item in sale_items:
+            sale_item['sale_id'] = sale_id
             db.execute(
-                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id) '
-                'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                (sale_id, si['product_id'], si['variant_id'], si['product_name'], si['variant_label'],
-                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'], si['staff_id'])
+                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id, cost_price) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                (sale_id, sale_item['product_id'], sale_item['variant_id'], sale_item['product_name'],
+                 sale_item['variant_label'], sale_item['sku'], sale_item['quantity'], sale_item['price'],
+                 sale_item['total'], sale_item['is_return'], sale_item['staff_id'], sale_item['cost_price'])
             )
-
-        account_map = {'cash': ('POS Petty Cash', 'cash'), 'bl': ('Bilal', 'bank'), 'jl': ('Jamal', 'bank'), 'z': ('Zahid', 'bank')}
-        for p in pymt_list:
-            db.execute(
-                'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
-                (sale_id, p['method'], p['amount'])
-            )
-            if p['method'] in account_map:
-                acc_name, acc_type = account_map[p['method']]
-                acc = db.execute('SELECT * FROM accounts WHERE name=?', (acc_name,)).fetchone()
-                if not acc:
-                    cur = db.execute('INSERT INTO accounts (name, type, balance) VALUES (?,?,?)',
-                                     (acc_name, acc_type, 0))
-                    acc_id = cur.lastrowid
-                else:
-                    acc_id = acc['id']
-                txn_type = 'payment' if is_return else 'receipt'
-                txn_desc = f'Sale return: {receipt}' if is_return else f'Sale receipt: {receipt}'
-                db.execute(
-                    "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
-                    (acc_id, txn_type, abs(p['amount']), txn_desc,
-                     'customer', customer_id, 'sale', sale_id, json.dumps([]))
-                )
-                balance_change = -abs(p['amount']) if is_return else p['amount']
-                db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (balance_change, acc_id))
-
+        
+        recorded_amount = record_payments(db, sale_id, payment_list, is_return, customer_id, receipt_number)
+        
+        # Verify: sum of account transactions must equal sum of non-credit payment legs
+        expected_recorded = sum(
+            payment['amount'] for payment in payment_list
+            if payment['method'] in ('cash', 'bl', 'jl', 'z')
+        )
+        if abs(recorded_amount - expected_recorded) > 0.01:
+            return jsonify({'error': f'Payment recording mismatch: expected Rs {expected_recorded:.2f}, recorded Rs {recorded_amount:.2f}'}), 500
+        
         if customer_id:
             spent_change = -abs(total) if is_return else total
             db.execute('UPDATE customers SET total_spent=total_spent+?, visit_count=visit_count+1 WHERE id=?',
                        (spent_change, customer_id))
-            for p in pymt_list:
-                if p['method'] == 'credit':
-                    credit_change = -abs(p['amount']) if is_return else p['amount']
+            for payment in payment_list:
+                if payment['method'] == 'credit':
+                    credit_change = -abs(payment['amount']) if is_return else payment['amount']
                     db.execute('UPDATE customers SET credit=credit+? WHERE id=?', (credit_change, customer_id))
-
+        
         return jsonify({
             'ok': True,
             'sale_id': sale_id,
-            'receipt': receipt,
+            'receipt': receipt_number,
             'items': sale_items,
             'subtotal': round(subtotal, 2),
-            'discount': disc_amt,
+            'discount': discount_amount,
             'tax': tax,
             'total': total,
-            'payment': payment,
-            'payments': pymt_list,
+            'payment': payment_method,
+            'payments': payment_list,
             'customer_name': customer_name,
             'customer_phone': customer_phone,
             'staff_name': session['name'],
@@ -220,314 +303,346 @@ def complete_sale():
 @pos_bp.route('/sales-invoices', methods=['POST'])
 @login_required
 def create_sales_invoice():
-    """Create a sales invoice from spreadsheet data.
-    Validates stock, auto-links products by name, decrements stock, records sale."""
-    d = request.get_json() or {}
-    items = d.get('items', [])
+    """Create a sales invoice from spreadsheet data. Validates stock, auto-links products, records sale."""
+    request_data = request.get_json() or {}
+    items = request_data.get('items', [])
     if not items:
         return jsonify({'error': 'No items'}), 400
-
-    receipt = (d.get('receipt') or '').strip() or make_receipt()
-    customer_id = d.get('customer_id')
-    payment = d.get('payment', 'cash')
-    notes = d.get('notes', '')
-    due_date = d.get('due_date') or None
-
+    
+    receipt_number = (request_data.get('receipt') or '').strip() or generate_receipt_number()
+    customer_id = request_data.get('customer_id')
+    payment_method = request_data.get('payment', 'cash')
+    notes = request_data.get('notes', '')
+    due_date = request_data.get('due_date') or None
+    
     with get_db() as db:
         db.execute('BEGIN IMMEDIATE')
-        # Auto-link products by name where product_id is missing
+        
         for item in items:
             if not item.get('product_id') and item.get('item'):
-                row = db.execute(
+                product_row = db.execute(
                     'SELECT id FROM products WHERE LOWER(TRIM(name)) = LOWER(?)',
                     (item['item'].strip(),)
                 ).fetchone()
-                if row:
-                    item['product_id'] = row['id']
-
-        # Resolve variants and validate stock
+                if product_row:
+                    item['product_id'] = product_row['id']
+        
         sale_items = []
         subtotal = 0
-
+        
         for item in items:
-            pid = item.get('product_id')
-            qty = int(item.get('qty', 0))
-            if not pid or qty <= 0:
+            product_id = item.get('product_id')
+            quantity = int(item.get('qty', 0))
+            if not product_id or quantity <= 0:
                 continue
-            prod = db.execute('SELECT * FROM products WHERE id=?', (pid,)).fetchone()
-            if not prod:
+            
+            product = db.execute('SELECT * FROM products WHERE id=?', (product_id,)).fetchone()
+            if not product:
                 continue
+            
             variant = db.execute(
-                'SELECT * FROM variants WHERE product_id=? ORDER BY id LIMIT 1', (pid,)
+                'SELECT * FROM variants WHERE product_id=? ORDER BY id LIMIT 1', (product_id,)
             ).fetchone()
             if not variant:
                 continue
-            price = float(item.get('unit_price', 0) or prod['base_price'] or 0)
+            
+            price = float(item.get('unit_price', 0) or product['base_price'] or 0)
             if price <= 0:
                 continue
-            line_total = round(price * qty, 2)
+            
+            line_total = round(price * quantity, 2)
             subtotal += line_total
+            
             sale_items.append({
-                'product_id': pid,
+                'product_id': product_id,
                 'variant_id': variant['id'],
-                'product_name': prod['name'],
+                'product_name': product['name'],
                 'variant_label': '',
                 'sku': variant['sku'],
-                'quantity': qty,
+                'quantity': quantity,
                 'price': price,
                 'total': line_total,
                 'is_return': 0,
+                'cost_price': product['cost_price'],
             })
-
+        
         if not sale_items:
             return jsonify({'error': 'No valid items to sell'}), 400
-
-        # Decrement stock and create sale records
-        for si in sale_items:
-            db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
-
+        
+        for sale_item in sale_items:
+            db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (sale_item['quantity'], sale_item['variant_id']))
+        
         customer_name = ''
         if customer_id:
-            c = db.execute('SELECT name FROM customers WHERE id=?', (customer_id,)).fetchone()
-            if c:
-                customer_name = c['name']
-
-        # No tax for spreadsheet sales (Q6 = B: tax-inclusive prices)
+            customer = db.execute('SELECT name FROM customers WHERE id=?', (customer_id,)).fetchone()
+            if customer:
+                customer_name = customer['name']
+        
         total = round(subtotal, 2)
-        status = 'Paid' if payment != 'credit' else 'Unpaid'
-        paid_amt = total if status == 'Paid' else 0
-
+        paid_amount = total if payment_method != 'credit' else 0
+        status = compute_sale_status(paid_amount, total)
+        
         sale_id = db.execute(
             'INSERT INTO sales (receipt, subtotal, discount, discount_type, tax, total, payment, status, customer_id, customer_name, staff_id, staff_name, notes, due_date, paid) '
             'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            (receipt, total, 0, 'percent', 0, total, payment, status,
-             customer_id, customer_name, session['user_id'], session['name'], notes, due_date, paid_amt)
+            (receipt_number, total, 0, 'percent', 0, total, payment_method, status,
+             customer_id, customer_name, session['user_id'], session['name'], notes, due_date, paid_amount)
         ).lastrowid
-
-        for si in sale_items:
-            si['sale_id'] = sale_id
+        
+        for sale_item in sale_items:
+            sale_item['sale_id'] = sale_id
             db.execute(
-                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id) '
-                'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                (sale_id, si['product_id'], si['variant_id'], si['product_name'], si['variant_label'],
-                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'], None)
+                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id, cost_price) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                (sale_id, sale_item['product_id'], sale_item['variant_id'], sale_item['product_name'],
+                 sale_item['variant_label'], sale_item['sku'], sale_item['quantity'], sale_item['price'],
+                 sale_item['total'], sale_item['is_return'], None, sale_item['cost_price'])
             )
-
+        
         db.execute(
             'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
-            (sale_id, payment, total)
+            (sale_id, payment_method, total)
         )
-
+        
         if customer_id:
             db.execute('UPDATE customers SET total_spent=total_spent+?, visit_count=visit_count+1 WHERE id=?',
                        (total, customer_id))
-            if payment == 'credit':
+            if payment_method == 'credit':
                 db.execute('UPDATE customers SET credit=credit+? WHERE id=?', (total, customer_id))
-
+        
         return jsonify({
             'ok': True,
             'sale_id': sale_id,
-            'receipt': receipt,
+            'receipt': receipt_number,
             'items': sale_items,
             'subtotal': total,
             'total': total,
-            'payment': payment,
+            'payment': payment_method,
             'customer_name': customer_name,
             'staff_name': session.get('name', ''),
         })
 
 
-@pos_bp.route('/sales-invoices/<int:sid>', methods=['PUT'])
+@pos_bp.route('/sales-invoices/<int:sale_id>', methods=['PUT'])
 @login_required
 @manager_required
-def update_sales_invoice(sid):
+def update_sales_invoice(sale_id):
     """Update a sales invoice: reverse old stock, apply new items, update sale row."""
-    d = request.get_json() or {}
-    items = d.get('items', [])
+    request_data = request.get_json() or {}
+    items = request_data.get('items', [])
     if not items:
         return jsonify({'error': 'No items'}), 400
-
+    
     with get_db() as db:
         db.execute('BEGIN IMMEDIATE')
-        old = db.execute('SELECT * FROM sales WHERE id=?', (sid,)).fetchone()
-        if not old:
+        old_sale = db.execute('SELECT * FROM sales WHERE id=?', (sale_id,)).fetchone()
+        if not old_sale:
             return jsonify({'error': 'Sale not found'}), 404
-        old = dict(old)
-
-        old_items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sid,)).fetchall()
-        due_date = d.get('due_date') or old.get('due_date')
-        for oi in old_items:
-            if oi['variant_id'] and oi['is_return'] == 0:
-                db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (oi['quantity'], oi['variant_id']))
-
+        old_sale = dict(old_sale)
+        
+        old_items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale_id,)).fetchall()
+        due_date = request_data.get('due_date') or old_sale.get('due_date')
+        
+        for old_item in old_items:
+            if old_item['variant_id'] and old_item['is_return'] == 0:
+                db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (old_item['quantity'], old_item['variant_id']))
+        
         for item in items:
             if not item.get('product_id') and item.get('item'):
-                row = db.execute(
+                product_row = db.execute(
                     'SELECT id FROM products WHERE LOWER(TRIM(name)) = LOWER(?)',
                     (item['item'].strip(),)
                 ).fetchone()
-                if row:
-                    item['product_id'] = row['id']
-
+                if product_row:
+                    item['product_id'] = product_row['id']
+        
         sale_items = []
         subtotal = 0
+        
         for item in items:
-            pid = item.get('product_id')
-            qty = int(item.get('qty', 0))
-            if not pid or qty <= 0:
+            product_id = item.get('product_id')
+            quantity = int(item.get('qty', 0))
+            if not product_id or quantity <= 0:
                 continue
-            prod = db.execute('SELECT * FROM products WHERE id=?', (pid,)).fetchone()
-            if not prod:
+            
+            product = db.execute('SELECT * FROM products WHERE id=?', (product_id,)).fetchone()
+            if not product:
                 continue
+            
             variant = db.execute(
-                'SELECT * FROM variants WHERE product_id=? ORDER BY id LIMIT 1', (pid,)
+                'SELECT * FROM variants WHERE product_id=? ORDER BY id LIMIT 1', (product_id,)
             ).fetchone()
             if not variant:
                 continue
-            price = float(item.get('unit_price', 0) or prod['base_price'] or 0)
+            
+            price = float(item.get('unit_price', 0) or product['base_price'] or 0)
             if price <= 0:
                 continue
-            line_total = round(price * qty, 2)
+            
+            line_total = round(price * quantity, 2)
             subtotal += line_total
+            
             sale_items.append({
-                'product_id': pid,
+                'product_id': product_id,
                 'variant_id': variant['id'],
-                'product_name': prod['name'],
+                'product_name': product['name'],
                 'variant_label': '',
                 'sku': variant['sku'],
-                'quantity': qty,
+                'quantity': quantity,
                 'price': price,
                 'total': line_total,
                 'is_return': 0,
+                'cost_price': product['cost_price'],
             })
-
+        
         if not sale_items:
-            for oi in old_items:
-                if oi['variant_id'] and oi['is_return'] == 0:
-                    db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (oi['quantity'], oi['variant_id']))
+            for old_item in old_items:
+                if old_item['variant_id'] and old_item['is_return'] == 0:
+                    db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (old_item['quantity'], old_item['variant_id']))
             return jsonify({'error': 'No valid items to sell'}), 400
-
-        for si in sale_items:
-            db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (si['quantity'], si['variant_id']))
-
-        customer_id = d.get('customer_id') or old.get('customer_id')
-        payment = d.get('payment') or old.get('payment')
-        notes = d.get('notes', old.get('notes', ''))
-        customer_name = old.get('customer_name', '')
+        
+        for sale_item in sale_items:
+            db.execute('UPDATE variants SET stock = stock - ? WHERE id=?', (sale_item['quantity'], sale_item['variant_id']))
+        
+        customer_id = request_data.get('customer_id') or old_sale.get('customer_id')
+        payment_method = request_data.get('payment') or old_sale.get('payment')
+        notes = request_data.get('notes', old_sale.get('notes', ''))
+        customer_name = old_sale.get('customer_name', '')
+        
         if customer_id:
-            c = db.execute('SELECT name FROM customers WHERE id=?', (customer_id,)).fetchone()
-            if c:
-                customer_name = c['name']
-
+            customer = db.execute('SELECT name FROM customers WHERE id=?', (customer_id,)).fetchone()
+            if customer:
+                customer_name = customer['name']
+        
         total = round(subtotal, 2)
-        if old.get('customer_id') and old['customer_id'] == customer_id:
-            db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (old['total'], old['customer_id']))
-        elif old.get('customer_id'):
-            db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (old['total'], old['customer_id']))
+        
+        if old_sale.get('customer_id') and old_sale['customer_id'] == customer_id:
+            db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
+        elif old_sale.get('customer_id'):
+            db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
+        
         if customer_id:
             db.execute('UPDATE customers SET total_spent = total_spent + ? WHERE id=?', (total, customer_id))
-            if payment == 'credit':
-                if old.get('customer_id') and old['customer_id'] == customer_id and old.get('payment') == 'credit':
-                    db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (old['total'], old['customer_id']))
-                elif old.get('customer_id') and old.get('payment') == 'credit':
-                    db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (old['total'], old['customer_id']))
+            if payment_method == 'credit':
+                if old_sale.get('customer_id') and old_sale['customer_id'] == customer_id and old_sale.get('payment') == 'credit':
+                    db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
+                elif old_sale.get('customer_id') and old_sale.get('payment') == 'credit':
+                    db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
                 db.execute('UPDATE customers SET credit = credit + ? WHERE id=?', (total, customer_id))
-
-        status = 'Paid' if payment != 'credit' else 'Unpaid'
-        new_paid = total if status == 'Paid' else old.get('paid', 0)
+        
+        new_paid = total if payment_method != 'credit' else old_sale.get('paid', 0)
+        status = compute_sale_status(new_paid, total)
+        
         db.execute(
             'UPDATE sales SET subtotal=?, discount=?, discount_type=?, tax=?, total=?, payment=?, status=?, paid=?, customer_id=?, customer_name=?, notes=?, due_date=? WHERE id=?',
-            (total, 0, 'percent', 0, total, payment, status, new_paid, customer_id, customer_name, notes, due_date, sid)
+            (total, 0, 'percent', 0, total, payment_method, status, new_paid, customer_id, customer_name, notes, due_date, sale_id)
         )
-        db.execute('DELETE FROM sale_items WHERE sale_id=? AND is_return=0', (sid,))
-        for si in sale_items:
+        
+        db.execute('DELETE FROM sale_items WHERE sale_id=? AND is_return=0', (sale_id,))
+        for sale_item in sale_items:
             db.execute(
-                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id) '
-                'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                (sid, si['product_id'], si['variant_id'], si['product_name'], si['variant_label'],
-                 si['sku'], si['quantity'], si['price'], si['total'], si['is_return'], None)
+                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id, cost_price) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                (sale_id, sale_item['product_id'], sale_item['variant_id'], sale_item['product_name'],
+                 sale_item['variant_label'], sale_item['sku'], sale_item['quantity'], sale_item['price'],
+                 sale_item['total'], sale_item['is_return'], None, sale_item['cost_price'])
             )
-
-        db.execute('DELETE FROM payments WHERE sale_id=?', (sid,))
-        db.execute(
-            'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
-            (sid, payment, total)
-        )
-
+        
+        reverse_sale_transactions(db, sale_id)
+        
+        db.execute('DELETE FROM payments WHERE sale_id=?', (sale_id,))
+        payment_list = [{'method': payment_method, 'amount': total}]
+        record_payments(db, sale_id, payment_list, False, customer_id, old_sale['receipt'])
+        
         return jsonify({
             'ok': True,
-            'sale_id': sid,
-            'receipt': old['receipt'],
+            'sale_id': sale_id,
+            'receipt': old_sale['receipt'],
             'items': sale_items,
             'subtotal': total,
             'total': total,
-            'payment': payment,
+            'payment': payment_method,
             'customer_name': customer_name,
             'staff_name': session.get('name', ''),
         })
 
 
-@pos_bp.route('/sales-invoices/<int:sid>', methods=['DELETE'])
+@pos_bp.route('/sales-invoices/<int:sale_id>', methods=['DELETE'])
 @login_required
 @manager_required
-def delete_sales_invoice(sid):
+def delete_sales_invoice(sale_id):
     """Delete a sales invoice: restore stock, reverse customer effects, remove rows."""
     with get_db() as db:
-        sale = db.execute('SELECT * FROM sales WHERE id=?', (sid,)).fetchone()
+        sale = db.execute('SELECT * FROM sales WHERE id=?', (sale_id,)).fetchone()
         if not sale:
             return jsonify({'error': 'Sale not found'}), 404
         sale = dict(sale)
-
-        items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sid,)).fetchall()
-        for it in items:
-            if it['variant_id'] and it['is_return'] == 0:
-                db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (it['quantity'], it['variant_id']))
-
+        
+        sale_items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale_id,)).fetchall()
+        for item in sale_items:
+            if item['variant_id'] and item['is_return'] == 0:
+                db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (item['quantity'], item['variant_id']))
+        
         if sale.get('customer_id'):
             db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (sale['total'], sale['customer_id']))
             if sale.get('payment') == 'credit':
                 db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (sale['total'], sale['customer_id']))
-
-        db.execute('DELETE FROM sale_items WHERE sale_id=?', (sid,))
-        db.execute('DELETE FROM payments WHERE sale_id=?', (sid,))
-        db.execute('DELETE FROM sales WHERE id=?', (sid,))
+        
+        reverse_sale_transactions(db, sale_id)
+        
+        db.execute('DELETE FROM sale_items WHERE sale_id=?', (sale_id,))
+        db.execute('DELETE FROM payments WHERE sale_id=?', (sale_id,))
+        db.execute('DELETE FROM sales WHERE id=?', (sale_id,))
+        
         return jsonify({'ok': True})
 
 
 @pos_bp.route('/sales')
 @login_required
 def sales_list():
-    q = request.args.get('q', '')
+    """List recent sales with optional search filter."""
+    search_query = request.args.get('q', '')
     with get_db() as db:
-        if q:
+        if search_query:
             rows = db.execute(
                 'SELECT * FROM sales WHERE receipt LIKE ? OR customer_name LIKE ? ORDER BY id DESC LIMIT 50',
-                (f'%{q}%', f'%{q}%')
+                (f'%{search_query}%', f'%{search_query}%')
             ).fetchall()
         else:
             rows = db.execute('SELECT * FROM sales ORDER BY id DESC LIMIT 50').fetchall()
+        
         result = []
-        for r in rows:
-            r = dict(r)
-            r['items'] = [dict(x) for x in db.execute('SELECT * FROM sale_items WHERE sale_id=?', (r['id'],)).fetchall()]
-            result.append(r)
+        for row in rows:
+            sale = dict(row)
+            # Compute status dynamically
+            sale['status'] = compute_sale_status(sale['paid'], sale['total'])
+            sale['items'] = [dict(item) for item in db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale['id'],)).fetchall()]
+            result.append(sale)
+        
         return jsonify(result)
 
 
-@pos_bp.route('/sales/<int:sid>')
+@pos_bp.route('/sales/<int:sale_id>')
 @login_required
-def sale_detail(sid):
+def sale_detail(sale_id):
+    """Get detailed information for a specific sale."""
     with get_db() as db:
-        sale = db.execute('SELECT * FROM sales WHERE id=?', (sid,)).fetchone()
+        sale = db.execute('SELECT * FROM sales WHERE id=?', (sale_id,)).fetchone()
         if not sale:
             return jsonify({'error': 'Not found'}), 404
+        
         sale = dict(sale)
-        sale['items'] = [dict(x) for x in db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sid,)).fetchall()]
-        sale['payments'] = [dict(x) for x in db.execute('SELECT * FROM payments WHERE sale_id=?', (sid,)).fetchall()]
+        # Compute status dynamically
+        sale['status'] = compute_sale_status(sale['paid'], sale['total'])
+        sale['items'] = [dict(item) for item in db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale_id,)).fetchall()]
+        sale['payments'] = [dict(payment) for payment in db.execute('SELECT * FROM payments WHERE sale_id=?', (sale_id,)).fetchall()]
+        
         if sale.get('customer_id'):
-            cust = db.execute('SELECT phone FROM customers WHERE id=?', (sale['customer_id'],)).fetchone()
-            sale['customer_phone'] = cust['phone'] if cust else ''
+            customer = db.execute('SELECT phone FROM customers WHERE id=?', (sale['customer_id'],)).fetchone()
+            sale['customer_phone'] = customer['phone'] if customer else ''
         else:
             sale['customer_phone'] = ''
+        
         sale['is_return'] = 1 if sale.get('status') == 'returned' else 0
+        
         return jsonify(sale)

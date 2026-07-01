@@ -58,13 +58,28 @@ def auto_link_product(db, item):
 @pi_bp.route('/purchase-invoices')
 @login_required
 def list_purchase_invoices():
-    """List all purchase invoices with supplier names."""
+    """List all purchase invoices with supplier names and pagination."""
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    offset = (page - 1) * per_page
+    
     with get_db() as db:
+        count_row = db.execute('SELECT COUNT(*) as cnt FROM purchase_invoices').fetchone()
+        total = count_row['cnt']
+        
         rows = db.execute(
             'SELECT pi.*, s.name as supplier_name FROM purchase_invoices pi '
-            'LEFT JOIN suppliers s ON s.id=pi.supplier_id ORDER BY pi.id DESC'
+            'LEFT JOIN suppliers s ON s.id=pi.supplier_id ORDER BY pi.id DESC LIMIT ? OFFSET ?',
+            (per_page, offset)
         ).fetchall()
-        return jsonify([dict(row) for row in rows])
+        
+        return jsonify({
+            'items': [dict(row) for row in rows],
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
+        })
 
 
 @pi_bp.route('/purchase-invoices/<int:invoice_id>')

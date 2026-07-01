@@ -48,6 +48,7 @@
                     <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
             <div style="margin-top:12px;text-align:right">
                 <button class="btn btn-sm btn-print" onclick="printTable()">Print</button>
             </div>
@@ -104,7 +105,7 @@
     </div>
     
     <script>
-        var custList = [], sortIdx = -1, sortDir = 1, editId = null;
+        var custList = [], sortIdx = -1, sortDir = 1, editId = null, currentPage = 1, totalPages = 1;
         
         function statusBadge(c) {
             var cr = c.credit || 0;
@@ -120,16 +121,29 @@
             return html;
         }
         
-        function load() {
+        function load(page) {
             var q = document.getElementById('s').value.toLowerCase();
-            fetch('/api/customers')
+            currentPage = page || 1;
+            fetch('/api/customers?page=' + currentPage + '&per_page=50')
                 .then(r => r.json())
                 .then(d => {
-                    custList = d;
-                    render(d.filter(function(c) {
+                    custList = d.items || [];
+                    totalPages = d.total_pages || 1;
+                    render(custList.filter(function(c) {
                         return !q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').toLowerCase().includes(q);
                     }));
+                    renderPagination();
                 });
+        }
+        
+        function renderPagination() {
+            var html = '';
+            if (totalPages > 1) {
+                html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage <= 1 ? ' disabled' : '') + '>← Prev</button>';
+                html += '<span style="margin:0 12px;color:#6b7280;font-size:13px">Page ' + currentPage + ' of ' + totalPages + '</span>';
+                html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
+            }
+            document.getElementById('pagination').innerHTML = html;
         }
         
         function render(l) {

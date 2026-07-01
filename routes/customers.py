@@ -8,17 +8,35 @@ cust_bp = Blueprint('customers', __name__, url_prefix='/api')
 @cust_bp.route('/customers')
 @login_required
 def list_customers():
-    """List all customers with optional search filter."""
+    """List all customers with optional search filter and pagination."""
     search_query = request.args.get('q', '')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    offset = (page - 1) * per_page
+    
     with get_db() as db:
         if search_query:
-            rows = db.execute(
-                'SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name',
+            count_row = db.execute(
+                'SELECT COUNT(*) as cnt FROM customers WHERE name LIKE ? OR phone LIKE ?',
                 (f'%{search_query}%', f'%{search_query}%')
+            ).fetchone()
+            total = count_row['cnt']
+            rows = db.execute(
+                'SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? ORDER BY name LIMIT ? OFFSET ?',
+                (f'%{search_query}%', f'%{search_query}%', per_page, offset)
             ).fetchall()
         else:
-            rows = db.execute('SELECT * FROM customers ORDER BY name').fetchall()
-        return jsonify([dict(row) for row in rows])
+            count_row = db.execute('SELECT COUNT(*) as cnt FROM customers').fetchone()
+            total = count_row['cnt']
+            rows = db.execute('SELECT * FROM customers ORDER BY name LIMIT ? OFFSET ?', (per_page, offset)).fetchall()
+        
+        return jsonify({
+            'items': [dict(row) for row in rows],
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
+        })
 
 
 @cust_bp.route('/customers', methods=['POST'])

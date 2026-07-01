@@ -633,26 +633,42 @@ def delete_sales_invoice(sale_id):
 @pos_bp.route('/sales')
 @login_required
 def sales_list():
-    """List recent sales with optional search filter."""
+    """List recent sales with optional search filter and pagination."""
     search_query = request.args.get('q', '')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    offset = (page - 1) * per_page
+    
     with get_db() as db:
         if search_query:
-            rows = db.execute(
-                'SELECT * FROM sales WHERE receipt LIKE ? OR customer_name LIKE ? ORDER BY id DESC LIMIT 50',
+            count_row = db.execute(
+                'SELECT COUNT(*) as cnt FROM sales WHERE receipt LIKE ? OR customer_name LIKE ?',
                 (f'%{search_query}%', f'%{search_query}%')
+            ).fetchone()
+            total = count_row['cnt']
+            rows = db.execute(
+                'SELECT * FROM sales WHERE receipt LIKE ? OR customer_name LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?',
+                (f'%{search_query}%', f'%{search_query}%', per_page, offset)
             ).fetchall()
         else:
-            rows = db.execute('SELECT * FROM sales ORDER BY id DESC LIMIT 50').fetchall()
+            count_row = db.execute('SELECT COUNT(*) as cnt FROM sales').fetchone()
+            total = count_row['cnt']
+            rows = db.execute('SELECT * FROM sales ORDER BY id DESC LIMIT ? OFFSET ?', (per_page, offset)).fetchall()
         
         result = []
         for row in rows:
             sale = dict(row)
-            # Compute status dynamically
             sale['status'] = compute_sale_status(sale['paid'], sale['total'])
             sale['items'] = [dict(item) for item in db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale['id'],)).fetchall()]
             result.append(sale)
         
-        return jsonify(result)
+        return jsonify({
+            'items': result,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
+        })
 
 
 @pos_bp.route('/sales/<int:sale_id>')

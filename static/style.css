@@ -84,6 +84,11 @@ input[type="checkbox"] { width:auto; }
 .search { display:flex; gap:8px; margin-bottom:16px; align-items:center; }
 .search input { max-width:360px; }
 
+/* ─── Pagination ─── */
+.pagination { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:16px; padding:8px 0; }
+.pagination button:disabled { opacity:0.5; cursor:not-allowed; }
+.pagination span { font-size:13px; color:#6b7280; }
+
 /* ─── Modal ─── */
 .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); align-items:center; justify-content:center; z-index:200; }
 .modal.show { display:flex; }

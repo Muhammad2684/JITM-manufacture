@@ -48,6 +48,7 @@
                     <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
             <div style="margin-top:12px;text-align:right"><button class="btn btn-sm btn-print"
                     onclick="printTable()">Print</button></div>
         </div>
@@ -67,7 +68,7 @@
         </div>
     </div>
     <script>
-        var allSales = [], sortIdx = -1, sortDir = 1;
+        var allSales = [], sortIdx = -1, sortDir = 1, currentPage = 1, totalPages = 1;
         function statusBadge(s) {
             if (s === 'Paid') return '<span class="bdg bdg-ok">Paid</span>';
             if (s === 'Partial') return '<span class="bdg bdg-warn">Partial</span>';
@@ -90,12 +91,27 @@
             if (diff === 0) return '<span style="font-size:11px;color:#856404">Due today</span>';
             return '<span style="font-size:11px;color:#dc2626">' + Math.abs(diff) + 'd overdue</span>';
         }
-        function load() {
+        function load(page) {
             var q = document.getElementById('s').value;
-            fetch('/api/sales?q=' + encodeURIComponent(q))
+            currentPage = page || 1;
+            fetch('/api/sales?q=' + encodeURIComponent(q) + '&page=' + currentPage + '&per_page=50')
                 .then(function (r) { return r.json(); })
-                .then(function (d) { allSales = d || []; render(allSales); })
+                .then(function (d) { 
+                    allSales = d.items || []; 
+                    totalPages = d.total_pages || 1;
+                    render(allSales); 
+                    renderPagination();
+                })
                 .catch(function (e) { });
+        }
+        function renderPagination() {
+            var html = '';
+            if (totalPages > 1) {
+                html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage <= 1 ? ' disabled' : '') + '>← Prev</button>';
+                html += '<span style="margin:0 12px;color:#6b7280;font-size:13px">Page ' + currentPage + ' of ' + totalPages + '</span>';
+                html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
+            }
+            document.getElementById('pagination').innerHTML = html;
         }
         function render(l) {
             try {

@@ -9,16 +9,29 @@ prod_bp = Blueprint('products', __name__, url_prefix='/api')
 @login_required
 def list_products():
     q = request.args.get('q', '')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    offset = (page - 1) * per_page
+    
     with get_db() as db:
         if q:
+            count_row = db.execute(
+                'SELECT COUNT(DISTINCT p.id) as cnt FROM products p LEFT JOIN variants v ON v.product_id=p.id '
+                'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? OR p.category LIKE ?',
+                (f'%{q}%', f'%{q}%', f'%{q}%', q, q, f'%{q}%')
+            ).fetchone()
+            total = count_row['cnt']
             rows = db.execute(
                 'SELECT DISTINCT p.* FROM products p LEFT JOIN variants v ON v.product_id=p.id '
                 'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? OR p.category LIKE ? '
-                'ORDER BY p.name',
-                (f'%{q}%', f'%{q}%', f'%{q}%', q, q, f'%{q}%')
+                'ORDER BY p.name LIMIT ? OFFSET ?',
+                (f'%{q}%', f'%{q}%', f'%{q}%', q, q, f'%{q}%', per_page, offset)
             ).fetchall()
         else:
-            rows = db.execute('SELECT * FROM products ORDER BY name').fetchall()
+            count_row = db.execute('SELECT COUNT(*) as cnt FROM products').fetchone()
+            total = count_row['cnt']
+            rows = db.execute('SELECT * FROM products ORDER BY name LIMIT ? OFFSET ?', (per_page, offset)).fetchall()
+        
         products = []
         for p in rows:
             variants = db.execute('SELECT * FROM variants WHERE product_id=? ORDER BY size, color', (p['id'],)).fetchall()
@@ -33,7 +46,14 @@ def list_products():
             ).fetchone()
             p['last_purchased_cost'] = round(last_cost['cost'], 2) if last_cost else None
             products.append(p)
-        return jsonify(products)
+        
+        return jsonify({
+            'items': products,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
+        })
 
 
 @prod_bp.route('/products/search')

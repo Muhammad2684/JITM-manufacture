@@ -65,6 +65,7 @@
                     <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
             <div style="margin-top:12px;text-align:right">
                 <button class="btn btn-sm btn-print" onclick="printTable()">Print</button>
             </div>
@@ -134,7 +135,7 @@
     </div>
     
     <script>
-        var piList = [], sortIdx = -1, sortDir = 1, editId = null, suppliers = [];
+        var piList = [], sortIdx = -1, sortDir = 1, editId = null, suppliers = [], currentPage = 1, totalPages = 1;
         
         function statusBadge(s) {
             if (s === 'Paid') return '<span class="bdg bdg-ok">Paid</span>';
@@ -173,19 +174,32 @@
             return '<span class="due-cell bdg-due-late">' + late + ' day' + (late === 1 ? '' : 's') + ' overdue</span>';
         }
         
-        function load() {
+        function load(page) {
             var q = document.getElementById('s').value.toLowerCase();
-            fetch('/api/purchase-invoices')
+            currentPage = page || 1;
+            fetch('/api/purchase-invoices?page=' + currentPage + '&per_page=50')
                 .then(r => r.json())
                 .then(d => {
-                    piList = d;
-                    render(d.filter(function(p) {
+                    piList = d.items || [];
+                    totalPages = d.total_pages || 1;
+                    render(piList.filter(function(p) {
                         return !q || 
                             (p.invoice_no || '').toLowerCase().includes(q) ||
                             (p.supplier_name || '').toLowerCase().includes(q) ||
                             (p.status || '').toLowerCase().includes(q);
                     }));
+                    renderPagination();
                 });
+        }
+        
+        function renderPagination() {
+            var html = '';
+            if (totalPages > 1) {
+                html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage <= 1 ? ' disabled' : '') + '>← Prev</button>';
+                html += '<span style="margin:0 12px;color:#6b7280;font-size:13px">Page ' + currentPage + ' of ' + totalPages + '</span>';
+                html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
+            }
+            document.getElementById('pagination').innerHTML = html;
         }
         
         function render(l) {

@@ -10,6 +10,9 @@ ledger_bp = Blueprint('ledger', __name__)
 def get_ledger():
     entity_type = request.args.get('type')
     entity_id = request.args.get('id', type=int)
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
     if not entity_type or not entity_id:
         return jsonify({'error': 'type and id required'}), 400
 
@@ -43,7 +46,19 @@ def get_ledger():
         else:
             return jsonify({'error': 'invalid type, use customer/supplier/account/product'}), 400
 
-    return jsonify({'entity': entity, 'entries': entries})
+    # Paginate entries
+    total = len(entries)
+    offset = (page - 1) * per_page
+    paginated_entries = entries[offset:offset + per_page]
+    
+    return jsonify({
+        'entity': entity, 
+        'entries': paginated_entries,
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total + per_page - 1) // per_page
+    })
 
 
 def get_customer_entries(db, customer_id, entity):

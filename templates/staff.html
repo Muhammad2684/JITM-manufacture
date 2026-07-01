@@ -19,6 +19,7 @@
         </div>
         <div class="content">
             <div class="sg" id="sg"></div>
+            <div class="pagination" id="pagination"></div>
         </div>
     </div>
     
@@ -84,13 +85,37 @@
     
     <script>
         var editing = null;
+        var currentPage = 1, totalPages = 1, perPage = 50;
         
         load();
         
-        function load() {
-            fetch('/api/staff')
+        function load(page) {
+            if (page) currentPage = page;
+            fetch('/api/staff?page=' + currentPage + '&per_page=' + perPage)
                 .then(r => r.json())
-                .then(d => render(d));
+                .then(d => {
+                    var staffList = d.items || d;
+                    totalPages = d.total_pages || 1;
+                    render(staffList);
+                    renderPagination();
+                });
+        }
+        
+        function renderPagination() {
+            var pag = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                pag.innerHTML = '';
+                return;
+            }
+            
+            var html = '<div class="pagination-controls">';
+            html += '<button class="btn btn-sm" onclick="load(1)"' + (currentPage === 1 ? ' disabled' : '') + '>« First</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage === 1 ? ' disabled' : '') + '>‹ Prev</button>';
+            html += '<span class="pagination-info">Page ' + currentPage + ' of ' + totalPages + '</span>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Next ›</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + totalPages + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Last »</button>';
+            html += '</div>';
+            pag.innerHTML = html;
         }
         
         function render(l) {
@@ -140,9 +165,10 @@
         }
         
         function edit(id) {
-            fetch('/api/staff')
+            fetch('/api/staff?per_page=10000')
                 .then(r => r.json())
-                .then(all => {
+                .then(d => {
+                    var all = d.items || d;
                     const s = all.find(x => x.id === id);
                     if (!s) return;
                     editing = id;

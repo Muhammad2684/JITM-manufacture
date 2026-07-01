@@ -92,7 +92,7 @@
         </div>
         <div class="content">
             <div class="search">
-                <input id="s" placeholder="Search transfers..." oninput="load()">
+                <input id="s" placeholder="Search transfers..." oninput="currentPage=1;load()">
             </div>
             <div class="table-wrap">
                 <table>
@@ -110,6 +110,7 @@
                     <tbody id="tb"></tbody>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
             <div style="margin-top:12px;text-align:right">
                 <button class="btn btn-sm btn-print" onclick="printTable()">Print</button>
             </div>
@@ -158,27 +159,48 @@
     
     <script>
         var list = [], sortIdx = -1, sortDir = 1, editId = null, accts = [];
+        var currentPage = 1, totalPages = 1, perPage = 50;
         
-        function load() {
+        function load(page) {
+            if (page) currentPage = page;
             var q = document.getElementById('s').value.toLowerCase();
-            fetch('/api/account-transfers')
+            fetch('/api/account-transfers?page=' + currentPage + '&per_page=' + perPage)
                 .then(r => r.json())
                 .then(d => {
-                    list = d;
-                    render(d.filter(function(x) {
+                    list = d.items || d;
+                    totalPages = d.total_pages || 1;
+                    render(list.filter(function(x) {
                         return !q || 
                             (x.date || '').includes(q) ||
                             (x.from_name || '').toLowerCase().includes(q) ||
                             (x.to_name || '').toLowerCase().includes(q) ||
                             (x.note || '').toLowerCase().includes(q);
                     }));
+                    renderPagination();
                 });
+        }
+        
+        function renderPagination() {
+            var pag = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                pag.innerHTML = '';
+                return;
+            }
+            
+            var html = '<div class="pagination-controls">';
+            html += '<button class="btn btn-sm" onclick="load(1)"' + (currentPage === 1 ? ' disabled' : '') + '>« First</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage === 1 ? ' disabled' : '') + '>‹ Prev</button>';
+            html += '<span class="pagination-info">Page ' + currentPage + ' of ' + totalPages + '</span>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Next ›</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + totalPages + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Last »</button>';
+            html += '</div>';
+            pag.innerHTML = html;
         }
         
         function render(l) {
             document.getElementById('tb').innerHTML = l.map(function(x, i) {
                 return '<tr>' +
-                    '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                    '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + i + 1) + '</td>' +
                     '<td>' + x.date + '</td>' +
                     '<td><span class="bdg bdg-out">' + x.from_name + '</span></td>' +
                     '<td><span class="bdg bdg-in">' + x.to_name + '</span></td>' +
@@ -212,6 +234,7 @@
             });
             
             var q = document.getElementById('s').value.toLowerCase();
+            currentPage = 1;
             render(list.filter(function(x) {
                 return !q || 
                     (x.date || '').includes(q) ||
@@ -219,14 +242,15 @@
                     (x.to_name || '').toLowerCase().includes(q) ||
                     (x.note || '').toLowerCase().includes(q);
             }));
+            renderPagination();
         }
         
         function loadAccts() {
-            fetch('/api/accounts')
+            fetch('/api/accounts?per_page=10000')
                 .then(r => r.json())
                 .then(d => {
-                    accts = d;
-                    var o = d.map(function(a) {
+                    accts = d.items || d;
+                    var o = accts.map(function(a) {
                         return '<option value="' + a.id + '">' + a.name + ' (Rs ' + a.balance.toFixed(2) + ')</option>';
                     }).join('');
                     document.getElementById('afa').innerHTML = o;

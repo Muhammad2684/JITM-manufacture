@@ -90,7 +90,24 @@ def logout():
 @auth_bp.route('/api/staff')
 @login_required
 def api_staff():
-    return jsonify([dict(r) for r in get_staff()])
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    offset = (page - 1) * per_page
+    
+    with get_db() as db:
+        total = db.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        staff = db.execute(
+            'SELECT id, username, role, name, nick_name, permissions, active FROM users ORDER BY name LIMIT ? OFFSET ?',
+            (per_page, offset)
+        ).fetchall()
+        
+        return jsonify({
+            'items': [dict(r) for r in staff],
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
+        })
 
 
 @auth_bp.route('/api/staff', methods=['POST'])

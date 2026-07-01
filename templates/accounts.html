@@ -19,7 +19,7 @@
         </div>
         <div class="content">
             <div class="search">
-                <input id="s" placeholder="Search accounts..." oninput="load()">
+                <input id="s" placeholder="Search accounts..." oninput="currentPage=1;load()">
             </div>
             <div class="table-wrap">
                 <table>
@@ -35,6 +35,7 @@
                     <tbody id="tb"></tbody>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
             <div style="margin-top:12px;text-align:right">
                 <button class="btn btn-sm btn-print" onclick="printTable()">Print</button>
             </div>
@@ -86,23 +87,44 @@
     
     <script>
         var accList = [], sortIdx = -1, sortDir = 1, editId = null;
+        var currentPage = 1, totalPages = 1, perPage = 50;
         
-        function load() {
+        function load(page) {
+            if (page) currentPage = page;
             var q = document.getElementById('s').value.toLowerCase();
-            fetch('/api/accounts')
+            fetch('/api/accounts?page=' + currentPage + '&per_page=' + perPage)
                 .then(r => r.json())
                 .then(d => {
-                    accList = d;
-                    render(d.filter(function(a) {
+                    accList = d.items || d;
+                    totalPages = d.total_pages || 1;
+                    render(accList.filter(function(a) {
                         return !q || (a.name || '').toLowerCase().includes(q) || (a.type || '').toLowerCase().includes(q);
                     }));
+                    renderPagination();
                 });
+        }
+        
+        function renderPagination() {
+            var pag = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                pag.innerHTML = '';
+                return;
+            }
+            
+            var html = '<div class="pagination-controls">';
+            html += '<button class="btn btn-sm" onclick="load(1)"' + (currentPage === 1 ? ' disabled' : '') + '>« First</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage === 1 ? ' disabled' : '') + '>‹ Prev</button>';
+            html += '<span class="pagination-info">Page ' + currentPage + ' of ' + totalPages + '</span>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Next ›</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + totalPages + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Last »</button>';
+            html += '</div>';
+            pag.innerHTML = html;
         }
         
         function render(l) {
             document.getElementById('tb').innerHTML = l.map((a, i) => 
                 '<tr>' +
-                '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + i + 1) + '</td>' +
                 '<td style="font-weight:600"><a href="/ledger/account/' + a.id + '" style="text-decoration:none;color:inherit">' + a.name + '</a></td>' +
                 '<td><span class="bdg bdg-' + (a.type === 'bank' ? 'ok' : 'warn') + '">' + a.type + '</span></td>' +
                 '<td class="text-right">Rs ' + a.balance.toFixed(2) + '</td>' +
@@ -142,9 +164,11 @@
             });
             
             var q = document.getElementById('s').value.toLowerCase();
+            currentPage = 1;
             render(accList.filter(function(a) {
                 return !q || (a.name || '').toLowerCase().includes(q) || (a.type || '').toLowerCase().includes(q);
             }));
+            renderPagination();
         }
         
         function showAdd() {

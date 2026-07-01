@@ -19,7 +19,7 @@
         </div>
         <div class="content">
             <div class="search">
-                <input id="s" placeholder="Search suppliers..." oninput="load()">
+                <input id="s" placeholder="Search suppliers..." oninput="currentPage=1;load()">
             </div>
             <div class="table-wrap">
                 <table>
@@ -39,6 +39,7 @@
                     <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
             <div style="margin-top:12px;text-align:right">
                 <button class="btn btn-sm btn-print" onclick="printTable()">Print</button>
             </div>
@@ -87,14 +88,17 @@
     
     <script>
         var supList = [], sortIdx = -1, sortDir = 1, editId = null;
+        var currentPage = 1, totalPages = 1, perPage = 50;
         
-        function load() {
+        function load(page) {
+            if (page) currentPage = page;
             var q = document.getElementById('s').value.toLowerCase();
-            fetch('/api/suppliers')
+            fetch('/api/suppliers?page=' + currentPage + '&per_page=' + perPage)
                 .then(r => r.json())
                 .then(d => {
-                    supList = d;
-                    render(d.filter(function(s) {
+                    supList = d.items || d;
+                    totalPages = d.total_pages || 1;
+                    render(supList.filter(function(s) {
                         return !q || 
                             (s.name || '').toLowerCase().includes(q) ||
                             (s.contact_person || '').toLowerCase().includes(q) ||
@@ -102,13 +106,31 @@
                             (s.company_phone || '').toLowerCase().includes(q) ||
                             (s.address || '').toLowerCase().includes(q);
                     }));
+                    renderPagination();
                 });
+        }
+        
+        function renderPagination() {
+            var pag = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                pag.innerHTML = '';
+                return;
+            }
+            
+            var html = '<div class="pagination-controls">';
+            html += '<button class="btn btn-sm" onclick="load(1)"' + (currentPage === 1 ? ' disabled' : '') + '>« First</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage === 1 ? ' disabled' : '') + '>‹ Prev</button>';
+            html += '<span class="pagination-info">Page ' + currentPage + ' of ' + totalPages + '</span>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Next ›</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + totalPages + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Last »</button>';
+            html += '</div>';
+            pag.innerHTML = html;
         }
         
         function render(l) {
             document.getElementById('tb').innerHTML = l.map((s, i) => 
                 '<tr>' +
-                '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + i + 1) + '</td>' +
                 '<td style="font-weight:600"><a href="/ledger/supplier/' + s.id + '" style="text-decoration:none;color:inherit">' + s.name + '</a></td>' +
                 '<td>' + (s.contact_person || '-') + '</td>' +
                 '<td>' + (s.phone || '-') + '</td>' +
@@ -153,6 +175,7 @@
             });
             
             var q = document.getElementById('s').value.toLowerCase();
+            currentPage = 1;
             render(supList.filter(function(s) {
                 return !q || 
                     (s.name || '').toLowerCase().includes(q) ||
@@ -161,6 +184,7 @@
                     (s.company_phone || '').toLowerCase().includes(q) ||
                     (s.address || '').toLowerCase().includes(q);
             }));
+            renderPagination();
         }
         
         function showAdd() {

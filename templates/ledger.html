@@ -61,7 +61,7 @@
                 <span class="current-bal">Balance: <strong id="ebal"></strong></span>
             </div>
             <div class="search">
-                <input id="s" placeholder="Search entries..." oninput="load()">
+                <input id="s" placeholder="Search entries..." oninput="currentPage=1;load()">
             </div>
             <div class="table-wrap">
                 <table>
@@ -87,6 +87,7 @@
                     <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
             <div style="margin-top:12px;text-align:right">
                 <button class="btn btn-sm btn-print" onclick="printTable()">Print</button>
             </div>
@@ -96,10 +97,12 @@
     <script>
         var list = [], sortIdx = -1, sortDir = 1;
         var entityType = '{{entity_type}}', entityId = parseInt('{{entity_id}}', 10);
+        var currentPage = 1, totalPages = 1, perPage = 50;
         
-        function load() {
+        function load(page) {
+            if (page) currentPage = page;
             var q = document.getElementById('s').value.toLowerCase();
-            fetch('/api/ledger?type=' + entityType + '&id=' + entityId)
+            fetch('/api/ledger?type=' + entityType + '&id=' + entityId + '&page=' + currentPage + '&per_page=' + perPage)
                 .then(r => r.json())
                 .then(d => {
                     document.getElementById('ename').textContent = d.entity.name || d.entity.id;
@@ -117,10 +120,29 @@
                     }
                     
                     list = d.entries;
+                    totalPages = d.total_pages || 1;
                     render(list.filter(function(e) {
                         return !q || (e.date || '').includes(q) || (e.description || '').toLowerCase().includes(q) || (e.reference || '').toLowerCase().includes(q);
                     }));
+                    renderPagination();
                 });
+        }
+        
+        function renderPagination() {
+            var pag = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                pag.innerHTML = '';
+                return;
+            }
+            
+            var html = '<div class="pagination-controls">';
+            html += '<button class="btn btn-sm" onclick="load(1)"' + (currentPage === 1 ? ' disabled' : '') + '>« First</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage === 1 ? ' disabled' : '') + '>‹ Prev</button>';
+            html += '<span class="pagination-info">Page ' + currentPage + ' of ' + totalPages + '</span>';
+            html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Next ›</button>';
+            html += '<button class="btn btn-sm" onclick="load(' + totalPages + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Last »</button>';
+            html += '</div>';
+            pag.innerHTML = html;
         }
         
         function render(l) {
@@ -129,7 +151,7 @@
                 var qtyCol = '{{ entity_type }}' === 'product' ? '<td class="text-right">' + (e.qty || '') + '</td>' : '';
                 
                 return '<tr>' +
-                    '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                    '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + i + 1) + '</td>' +
                     '<td>' + (e.date || '') + '</td>' +
                     '<td><span class="bdg ' + tClass + '">' + e.description + '</span></td>' +
                     '<td>' + (e.reference || '') + '</td>' +
@@ -184,9 +206,11 @@
             });
             
             var q = document.getElementById('s').value.toLowerCase();
+            currentPage = 1;
             render(list.filter(function(e) {
                 return !q || (e.date || '').includes(q) || (e.description || '').toLowerCase().includes(q) || (e.reference || '').toLowerCase().includes(q);
             }));
+            renderPagination();
         }
         
         load();

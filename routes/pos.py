@@ -614,9 +614,12 @@ def delete_sales_invoice(sale_id):
                 db.execute('UPDATE variants SET stock = stock + ? WHERE id=?', (item['quantity'], item['variant_id']))
         
         if sale.get('customer_id'):
-            db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (sale['total'], sale['customer_id']))
+            is_return = sale.get('status') == 'returned'
+            spent_change = -abs(sale['total']) if is_return else sale['total']
+            db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (spent_change, sale['customer_id']))
             if sale.get('payment') == 'credit':
-                db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (sale['total'], sale['customer_id']))
+                credit_change = -abs(sale['total']) if is_return else sale['total']
+                db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (credit_change, sale['customer_id']))
         
         reverse_sale_transactions(db, sale_id)
         

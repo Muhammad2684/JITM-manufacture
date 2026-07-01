@@ -219,7 +219,7 @@
         function render(l) {
             document.getElementById('tb').innerHTML = l.map((p, i) => 
                 '<tr>' +
-                '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + i + 1) + '</td>' +
                 '<td style="font-weight:600">' + p.invoice_no + '</td>' +
                 '<td>' + (p.issue_date || '') + '</td>' +
                 '<td>' + (p.supplier_name ? '<a href="/ledger/supplier/' + p.supplier_id + '" style="text-decoration:none;color:inherit">' + p.supplier_name + '</a>' : '-') + '</td>' +

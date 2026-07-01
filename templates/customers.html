@@ -149,7 +149,7 @@
         function render(l) {
             document.getElementById('tb').innerHTML = l.map((c, i) => 
                 '<tr>' +
-                '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + i + 1) + '</td>' +
                 '<td style="font-weight:600"><a href="/ledger/customer/' + c.id + '" style="text-decoration:none;color:inherit">' + c.name + '</a></td>' +
                 '<td class="text-right">Rs ' + (c.credit || 0).toFixed(2) + '</td>' +
                 '<td>' + statusCell(c) + '</td>' +

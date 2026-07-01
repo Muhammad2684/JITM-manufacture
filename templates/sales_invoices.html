@@ -131,7 +131,7 @@
         function render(l) {
             try {
                 document.getElementById('tb').innerHTML = l.map(function (s, i) {
-                    return '<tr><td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td><td style="font-weight:600">' + (s.receipt || '') + '</td>'
+                    return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + i + 1) + '</td><td style="font-weight:600">' + (s.receipt || '') + '</td>'
                         + '<td>' + ((s.created_at || '')).slice(0, 16) + '</td>'
                         + '<td>' + (s.customer_name ? '<a href="/ledger/customer/' + s.customer_id + '" style="text-decoration:none;color:inherit">' + s.customer_name + '</a>' : '-') + '</td>'
                         + '<td class="text-right">' + ((s.items && s.items.length) || 0) + '</td>'

@@ -43,10 +43,40 @@ def summary():
             'SELECT COALESCE(SUM(v.stock * p.cost_price),0) as total '
             'FROM variants v JOIN products p ON p.id=v.product_id'
         ).fetchone()
+        
+        if date_to:
+            stock_added = db.execute(
+                'SELECT COALESCE(SUM(qty_added),0) as total FROM restock_log WHERE date(date) <= ?',
+                [date_to]
+            ).fetchone()
+            stock_removed = db.execute(
+                'SELECT COALESCE(SUM(si.quantity),0) as total FROM sale_items si '
+                'JOIN sales s ON s.id=si.sale_id '
+                "WHERE s.status NOT IN ('returned') AND si.is_return=0 AND date(s.created_at) <= ?",
+                [date_to]
+            ).fetchone()
+            net_stock = stock_added['total'] - stock_removed['total']
+            avg_cost = db.execute(
+                'SELECT COALESCE(AVG(cost),0) as avg FROM restock_log WHERE cost > 0 AND date(date) <= ?',
+                [date_to]
+            ).fetchone()
+            inventory_value = {'total': net_stock * avg_cost['avg']}
 
         customer_credit = db.execute(
             'SELECT COALESCE(SUM(credit),0) as total FROM customers'
         ).fetchone()
+        
+        if date_to:
+            credit_sales = db.execute(
+                "SELECT COALESCE(SUM(total),0) as total FROM sales WHERE payment='credit' AND date(created_at) <= ?",
+                [date_to]
+            ).fetchone()
+            payments_received = db.execute(
+                "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
+                "WHERE type='receipt' AND party_type='customer' AND date(date) <= ?",
+                [date_to]
+            ).fetchone()
+            customer_credit = {'total': credit_sales['total'] - payments_received['total']}
 
         cogs_raw = db.execute(
             'SELECT COALESCE(SUM(si.quantity * si.cost_price),0) as total '
@@ -59,10 +89,30 @@ def summary():
         supplier_balance = db.execute(
             'SELECT COALESCE(SUM(balance),0) as total FROM suppliers'
         ).fetchone()
+        
+        if date_to:
+            purchases = db.execute(
+                'SELECT COALESCE(SUM(invoice_amount),0) as total FROM purchase_invoices WHERE date(issue_date) <= ?',
+                [date_to]
+            ).fetchone()
+            supplier_payments = db.execute(
+                "SELECT COALESCE(SUM(amount),0) as total FROM transactions "
+                "WHERE type='payment' AND party_type='supplier' AND date(date) <= ?",
+                [date_to]
+            ).fetchone()
+            supplier_balance = {'total': purchases['total'] - supplier_payments['total']}
 
         account_balance = db.execute(
             'SELECT COALESCE(SUM(balance),0) as total FROM accounts'
         ).fetchone()
+        
+        if date_to:
+            account_txns = db.execute(
+                "SELECT COALESCE(SUM(CASE WHEN type='receipt' THEN amount ELSE -amount END),0) as total "
+                "FROM transactions WHERE date(date) <= ?",
+                [date_to]
+            ).fetchone()
+            account_balance = {'total': account_txns['total']}
 
         expense_date_filter = ''
         expense_date_params = []

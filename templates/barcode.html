@@ -134,36 +134,67 @@
         .print-area { display: none; }
         
         @media print {
-            body * { visibility: hidden; }
-            .print-area, .print-area * { visibility: visible; }
+            @page {
+                size: auto;
+                margin: 10mm;
+            }
+            
+            body * { 
+                visibility: hidden !important;
+                display: none !important;
+            }
+            
             .print-area {
-                display: block;
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
+                display: block !important;
+                visibility: visible !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
+            
+            .print-area * {
+                visibility: visible !important;
+                display: block !important;
+            }
+            
             .print-grid {
-                display: grid;
-                gap: 4px;
-                padding: 8px;
+                display: grid !important;
+                gap: 8px !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
+            
             .print-label {
-                border: 1px dashed #ccc;
-                padding: 4px;
-                text-align: center;
+                border: 1px dashed #ccc !important;
+                padding: 8px !important;
+                text-align: center !important;
+                page-break-inside: avoid !important;
+                display: inline-block !important;
             }
-            .print-label svg { display: block; margin: 0 auto; }
+            
+            .print-label svg { 
+                display: block !important; 
+                margin: 0 auto !important;
+                max-width: 100% !important;
+                height: auto !important;
+            }
+            
             .print-label .pl-sku {
-                font-size: 10px;
-                font-weight: 700;
-                font-family: monospace;
-                margin-top: 2px;
+                font-size: 10px !important;
+                font-weight: 700 !important;
+                font-family: monospace !important;
+                margin-top: 4px !important;
+                display: block !important;
             }
+            
             .print-label .pl-name {
-                font-size: 8px;
-                color: #333;
-                margin-top: 1px;
+                font-size: 8px !important;
+                color: #333 !important;
+                margin-top: 2px !important;
+                display: block !important;
             }
         }
     </style>
@@ -235,7 +266,8 @@
                                         <option value="ITF">Code 2 of 5 Interleaved</option>
                                     </select>
                                 </div>
-                                <button class="btn btn-p" onclick="printBarcodes()" style="margin-left:auto;">Print All</button>
+                                <button class="btn" onclick="printPreview()" style="margin-left:auto;">Preview Print</button>
+                                <button class="btn btn-p" onclick="printBarcodes()">Print All</button>
                             </div>
                         </div>
                     </div>
@@ -387,11 +419,13 @@
             }
             var sz = labelSizes[document.getElementById('labelSize').value];
             var cols = parseInt(document.getElementById('cols').value) || 4;
+            var barcodeHeight = Math.round(sz.h * 0.5);
+            
             var html = '<div class="bc-preview" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px);">';
             
             queue.forEach(function(q) {
-                html += '<div class="bc-preview-item" style="width:' + sz.w + 'px;height:' + sz.h + 'px;">';
-                html += '<svg id="pv-' + q.id + '" width="' + sz.w + '" height="' + Math.round(sz.h * 0.65) + '"></svg>';
+                html += '<div class="bc-preview-item" style="width:' + sz.w + 'px;min-height:' + sz.h + 'px;">';
+                html += '<svg id="pv-' + q.id + '"></svg>';
                 html += '<div class="bp-sku">' + q.sku + '</div>';
                 html += '<div class="bp-name">' + q.name + '</div>';
                 html += '</div>';
@@ -406,42 +440,172 @@
                     try {
                         JsBarcode('#pv-' + q.id, q.sku, {
                             format: barcodeType,
-                            width: 1.5,
-                            height: Math.round(sz.h * 0.3),
-                            fontSize: sz.fs * 0.8,
-                            margin: 4,
-                            textMargin: 2
+                            width: 2,
+                            height: barcodeHeight,
+                            fontSize: sz.fs,
+                            margin: 8,
+                            textMargin: 4,
+                            displayValue: true
                         });
                     } catch (e) {
                         console.error('Barcode error for ' + q.sku, e);
+                        document.getElementById('pv-' + q.id).innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="red">Error</text>';
                     }
                 });
-            }, 100);
+            }, 150);
         }
         
-        function printBarcodes() {
-            if (!queue.length) return;
+        function printPreview() {
+            if (!queue.length) {
+                alert('No items in queue to preview');
+                return;
+            }
+            
+            // Temporarily show print area for preview
+            var pa = document.getElementById('printArea');
+            var originalDisplay = pa.style.display;
+            
+            // Generate print content
             var sz = labelSizes[document.getElementById('labelSize').value];
             var cols = parseInt(document.getElementById('cols').value) || 4;
             var rows = parseInt(document.getElementById('rows').value) || 3;
-            var pa = document.getElementById('printArea');
+            var barcodeType = document.getElementById('barcodeType').value;
+            var barcodeHeight = Math.round(sz.h * 0.5);
             
-            pa.innerHTML = '<div class="print-grid" style="grid-template-columns:repeat(' + cols + ',1fr);"></div>';
+            pa.innerHTML = '<div class="print-grid" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px);display:grid;gap:8px;padding:20px;"></div>';
             var grid = pa.querySelector('.print-grid');
             var maxLabels = cols * rows;
             var labelCount = 0;
+            var svgIds = [];
             
             queue.forEach(function(q) {
                 for (var c = 0; c < q.copies && labelCount < maxLabels; c++) {
                     var div = document.createElement('div');
                     div.className = 'print-label';
                     div.style.width = sz.w + 'px';
+                    div.style.height = sz.h + 'px';
+                    div.style.display = 'inline-block';
+                    div.style.border = '1px dashed #ccc';
+                    div.style.padding = '8px';
+                    div.style.textAlign = 'center';
                     
                     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                    svg.setAttribute('id', 'pl-' + q.id + '-' + c);
-                    svg.setAttribute('width', sz.w);
-                    svg.setAttribute('height', sz.h);
+                    var svgId = 'preview-' + q.id + '-' + c;
+                    svg.setAttribute('id', svgId);
                     div.appendChild(svg);
+                    svgIds.push(svgId);
+                    
+                    var skuDiv = document.createElement('div');
+                    skuDiv.style.fontSize = '10px';
+                    skuDiv.style.fontWeight = '700';
+                    skuDiv.style.fontFamily = 'monospace';
+                    skuDiv.style.marginTop = '4px';
+                    skuDiv.textContent = q.sku;
+                    div.appendChild(skuDiv);
+                    
+                    var nameDiv = document.createElement('div');
+                    nameDiv.style.fontSize = '8px';
+                    nameDiv.style.color = '#333';
+                    nameDiv.style.marginTop = '2px';
+                    nameDiv.textContent = q.name;
+                    div.appendChild(nameDiv);
+                    
+                    grid.appendChild(div);
+                    labelCount++;
+                }
+            });
+            
+            // Render barcodes
+            svgIds.forEach(function(svgId) {
+                var parts = svgId.split('-');
+                var qId = parseInt(parts[1]);
+                var queueItem = queue.find(function(q) { return q.id === qId; });
+                
+                if (queueItem) {
+                    try {
+                        JsBarcode('#' + svgId, queueItem.sku, {
+                            format: barcodeType,
+                            width: 2,
+                            height: barcodeHeight,
+                            fontSize: sz.fs,
+                            margin: 8,
+                            textMargin: 4,
+                            displayValue: false
+                        });
+                    } catch (e) {
+                        console.error('Preview barcode error', e);
+                    }
+                }
+            });
+            
+            // Show preview in a modal-like overlay
+            pa.style.position = 'fixed';
+            pa.style.top = '0';
+            pa.style.left = '0';
+            pa.style.width = '100%';
+            pa.style.height = '100%';
+            pa.style.backgroundColor = 'white';
+            pa.style.zIndex = '9999';
+            pa.style.overflow = 'auto';
+            pa.style.padding = '20px';
+            
+            // Add close button
+            var closeBtn = document.createElement('button');
+            closeBtn.textContent = 'Close Preview';
+            closeBtn.className = 'btn btn-p';
+            closeBtn.style.position = 'fixed';
+            closeBtn.style.top = '20px';
+            closeBtn.style.right = '20px';
+            closeBtn.style.zIndex = '10000';
+            closeBtn.onclick = function() {
+                pa.style.display = 'none';
+                pa.innerHTML = '';
+                pa.style.position = '';
+                pa.style.top = '';
+                pa.style.left = '';
+                pa.style.width = '';
+                pa.style.height = '';
+                pa.style.backgroundColor = '';
+                pa.style.zIndex = '';
+                pa.style.overflow = '';
+                pa.style.padding = '';
+            };
+            pa.appendChild(closeBtn);
+            
+            pa.style.display = 'block';
+        }
+        
+        function printBarcodes() {
+            if (!queue.length) {
+                alert('No items in queue to print');
+                return;
+            }
+            
+            var sz = labelSizes[document.getElementById('labelSize').value];
+            var cols = parseInt(document.getElementById('cols').value) || 4;
+            var rows = parseInt(document.getElementById('rows').value) || 3;
+            var pa = document.getElementById('printArea');
+            var barcodeType = document.getElementById('barcodeType').value;
+            var barcodeHeight = Math.round(sz.h * 0.5);
+            
+            pa.innerHTML = '<div class="print-grid" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px);"></div>';
+            var grid = pa.querySelector('.print-grid');
+            var maxLabels = cols * rows;
+            var labelCount = 0;
+            var svgIds = [];
+            
+            queue.forEach(function(q) {
+                for (var c = 0; c < q.copies && labelCount < maxLabels; c++) {
+                    var div = document.createElement('div');
+                    div.className = 'print-label';
+                    div.style.width = sz.w + 'px';
+                    div.style.height = sz.h + 'px';
+                    
+                    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    var svgId = 'pl-' + q.id + '-' + c;
+                    svg.setAttribute('id', svgId);
+                    div.appendChild(svg);
+                    svgIds.push(svgId);
                     
                     var skuDiv = document.createElement('div');
                     skuDiv.className = 'pl-sku';
@@ -458,24 +622,42 @@
                 }
             });
             
-            setTimeout(function() {
-                var barcodeType = document.getElementById('barcodeType').value;
-                queue.forEach(function(q) {
-                    for (var c = 0; c < q.copies && c < maxLabels; c++) {
-                        try {
-                            JsBarcode('#pl-' + q.id + '-' + c, q.sku, {
-                                format: barcodeType,
-                                width: 1.5,
-                                height: sz.h * 0.3,
-                                fontSize: sz.fs * 0.8,
-                                margin: 4,
-                                textMargin: 2
-                            });
-                        } catch (e) {}
+            // Render all barcodes
+            var renderCount = 0;
+            var totalSvgs = svgIds.length;
+            
+            svgIds.forEach(function(svgId, index) {
+                var queueItem = null;
+                var parts = svgId.split('-');
+                var qId = parseInt(parts[1]);
+                queueItem = queue.find(function(q) { return q.id === qId; });
+                
+                if (queueItem) {
+                    try {
+                        JsBarcode('#' + svgId, queueItem.sku, {
+                            format: barcodeType,
+                            width: 2,
+                            height: barcodeHeight,
+                            fontSize: sz.fs,
+                            margin: 8,
+                            textMargin: 4,
+                            displayValue: false
+                        });
+                        renderCount++;
+                    } catch (e) {
+                        console.error('Print barcode error for ' + queueItem.sku, e);
                     }
-                });
-                window.print();
-            }, 100);
+                }
+            });
+            
+            // Wait for rendering to complete before printing
+            setTimeout(function() {
+                if (renderCount > 0) {
+                    window.print();
+                } else {
+                    alert('Failed to render barcodes. Please try again.');
+                }
+            }, 300);
         }
     </script>
 </body>

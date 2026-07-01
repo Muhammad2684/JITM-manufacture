@@ -8,10 +8,23 @@ acc_bp = Blueprint('accounts', __name__, url_prefix='/api')
 @acc_bp.route('/accounts')
 @login_required
 def list_accounts():
-    """List all accounts ordered by name."""
+    """List all accounts ordered by name with pagination."""
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    offset = (page - 1) * per_page
+    
     with get_db() as db:
-        rows = db.execute('SELECT * FROM accounts ORDER BY name').fetchall()
-        return jsonify([dict(row) for row in rows])
+        count_row = db.execute('SELECT COUNT(*) as cnt FROM accounts').fetchone()
+        total = count_row['cnt']
+        
+        rows = db.execute('SELECT * FROM accounts ORDER BY name LIMIT ? OFFSET ?', (per_page, offset)).fetchall()
+        return jsonify({
+            'items': [dict(row) for row in rows],
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
+        })
 
 
 @acc_bp.route('/accounts', methods=['POST'])
@@ -61,16 +74,30 @@ def delete_account(account_id):
 @acc_bp.route('/account-transfers')
 @login_required
 def list_transfers():
-    """List all inter-account transfers with account names."""
+    """List all inter-account transfers with account names and pagination."""
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    offset = (page - 1) * per_page
+    
     with get_db() as db:
+        count_row = db.execute('SELECT COUNT(*) as cnt FROM account_transfers').fetchone()
+        total = count_row['cnt']
+        
         rows = db.execute(
             'SELECT t.*, fa.name as from_name, ta.name as to_name '
             'FROM account_transfers t '
             'JOIN accounts fa ON fa.id=t.from_account_id '
             'JOIN accounts ta ON ta.id=t.to_account_id '
-            'ORDER BY t.date DESC, t.id DESC'
+            'ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?',
+            (per_page, offset)
         ).fetchall()
-        return jsonify([dict(row) for row in rows])
+        return jsonify({
+            'items': [dict(row) for row in rows],
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
+        })
 
 
 @acc_bp.route('/account-transfers', methods=['POST'])

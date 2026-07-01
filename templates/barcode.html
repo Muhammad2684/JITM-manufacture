@@ -10,16 +10,21 @@
             grid-template-columns: 320px 1fr;
             gap: 16px;
             min-height: calc(100vh - 140px);
+            max-width: 100%;
+            overflow: hidden;
         }
         .bc-left {
             display: flex;
             flex-direction: column;
             gap: 12px;
+            min-width: 0;
         }
         .bc-right {
             display: flex;
             flex-direction: column;
             gap: 12px;
+            min-width: 0;
+            overflow: hidden;
         }
         .bc-search { position: relative; }
         .bc-results {
@@ -83,6 +88,8 @@
             gap: 6px;
             padding: 12px;
             justify-content: center;
+            max-width: 100%;
+            overflow-x: auto;
         }
         .bc-preview-item {
             border: 1px solid #e2e1de;
@@ -90,6 +97,7 @@
             padding: 6px;
             text-align: center;
             background: #fff;
+            min-width: 0;
         }
         .bc-preview-item svg { display: block; margin: 0 auto; }
         .bc-preview-item .bp-sku {
@@ -169,7 +177,7 @@
                 <span class="text-muted">{{name}}</span>
             </div>
         </div>
-        <div class="content">
+        <div class="content" style="overflow-x: hidden; max-width: 100%;">
             <div class="bc-layout">
                 <div class="bc-left">
                     <div class="card">
@@ -219,12 +227,20 @@
                                         <option value="large">Large (400x160)</option>
                                     </select>
                                 </div>
+                                <div>
+                                    <label>Barcode Type:</label>
+                                    <select id="barcodeType" onchange="renderPreview()">
+                                        <option value="CODE128" selected>Code 128</option>
+                                        <option value="CODE11">Code 11</option>
+                                        <option value="ITF">Code 2 of 5 Interleaved</option>
+                                    </select>
+                                </div>
                                 <button class="btn btn-p" onclick="printBarcodes()" style="margin-left:auto;">Print All</button>
                             </div>
                         </div>
                     </div>
-                    <div class="card" style="flex:1">
-                        <div class="card-body">
+                    <div class="card" style="flex:1; overflow: hidden;">
+                        <div class="card-body" style="overflow: auto;">
                             <div id="previewArea" style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px;">
                                 Add products to queue to preview barcodes
                             </div>
@@ -385,10 +401,11 @@
             area.innerHTML = html;
             
             setTimeout(function() {
+                var barcodeType = document.getElementById('barcodeType').value;
                 queue.forEach(function(q) {
                     try {
                         JsBarcode('#pv-' + q.id, q.sku, {
-                            format: 'CODE128',
+                            format: barcodeType,
                             width: 1.5,
                             height: Math.round(sz.h * 0.3),
                             fontSize: sz.fs * 0.8,
@@ -442,11 +459,12 @@
             });
             
             setTimeout(function() {
+                var barcodeType = document.getElementById('barcodeType').value;
                 queue.forEach(function(q) {
                     for (var c = 0; c < q.copies && c < maxLabels; c++) {
                         try {
                             JsBarcode('#pl-' + q.id + '-' + c, q.sku, {
-                                format: 'CODE128',
+                                format: barcodeType,
                                 width: 1.5,
                                 height: sz.h * 0.3,
                                 fontSize: sz.fs * 0.8,

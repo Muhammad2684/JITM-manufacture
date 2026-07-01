@@ -167,11 +167,23 @@ def reverse_invoice_effect(db, txn_type, amount, reference_type, reference_id, a
 @login_required
 def list_transactions():
     t = request.args.get('type', 'receipt')
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    offset = (page - 1) * per_page
+    
     with get_db() as db:
+        # Get total count
+        count_row = db.execute(
+            'SELECT COUNT(*) as cnt FROM transactions WHERE type=?', (t,)
+        ).fetchone()
+        total = count_row['cnt']
+        
+        # Get paginated results
         rows = db.execute(
             'SELECT t.*, a.name as account_name FROM transactions t '
             'JOIN accounts a ON a.id=t.account_id '
-            'WHERE t.type=? ORDER BY t.date DESC, t.id DESC', (t,)
+            'WHERE t.type=? ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?', 
+            (t, per_page, offset)
         ).fetchall()
         result = []
         for r in rows:
@@ -215,7 +227,13 @@ def list_transactions():
             else:
                 d['allocation_labels'] = ''
             result.append(d)
-        return jsonify(result)
+        return jsonify({
+            'items': result,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
+        })
 
 
 @txn_bp.route('/transactions', methods=['POST'])

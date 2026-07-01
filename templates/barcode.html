@@ -5,196 +5,86 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="stylesheet" href="/static/style.css">
     <style>
-        .bc-layout {
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 16px;
-            min-height: calc(100vh - 140px);
-            max-width: 100%;
-            overflow: hidden;
+        .bc-wrap { display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
+        .bc-left, .bc-right { display: flex; flex-direction: column; gap: 12px; }
+        
+        .search-wrap { position: relative; }
+        .search-results {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: #fff; border: 1px solid #e2e1de; border-radius: 8px;
+            max-height: 280px; overflow-y: auto; z-index: 50;
+            box-shadow: 0 4px 12px rgba(0,0,0,.1); display: none;
         }
-        .bc-left {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            min-width: 0;
+        .search-results.show { display: block; }
+        .search-item {
+            padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #f3f2ef;
         }
-        .bc-right {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            min-width: 0;
-            overflow: hidden;
-        }
-        .bc-search { position: relative; }
-        .bc-results {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: #fff;
-            border: 1px solid #e2e1de;
-            border-radius: 8px;
-            max-height: 300px;
-            overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
-            z-index: 50;
-            display: none;
-        }
-        .bc-results.show { display: block; }
-        .bc-result-item {
-            padding: 10px 14px;
-            cursor: pointer;
-            border-bottom: 1px solid #f3f2ef;
-        }
-        .bc-result-item:last-child { border-bottom: none; }
-        .bc-result-item:hover, .bc-result-item.hl { background: #f0effc; }
-        .bc-result-item .br-name {
-            font-size: 13px;
-            font-weight: 600;
-            color: #1a1c2e;
-        }
-        .bc-result-item .br-detail {
-            font-size: 11px;
-            color: #6b7280;
-        }
-        .bc-result-item .br-sku {
-            font-size: 11px;
-            color: #3b4fe2;
-            font-weight: 600;
-        }
-        .queue-list { max-height: 400px; overflow-y: auto; }
+        .search-item:last-child { border-bottom: none; }
+        .search-item:hover, .search-item.hl { background: #f0effc; }
+        .search-item .si-name { font-size: 13px; font-weight: 600; color: #1a1c2e; }
+        .search-item .si-detail { font-size: 11px; color: #6b7280; margin-top: 2px; }
+        .search-item .si-sku { font-size: 11px; color: #3b4fe2; font-weight: 600; }
+        
+        .queue-list { max-height: 360px; overflow-y: auto; }
         .queue-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border-bottom: 1px solid #f3f2ef;
-            font-size: 12px;
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 10px; border-bottom: 1px solid #f3f2ef; font-size: 12px;
         }
         .queue-item:last-child { border-bottom: none; }
         .queue-item .qi-name { flex: 1; font-weight: 600; }
         .queue-item .qi-sku { color: #3b4fe2; font-family: monospace; }
-        .queue-item .qi-copies { color: #6b7280; min-width: 40px; text-align: center; }
+        .queue-item .qi-copies { color: #6b7280; min-width: 36px; text-align: center; }
         .queue-item .qi-remove {
-            color: #dc2626;
-            cursor: pointer;
-            font-size: 14px;
-            padding: 2px 6px;
+            color: #dc2626; cursor: pointer; font-size: 14px;
+            padding: 2px 6px; background: none; border: none;
         }
         .queue-item .qi-remove:hover { background: #fef2f2; border-radius: 4px; }
-        .bc-preview {
-            display: grid;
-            gap: 6px;
-            padding: 12px;
-            justify-content: center;
-            max-width: 100%;
-            overflow-x: auto;
+        
+        .controls {
+            display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
         }
-        .bc-preview-item {
-            border: 1px solid #e2e1de;
-            border-radius: 4px;
-            padding: 6px;
-            text-align: center;
-            background: #fff;
-            min-width: 0;
+        .controls > div { display: flex; flex-direction: column; gap: 4px; }
+        .controls label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; }
+        .controls input[type=number] { width: 70px; padding: 6px 8px; border: 1px solid #e2e1de; border-radius: 4px; font-size: 13px; }
+        .controls select { padding: 6px 8px; border: 1px solid #e2e1de; border-radius: 4px; font-size: 13px; }
+        
+        .preview-grid {
+            display: grid; gap: 8px; padding: 12px; justify-content: center;
         }
-        .bc-preview-item svg { display: block; margin: 0 auto; }
-        .bc-preview-item .bp-sku {
-            font-size: 10px;
-            font-weight: 700;
-            font-family: monospace;
-            margin-top: 2px;
+        .preview-label {
+            border: 1px solid #e2e1de; border-radius: 4px; padding: 6px;
+            text-align: center; background: #fff;
         }
-        .bc-preview-item .bp-name {
-            font-size: 8px;
-            color: #6b7280;
-            margin-top: 1px;
-        }
-        .bc-controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .bc-controls label { font-size: 12px; color: #6b7280; }
-        .bc-controls input[type=number] {
-            width: 60px;
-            padding: 6px 8px;
-            border: 1px solid #e2e1de;
-            border-radius: 4px;
-            font-size: 13px;
-        }
-        .bc-controls select {
-            padding: 6px 8px;
-            border: 1px solid #e2e1de;
-            border-radius: 4px;
-            font-size: 13px;
-        }
+        .preview-label svg { display: block; margin: 0 auto; }
+        .preview-label .pl-sku { font-size: 10px; font-weight: 700; font-family: monospace; margin-top: 2px; }
+        .preview-label .pl-name { font-size: 8px; color: #6b7280; margin-top: 1px; }
+        .preview-label .pl-warn { font-size: 8px; color: #d97706; margin-top: 1px; font-style: italic; }
+        
         .print-area { display: none; }
         
         @media print {
-            @page {
-                size: auto;
-                margin: 10mm;
-            }
-            
-            body * { 
-                visibility: hidden !important;
-                display: none !important;
-            }
-            
+            @page { size: auto; margin: 8mm; }
+            body * { visibility: hidden !important; }
+            .print-area, .print-area * { visibility: visible !important; }
             .print-area {
                 display: block !important;
-                visibility: visible !important;
                 position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
+                left: 0 !important; top: 0 !important;
                 width: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
             }
-            
-            .print-area * {
-                visibility: visible !important;
-                display: block !important;
-            }
-            
-            .print-grid {
-                display: grid !important;
-                gap: 8px !important;
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-            
+            .print-grid { display: grid !important; gap: 6px !important; }
             .print-label {
                 border: 1px dashed #ccc !important;
-                padding: 8px !important;
-                text-align: center !important;
+                padding: 6px !important; text-align: center !important;
                 page-break-inside: avoid !important;
-                display: inline-block !important;
             }
-            
-            .print-label svg { 
-                display: block !important; 
-                margin: 0 auto !important;
-                max-width: 100% !important;
-                height: auto !important;
-            }
-            
+            .print-label svg { display: block !important; margin: 0 auto !important; }
             .print-label .pl-sku {
-                font-size: 10px !important;
-                font-weight: 700 !important;
-                font-family: monospace !important;
-                margin-top: 4px !important;
-                display: block !important;
+                font-size: 10px !important; font-weight: 700 !important;
+                font-family: monospace !important; margin-top: 2px !important;
             }
-            
             .print-label .pl-name {
-                font-size: 8px !important;
-                color: #333 !important;
-                margin-top: 2px !important;
-                display: block !important;
+                font-size: 8px !important; color: #333 !important; margin-top: 1px !important;
             }
         }
     </style>
@@ -208,27 +98,26 @@
                 <span class="text-muted">{{name}}</span>
             </div>
         </div>
-        <div class="content" style="overflow-x: hidden; max-width: 100%;">
-            <div class="bc-layout">
+        <div class="content">
+            <div class="bc-wrap">
                 <div class="bc-left">
                     <div class="card">
                         <div class="card-body">
-                            <div class="bc-search">
-                                <input id="bs" placeholder="Search product name or SKU..." autofocus 
-                                    style="width:100%;padding:8px 12px;border:1px solid #e2e1de;border-radius:6px;font-size:13px">
-                                <div class="bc-results" id="br"></div>
+                            <div class="search-wrap">
+                                <input id="searchInput" placeholder="Search product or SKU..." autofocus>
+                                <div class="search-results" id="searchResults"></div>
                             </div>
                         </div>
                     </div>
                     <div class="card" style="flex:1">
                         <div class="card-body">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                                <h3 style="margin:0;font-size:14px;">Barcode Queue</h3>
-                                <button class="btn btn-ghost btn-sm" onclick="clearQueue()" style="font-size:11px;">Clear All</button>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                                <h3 style="margin:0;font-size:14px">Queue</h3>
+                                <button class="btn btn-ghost btn-sm" onclick="clearQueue()">Clear All</button>
                             </div>
                             <div class="queue-list" id="queueList">
-                                <div style="text-align:center;color:#9ca3af;padding:20px 0;font-size:12px;">
-                                    Search and add products to queue
+                                <div style="text-align:center;color:#9ca3af;padding:20px 0;font-size:12px">
+                                    Search and add products
                                 </div>
                             </div>
                         </div>
@@ -237,21 +126,21 @@
                 <div class="bc-right">
                     <div class="card">
                         <div class="card-body">
-                            <div class="bc-controls">
+                            <div class="controls">
                                 <div>
-                                    <label>Copies per item:</label>
+                                    <label>Copies</label>
                                     <input type="number" id="copies" value="1" min="1" max="100" onchange="renderPreview()">
                                 </div>
                                 <div>
-                                    <label>Columns:</label>
+                                    <label>Columns</label>
                                     <input type="number" id="cols" value="4" min="1" max="10" onchange="renderPreview()">
                                 </div>
                                 <div>
-                                    <label>Rows:</label>
+                                    <label>Rows</label>
                                     <input type="number" id="rows" value="3" min="1" max="20" onchange="renderPreview()">
                                 </div>
                                 <div>
-                                    <label>Label Size:</label>
+                                    <label>Label Size</label>
                                     <select id="labelSize" onchange="renderPreview()">
                                         <option value="small">Small (200x80)</option>
                                         <option value="medium" selected>Medium (300x120)</option>
@@ -259,21 +148,24 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label>Barcode Type:</label>
+                                    <label>Barcode Type</label>
                                     <select id="barcodeType" onchange="renderPreview()">
                                         <option value="CODE128" selected>Code 128</option>
                                         <option value="CODE11">Code 11</option>
-                                        <option value="ITF">Code 2 of 5 Interleaved</option>
+                                        <option value="ITF14">ITF-14</option>
+                                        <option value="pharmacode">Pharmacode</option>
                                     </select>
                                 </div>
-                                <button class="btn" onclick="printPreview()" style="margin-left:auto;">Preview Print</button>
-                                <button class="btn btn-p" onclick="printBarcodes()">Print All</button>
+                                <div style="margin-left:auto;display:flex;gap:8px;align-items:flex-end">
+                                    <button class="btn" onclick="printPreview()">Preview Print</button>
+                                    <button class="btn btn-p" onclick="printBarcodes()">Print</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="card" style="flex:1; overflow: hidden;">
-                        <div class="card-body" style="overflow: auto;">
-                            <div id="previewArea" style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px;">
+                    <div class="card" style="flex:1">
+                        <div class="card-body" style="overflow:auto">
+                            <div id="previewArea" style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px">
                                 Add products to queue to preview barcodes
                             </div>
                         </div>
@@ -282,83 +174,91 @@
             </div>
         </div>
     </div>
+    
     <div class="print-area" id="printArea"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
-        var allP = [], hlIdx = -1, queue = [], queueId = 0;
+        var queue = [], queueId = 0, hlIdx = -1;
         var labelSizes = {
             small: { w: 200, h: 80, fs: 10 },
             medium: { w: 300, h: 120, fs: 12 },
             large: { w: 400, h: 160, fs: 14 }
         };
         
-        document.getElementById('bs').addEventListener('input', function(e) {
-            if (e.target.value.length >= 1) search();
-            else closeResults();
+        var searchInput = document.getElementById('searchInput');
+        var searchResults = document.getElementById('searchResults');
+        
+        searchInput.addEventListener('input', function() {
+            if (this.value.length >= 1) doSearch();
+            else closeSearch();
         });
         
-        document.getElementById('bs').addEventListener('keydown', function(e) {
-            var items = document.querySelectorAll('.bc-result-item');
+        searchInput.addEventListener('keydown', function(e) {
+            var items = searchResults.querySelectorAll('.search-item');
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 hlIdx = Math.min(hlIdx + 1, items.length - 1);
-                highlight(items);
+                highlightItem(items);
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 hlIdx = Math.max(hlIdx - 1, 0);
-                highlight(items);
+                highlightItem(items);
             } else if (e.key === 'Enter' && hlIdx >= 0 && hlIdx < items.length) {
-                var it = items[hlIdx];
-                addToQueue(parseInt(it.dataset.vid), it.dataset.sku, it.dataset.name, it.dataset.variant);
+                e.preventDefault();
+                var item = items[hlIdx];
+                addToQueue(item.dataset.vid, item.dataset.sku, item.dataset.name, item.dataset.variant);
             }
         });
         
-        document.getElementById('bs').addEventListener('blur', function() {
-            setTimeout(closeResults, 200);
+        searchInput.addEventListener('blur', function() {
+            setTimeout(closeSearch, 200);
         });
         
-        function highlight(items) {
+        function highlightItem(items) {
             items.forEach(function(el, i) { el.classList.toggle('hl', i === hlIdx); });
-            var h = items[hlIdx];
-            if (h) h.scrollIntoView({ block: 'nearest' });
+            if (items[hlIdx]) items[hlIdx].scrollIntoView({ block: 'nearest' });
         }
         
-        function closeResults() {
-            var r = document.getElementById('br');
-            r.innerHTML = '';
-            r.classList.remove('show');
+        function closeSearch() {
+            searchResults.innerHTML = '';
+            searchResults.classList.remove('show');
             hlIdx = -1;
         }
         
-        function search() {
-            fetch('/api/products/search?q=' + encodeURIComponent(document.getElementById('bs').value))
+        function doSearch() {
+            fetch('/api/products/search?q=' + encodeURIComponent(searchInput.value))
                 .then(function(r) { return r.json(); })
-                .then(function(d) { allP = d; renderResults(d); })
-                .catch(function() { allP = []; });
+                .then(function(d) { renderSearchResults(d); })
+                .catch(function() { renderSearchResults([]); });
         }
         
-        function renderResults(l) {
-            var r = document.getElementById('br');
+        function renderSearchResults(list) {
             hlIdx = -1;
-            if (!l.length) { r.classList.remove('show'); r.innerHTML = ''; return; }
+            if (!list.length) {
+                searchResults.classList.remove('show');
+                searchResults.innerHTML = '';
+                return;
+            }
             
-            r.classList.add('show');
-            r.innerHTML = l.map(function(p, i) {
-                return '<div class="bc-result-item" data-vid="' + p.vid + '" data-sku="' + p.sku + '" ' +
-                    'data-name="' + p.name + '" data-variant="' + ((p.size || '') + ' ' + (p.color || '')).trim() + '">' +
-                    '<div class="br-name">' + p.name + '</div>' +
-                    '<div class="br-detail">' + ((p.size || '') + ' ' + (p.color || '')).trim() + 
-                    (p.stock ? ' &middot; ' + p.stock + ' in stock' : '') + '</div>' +
-                    '<div class="br-sku">' + p.sku + '</div>' +
+            searchResults.classList.add('show');
+            searchResults.innerHTML = list.map(function(p) {
+                var variant = (p.size || '') + ' ' + (p.color || '');
+                variant = variant.trim();
+                return '<div class="search-item" data-vid="' + p.vid + '" data-sku="' + p.sku + '" ' +
+                    'data-name="' + p.name + '" data-variant="' + variant + '">' +
+                    '<div class="si-name">' + p.name + '</div>' +
+                    '<div class="si-detail">' + (variant || 'Default variant') +
+                    (p.stock ? ' · ' + p.stock + ' in stock' : '') + '</div>' +
+                    '<div class="si-sku">' + p.sku + '</div>' +
                     '</div>';
             }).join('');
         }
         
-        document.getElementById('br').addEventListener('click', function(e) {
-            var item = e.target.closest('.bc-result-item');
+        searchResults.addEventListener('click', function(e) {
+            var item = e.target.closest('.search-item');
             if (!item) return;
-            addToQueue(parseInt(item.dataset.vid), item.dataset.sku, item.dataset.name, item.dataset.variant);
+            addToQueue(item.dataset.vid, item.dataset.sku, item.dataset.name, item.dataset.variant);
         });
         
         function addToQueue(vid, sku, name, variant) {
@@ -368,15 +268,15 @@
             } else {
                 queue.push({
                     id: queueId++,
-                    vid: vid,
+                    vid: parseInt(vid),
                     sku: sku,
                     name: name,
                     variant: variant,
                     copies: parseInt(document.getElementById('copies').value) || 1
                 });
             }
-            closeResults();
-            document.getElementById('bs').value = '';
+            closeSearch();
+            searchInput.value = '';
             renderQueue();
             renderPreview();
         }
@@ -398,7 +298,7 @@
         function renderQueue() {
             var el = document.getElementById('queueList');
             if (!queue.length) {
-                el.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px 0;font-size:12px;">Search and add products to queue</div>';
+                el.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px 0;font-size:12px">Search and add products</div>';
                 return;
             }
             el.innerHTML = queue.map(function(q) {
@@ -406,28 +306,89 @@
                     '<span class="qi-name">' + q.name + '</span>' +
                     '<span class="qi-sku">' + q.sku + '</span>' +
                     '<span class="qi-copies">x' + q.copies + '</span>' +
-                    '<span class="qi-remove" onclick="removeFromQueue(' + q.id + ')">&times;</span>' +
+                    '<button class="qi-remove" onclick="removeFromQueue(' + q.id + ')">&times;</button>' +
                     '</div>';
             }).join('');
+        }
+        
+        function prepareBarcodeData(sku, barcodeType) {
+            var data = sku;
+            var warning = null;
+            
+            if (barcodeType === 'CODE11') {
+                data = sku.replace(/[^0-9-]/g, '');
+                if (data !== sku) {
+                    warning = 'Letters removed (CODE11: digits + hyphens only)';
+                }
+                if (!data) {
+                    data = '0';
+                    warning = 'No valid chars, using fallback';
+                }
+            } else if (barcodeType === 'ITF14') {
+                data = sku.replace(/[^0-9]/g, '');
+                if (data.length === 13) {
+                    var check = calculateITF14CheckDigit(data);
+                    data = data + check;
+                    warning = 'Check digit added';
+                } else if (data.length < 13) {
+                    data = data.padStart(13, '0');
+                    var check = calculateITF14CheckDigit(data);
+                    data = data + check;
+                    warning = 'Padded to 14 digits';
+                } else if (data.length > 14) {
+                    data = data.substring(0, 14);
+                    warning = 'Truncated to 14 digits';
+                }
+                if (data.length !== 14) {
+                    data = '00000000000000';
+                    warning = 'Invalid length, using fallback';
+                }
+            } else if (barcodeType === 'pharmacode') {
+                var num = parseInt(sku.replace(/[^0-9]/g, '')) || 1;
+                if (num < 3) num = 3;
+                if (num > 131070) num = 131070;
+                data = num.toString();
+                if (data !== sku) {
+                    warning = 'Converted to number (3-131070)';
+                }
+            }
+            
+            return { data: data, warning: warning };
+        }
+        
+        function calculateITF14CheckDigit(data) {
+            var sum = 0;
+            for (var i = 0; i < 13; i++) {
+                var digit = parseInt(data[i]);
+                sum += (i % 2 === 0) ? digit * 3 : digit;
+            }
+            var check = (10 - (sum % 10)) % 10;
+            return check.toString();
         }
         
         function renderPreview() {
             var area = document.getElementById('previewArea');
             if (!queue.length) {
-                area.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px;">Add products to queue to preview barcodes</div>';
+                area.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:40px 0;font-size:13px">Add products to queue to preview barcodes</div>';
                 return;
             }
+            
             var sz = labelSizes[document.getElementById('labelSize').value];
             var cols = parseInt(document.getElementById('cols').value) || 4;
-            var barcodeHeight = Math.round(sz.h * 0.5);
+            var barcodeType = document.getElementById('barcodeType').value;
+            var barcodeHeight = Math.round(sz.h * 0.45);
             
-            var html = '<div class="bc-preview" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px);">';
+            var html = '<div class="preview-grid" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px)">';
             
             queue.forEach(function(q) {
-                html += '<div class="bc-preview-item" style="width:' + sz.w + 'px;min-height:' + sz.h + 'px;">';
+                var prepared = prepareBarcodeData(q.sku, barcodeType);
+                html += '<div class="preview-label" style="width:' + sz.w + 'px;min-height:' + sz.h + 'px">';
                 html += '<svg id="pv-' + q.id + '"></svg>';
-                html += '<div class="bp-sku">' + q.sku + '</div>';
-                html += '<div class="bp-name">' + q.name + '</div>';
+                html += '<div class="pl-sku">' + q.sku + '</div>';
+                if (prepared.warning) {
+                    html += '<div class="pl-warn">' + prepared.warning + '</div>';
+                }
+                html += '<div class="pl-name">' + q.name + '</div>';
                 html += '</div>';
             });
             
@@ -435,162 +396,57 @@
             area.innerHTML = html;
             
             setTimeout(function() {
-                var barcodeType = document.getElementById('barcodeType').value;
                 queue.forEach(function(q) {
+                    var prepared = prepareBarcodeData(q.sku, barcodeType);
                     try {
-                        JsBarcode('#pv-' + q.id, q.sku, {
+                        JsBarcode('#pv-' + q.id, prepared.data, {
                             format: barcodeType,
                             width: 2,
                             height: barcodeHeight,
                             fontSize: sz.fs,
-                            margin: 8,
-                            textMargin: 4,
-                            displayValue: true
+                            margin: 6,
+                            textMargin: 3,
+                            displayValue: false
                         });
                     } catch (e) {
-                        console.error('Barcode error for ' + q.sku, e);
-                        document.getElementById('pv-' + q.id).innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="red">Error</text>';
+                        console.error('Preview error for', q.sku, e);
+                        var svg = document.getElementById('pv-' + q.id);
+                        if (svg) {
+                            svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#dc2626" font-size="12">Error</text>';
+                        }
                     }
                 });
-            }, 150);
+            }, 100);
         }
         
         function printPreview() {
             if (!queue.length) {
-                alert('No items in queue to preview');
+                alert('No items in queue');
                 return;
             }
-            
-            // Temporarily show print area for preview
-            var pa = document.getElementById('printArea');
-            var originalDisplay = pa.style.display;
-            
-            // Generate print content
-            var sz = labelSizes[document.getElementById('labelSize').value];
-            var cols = parseInt(document.getElementById('cols').value) || 4;
-            var rows = parseInt(document.getElementById('rows').value) || 3;
-            var barcodeType = document.getElementById('barcodeType').value;
-            var barcodeHeight = Math.round(sz.h * 0.5);
-            
-            pa.innerHTML = '<div class="print-grid" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px);display:grid;gap:8px;padding:20px;"></div>';
-            var grid = pa.querySelector('.print-grid');
-            var maxLabels = cols * rows;
-            var labelCount = 0;
-            var svgIds = [];
-            
-            queue.forEach(function(q) {
-                for (var c = 0; c < q.copies && labelCount < maxLabels; c++) {
-                    var div = document.createElement('div');
-                    div.className = 'print-label';
-                    div.style.width = sz.w + 'px';
-                    div.style.height = sz.h + 'px';
-                    div.style.display = 'inline-block';
-                    div.style.border = '1px dashed #ccc';
-                    div.style.padding = '8px';
-                    div.style.textAlign = 'center';
-                    
-                    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                    var svgId = 'preview-' + q.id + '-' + c;
-                    svg.setAttribute('id', svgId);
-                    div.appendChild(svg);
-                    svgIds.push(svgId);
-                    
-                    var skuDiv = document.createElement('div');
-                    skuDiv.style.fontSize = '10px';
-                    skuDiv.style.fontWeight = '700';
-                    skuDiv.style.fontFamily = 'monospace';
-                    skuDiv.style.marginTop = '4px';
-                    skuDiv.textContent = q.sku;
-                    div.appendChild(skuDiv);
-                    
-                    var nameDiv = document.createElement('div');
-                    nameDiv.style.fontSize = '8px';
-                    nameDiv.style.color = '#333';
-                    nameDiv.style.marginTop = '2px';
-                    nameDiv.textContent = q.name;
-                    div.appendChild(nameDiv);
-                    
-                    grid.appendChild(div);
-                    labelCount++;
-                }
-            });
-            
-            // Render barcodes
-            svgIds.forEach(function(svgId) {
-                var parts = svgId.split('-');
-                var qId = parseInt(parts[1]);
-                var queueItem = queue.find(function(q) { return q.id === qId; });
-                
-                if (queueItem) {
-                    try {
-                        JsBarcode('#' + svgId, queueItem.sku, {
-                            format: barcodeType,
-                            width: 2,
-                            height: barcodeHeight,
-                            fontSize: sz.fs,
-                            margin: 8,
-                            textMargin: 4,
-                            displayValue: false
-                        });
-                    } catch (e) {
-                        console.error('Preview barcode error', e);
-                    }
-                }
-            });
-            
-            // Show preview in a modal-like overlay
-            pa.style.position = 'fixed';
-            pa.style.top = '0';
-            pa.style.left = '0';
-            pa.style.width = '100%';
-            pa.style.height = '100%';
-            pa.style.backgroundColor = 'white';
-            pa.style.zIndex = '9999';
-            pa.style.overflow = 'auto';
-            pa.style.padding = '20px';
-            
-            // Add close button
-            var closeBtn = document.createElement('button');
-            closeBtn.textContent = 'Close Preview';
-            closeBtn.className = 'btn btn-p';
-            closeBtn.style.position = 'fixed';
-            closeBtn.style.top = '20px';
-            closeBtn.style.right = '20px';
-            closeBtn.style.zIndex = '10000';
-            closeBtn.onclick = function() {
-                pa.style.display = 'none';
-                pa.innerHTML = '';
-                pa.style.position = '';
-                pa.style.top = '';
-                pa.style.left = '';
-                pa.style.width = '';
-                pa.style.height = '';
-                pa.style.backgroundColor = '';
-                pa.style.zIndex = '';
-                pa.style.overflow = '';
-                pa.style.padding = '';
-            };
-            pa.appendChild(closeBtn);
-            
-            pa.style.display = 'block';
+            renderPreview();
+            setTimeout(function() {
+                window.print();
+            }, 200);
         }
         
         function printBarcodes() {
             if (!queue.length) {
-                alert('No items in queue to print');
+                alert('No items in queue');
                 return;
             }
             
             var sz = labelSizes[document.getElementById('labelSize').value];
             var cols = parseInt(document.getElementById('cols').value) || 4;
             var rows = parseInt(document.getElementById('rows').value) || 3;
-            var pa = document.getElementById('printArea');
             var barcodeType = document.getElementById('barcodeType').value;
-            var barcodeHeight = Math.round(sz.h * 0.5);
-            
-            pa.innerHTML = '<div class="print-grid" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px);"></div>';
-            var grid = pa.querySelector('.print-grid');
             var maxLabels = cols * rows;
+            var barcodeHeight = Math.round(sz.h * 0.45);
+            
+            var pa = document.getElementById('printArea');
+            pa.innerHTML = '<div class="print-grid" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px)"></div>';
+            var grid = pa.querySelector('.print-grid');
+            
             var labelCount = 0;
             var svgIds = [];
             
@@ -601,11 +457,11 @@
                     div.style.width = sz.w + 'px';
                     div.style.height = sz.h + 'px';
                     
-                    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                     var svgId = 'pl-' + q.id + '-' + c;
+                    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                     svg.setAttribute('id', svgId);
                     div.appendChild(svg);
-                    svgIds.push(svgId);
+                    svgIds.push({ id: svgId, sku: q.sku, name: q.name });
                     
                     var skuDiv = document.createElement('div');
                     skuDiv.className = 'pl-sku';
@@ -622,42 +478,28 @@
                 }
             });
             
-            // Render all barcodes
-            var renderCount = 0;
-            var totalSvgs = svgIds.length;
-            
-            svgIds.forEach(function(svgId, index) {
-                var queueItem = null;
-                var parts = svgId.split('-');
-                var qId = parseInt(parts[1]);
-                queueItem = queue.find(function(q) { return q.id === qId; });
-                
-                if (queueItem) {
+            setTimeout(function() {
+                svgIds.forEach(function(item) {
+                    var prepared = prepareBarcodeData(item.sku, barcodeType);
                     try {
-                        JsBarcode('#' + svgId, queueItem.sku, {
+                        JsBarcode('#' + item.id, prepared.data, {
                             format: barcodeType,
                             width: 2,
                             height: barcodeHeight,
                             fontSize: sz.fs,
-                            margin: 8,
-                            textMargin: 4,
+                            margin: 6,
+                            textMargin: 3,
                             displayValue: false
                         });
-                        renderCount++;
                     } catch (e) {
-                        console.error('Print barcode error for ' + queueItem.sku, e);
+                        console.error('Print error for', item.sku, e);
                     }
-                }
-            });
-            
-            // Wait for rendering to complete before printing
-            setTimeout(function() {
-                if (renderCount > 0) {
+                });
+                
+                setTimeout(function() {
                     window.print();
-                } else {
-                    alert('Failed to render barcodes. Please try again.');
-                }
-            }, 300);
+                }, 100);
+            }, 150);
         }
     </script>
 </body>

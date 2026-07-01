@@ -108,7 +108,7 @@ def add_product():
             pid = cur.lastrowid
             if not d.get('has_variants'):
                 db.execute('INSERT INTO variants (product_id, sku, stock, size) VALUES (?,?,?,?)',
-                           (pid, d['sku'] + '-DEF', int(d.get('stock', 0)), d.get('size', '')))
+                           (pid, d['sku'], int(d.get('stock', 0)), d.get('size', '')))
             return jsonify({'ok': True, 'id': pid})
         except Exception as e:
             return jsonify({'error': str(e)}), 400
@@ -126,8 +126,8 @@ def update_product(pid):
              d['sku'], d.get('barcode'), int(d.get('low_stock', 5)), d.get('commission_class') or None, pid)
         )
         if not d.get('has_variants'):
-            db.execute('UPDATE variants SET size=? WHERE product_id=? AND sku LIKE ?',
-                       (d.get('size', ''), pid, '%-DEF'))
+            db.execute('UPDATE variants SET size=? WHERE product_id=?',
+                       (d.get('size', ''), pid))
         return jsonify({'ok': True})
 
 

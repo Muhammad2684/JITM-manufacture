@@ -422,7 +422,7 @@ def init_db():
             )
             db.execute(
                 'INSERT OR IGNORE INTO variants (id, product_id, sku, stock) VALUES (?,?,?,?)',
-                (prod[0], prod[0], prod[5] + '-DEF', 0)
+                (prod[0], prod[0], prod[5], 0)
             )
 
         for cc in ['Full Commission', 'Half Commission', 'No Commission']:

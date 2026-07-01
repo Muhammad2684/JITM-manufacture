@@ -312,6 +312,7 @@ def create_sales_invoice():
     receipt_number = (request_data.get('receipt') or '').strip() or generate_receipt_number()
     customer_id = request_data.get('customer_id')
     payment_method = request_data.get('payment', 'cash')
+    account_id = request_data.get('account_id')
     notes = request_data.get('notes', '')
     due_date = request_data.get('due_date') or None
     
@@ -403,6 +404,19 @@ def create_sales_invoice():
             'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
             (sale_id, payment_method, total)
         )
+        
+        if account_id and payment_method != 'credit':
+            account = db.execute('SELECT * FROM accounts WHERE id=?', (account_id,)).fetchone()
+            if account:
+                allocation = [{'ref_type': 'sale', 'ref_id': sale_id, 'amount': total}]
+                allocations_json = json.dumps(allocation)
+                db.execute(
+                    "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
+                    (account_id, 'receipt', total, f'Sale receipt: {receipt_number}',
+                     'customer', customer_id, 'sale', sale_id, allocations_json)
+                )
+                db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (total, account_id))
         
         if customer_id:
             db.execute('UPDATE customers SET total_spent=total_spent+?, visit_count=visit_count+1 WHERE id=?',
@@ -506,6 +520,7 @@ def update_sales_invoice(sale_id):
         
         customer_id = request_data.get('customer_id') or old_sale.get('customer_id')
         payment_method = request_data.get('payment') or old_sale.get('payment')
+        account_id = request_data.get('account_id')
         notes = request_data.get('notes', old_sale.get('notes', ''))
         customer_name = old_sale.get('customer_name', '')
         
@@ -551,8 +566,23 @@ def update_sales_invoice(sale_id):
         reverse_sale_transactions(db, sale_id)
         
         db.execute('DELETE FROM payments WHERE sale_id=?', (sale_id,))
-        payment_list = [{'method': payment_method, 'amount': total}]
-        record_payments(db, sale_id, payment_list, False, customer_id, old_sale['receipt'])
+        db.execute(
+            'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
+            (sale_id, payment_method, total)
+        )
+        
+        if account_id and payment_method != 'credit':
+            account = db.execute('SELECT * FROM accounts WHERE id=?', (account_id,)).fetchone()
+            if account:
+                allocation = [{'ref_type': 'sale', 'ref_id': sale_id, 'amount': total}]
+                allocations_json = json.dumps(allocation)
+                db.execute(
+                    "INSERT INTO transactions (account_id, type, amount, description, party_type, party_id, reference_type, reference_id, allocations, date) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,date('now'))",
+                    (account_id, 'receipt', total, f'Sale receipt: {old_sale["receipt"]}',
+                     'customer', customer_id, 'sale', sale_id, allocations_json)
+                )
+                db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (total, account_id))
         
         return jsonify({
             'ok': True,
@@ -644,5 +674,11 @@ def sale_detail(sale_id):
             sale['customer_phone'] = ''
         
         sale['is_return'] = 1 if sale.get('status') == 'returned' else 0
+        
+        account_transaction = db.execute(
+            "SELECT account_id FROM transactions WHERE reference_type='sale' AND reference_id=? LIMIT 1",
+            (sale_id,)
+        ).fetchone()
+        sale['account_id'] = account_transaction['account_id'] if account_transaction else None
         
         return jsonify(sale)

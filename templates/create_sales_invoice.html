@@ -59,8 +59,9 @@
             </div>
             <div class="ci-entity">
                 <div style="margin-bottom:12px"><label>Customer</label><select id="customer_id"><option value="">-- Walk-in / No Customer --</option></select></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
                     <div><label>Payment Method</label><select id="payment_method" onchange="toggleDueDate()"><option value="cash">Cash</option><option value="card">Card</option><option value="credit">Credit</option></select></div>
+                    <div id="account_wrap"><label>Receive to Account</label><select id="account_id"><option value="">-- Select Account --</option></select></div>
                     <div><label>Notes</label><input type="text" id="notes" placeholder="Optional notes"></div>
                     <div id="due_date_wrap" style="display:none"><label>Due Date</label><input type="date" id="due_date"></div>
                 </div>
@@ -148,11 +149,20 @@
     </div>
 </div>
 <script>
-var products = [], customers = [], rowId = 0, acHighlightIdx = -1, editId = null, stockMap = {}, createTargetRid = null, catList = [], ccList = [], sizeList = [];
+var products = [], customers = [], accounts = [], rowId = 0, acHighlightIdx = -1, editId = null, stockMap = {}, createTargetRid = null, catList = [], ccList = [], sizeList = [];
 
 function toggleDueDate() {
     var pm = document.getElementById('payment_method').value;
     document.getElementById('due_date_wrap').style.display = pm === 'credit' ? '' : 'none';
+    document.getElementById('account_wrap').style.display = pm === 'credit' ? 'none' : '';
+}
+
+function loadAccounts() {
+    fetch('/api/accounts').then(function(r){return r.json();}).then(function(d){
+        accounts = d;
+        var sel = document.getElementById('account_id');
+        sel.innerHTML = '<option value="">-- Select Account --</option>' + d.map(function(a){return '<option value="'+a.id+'">'+a.name+' ('+a.type+')</option>';}).join('');
+    });
 }
 
 function loadCustomers() {
@@ -642,6 +652,7 @@ function submitInvoice() {
     var receipt_no = document.getElementById('receipt_no').value.trim() || generateReceipt();
     var customer_id = document.getElementById('customer_id').value || null;
     var payment = document.getElementById('payment_method').value;
+    var account_id = document.getElementById('account_id').value || null;
     var notes = document.getElementById('notes').value;
     var due_date = payment === 'credit' ? document.getElementById('due_date').value : null;
     var btn = document.getElementById('submit-btn');
@@ -657,6 +668,7 @@ function submitInvoice() {
             sale_date: document.getElementById('sale_date').value,
             customer_id: customer_id,
             payment: payment,
+            account_id: account_id,
             notes: notes,
             due_date: due_date,
             items: items
@@ -687,6 +699,9 @@ function loadSale(id) {
         if (s.payment === 'credit' && s.due_date) {
             document.getElementById('due_date').value = s.due_date;
         }
+        if (s.account_id) {
+            document.getElementById('account_id').value = s.account_id;
+        }
         document.getElementById('submit-btn').textContent = 'Update Sale';
         document.getElementById('customer_id').value = s.customer_id || '';
         document.getElementById('items_tb').innerHTML = '';
@@ -710,6 +725,7 @@ document.getElementById('sale_date').value = new Date().toISOString().slice(0,10
 document.getElementById('receipt_no').value = generateReceipt();
 loadCustomers();
 loadProducts();
+loadAccounts();
 fetch('/api/categories').then(r=>r.json()).then(function(d){catList=d;});
 fetch('/api/commission-classes').then(r=>r.json()).then(function(d){ccList=d;});
 fetch('/api/sizes').then(r=>r.json()).then(function(d){sizeList=d;});

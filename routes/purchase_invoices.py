@@ -58,19 +58,40 @@ def auto_link_product(db, item):
 @pi_bp.route('/purchase-invoices')
 @login_required
 def list_purchase_invoices():
-    """List all purchase invoices with supplier names and pagination."""
+    """List all purchase invoices with supplier names, date range, and pagination."""
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
     offset = (page - 1) * per_page
     
     with get_db() as db:
-        count_row = db.execute('SELECT COUNT(*) as cnt FROM purchase_invoices').fetchone()
+        where_clauses = []
+        params = []
+        
+        if date_from and date_to:
+            where_clauses.append('date(pi.issue_date) BETWEEN ? AND ?')
+            params.extend([date_from, date_to])
+        elif date_from:
+            where_clauses.append('date(pi.issue_date) >= ?')
+            params.append(date_from)
+        elif date_to:
+            where_clauses.append('date(pi.issue_date) <= ?')
+            params.append(date_to)
+        
+        where_sql = ' AND '.join(where_clauses)
+        if where_sql:
+            where_sql = 'WHERE ' + where_sql
+        
+        count_row = db.execute(
+            'SELECT COUNT(*) as cnt FROM purchase_invoices pi ' + where_sql, params
+        ).fetchone()
         total = count_row['cnt']
         
         rows = db.execute(
             'SELECT pi.*, s.name as supplier_name FROM purchase_invoices pi '
-            'LEFT JOIN suppliers s ON s.id=pi.supplier_id ORDER BY pi.id DESC LIMIT ? OFFSET ?',
-            (per_page, offset)
+            'LEFT JOIN suppliers s ON s.id=pi.supplier_id ' + where_sql + ' ORDER BY pi.id DESC LIMIT ? OFFSET ?',
+            params + [per_page, offset]
         ).fetchall()
         
         return jsonify({

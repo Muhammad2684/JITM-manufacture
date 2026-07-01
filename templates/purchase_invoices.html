@@ -44,7 +44,10 @@
         </div>
         <div class="content">
             <div class="search">
-                <input id="s" placeholder="Search invoices..." oninput="load()">
+                <input id="s" placeholder="Search invoices..." oninput="load(1)">
+                <input type="date" id="df" onchange="load(1)" style="width:140px">
+                <input type="date" id="dt" onchange="load(1)" style="width:140px">
+                <button class="btn btn-sm" onclick="clearDates()">Clear</button>
             </div>
             <div class="table-wrap">
                 <table>
@@ -176,8 +179,13 @@
         
         function load(page) {
             var q = document.getElementById('s').value.toLowerCase();
+            var df = document.getElementById('df').value;
+            var dt = document.getElementById('dt').value;
             currentPage = page || 1;
-            fetch('/api/purchase-invoices?page=' + currentPage + '&per_page=50')
+            var url = '/api/purchase-invoices?page=' + currentPage + '&per_page=50';
+            if (df) url += '&date_from=' + df;
+            if (dt) url += '&date_to=' + dt;
+            fetch(url)
                 .then(r => r.json())
                 .then(d => {
                     piList = d.items || [];
@@ -190,6 +198,12 @@
                     }));
                     renderPagination();
                 });
+        }
+        
+        function clearDates() {
+            document.getElementById('df').value = '';
+            document.getElementById('dt').value = '';
+            load(1);
         }
         
         function renderPagination() {

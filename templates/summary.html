@@ -244,6 +244,13 @@
             </div>
         </div>
         <div class="content">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px">
+                <label style="margin:0;font-size:12px">From</label>
+                <input type="date" id="df" style="width:150px" onchange="loadSummary()">
+                <label style="margin:0;font-size:12px">To</label>
+                <input type="date" id="dt" style="width:150px" onchange="loadSummary()">
+                <button class="btn btn-sm" onclick="clearDates()" style="margin:0">Clear</button>
+            </div>
             <div class="dashboard-grid">
                 <div class="grid-column">
                     <div class="manager-card">
@@ -312,6 +319,67 @@
             return '<div class="card-body-row"><span>' + label + '</span><span class="value-null">&ndash;</span></div>';
         }
         
+        function loadSummary() {
+            var df = document.getElementById('df').value;
+            var dt = document.getElementById('dt').value;
+            var url = '/api/summary?';
+            if (df) url += 'date_from=' + df + '&';
+            if (dt) url += 'date_to=' + dt;
+            
+            fetch(url)
+                .then(r => r.json())
+                .then(d => {
+                    const bs = d.balance_sheet;
+                    
+                    document.getElementById('assets').innerHTML = bs.assets.map(a => {
+                        let type = '';
+                        if (a.label === 'Cash / Bank') type = 'cash_bank';
+                        else if (a.label === 'Inventory Value') type = 'inventory';
+                        else if (a.label === 'Customer Receivables') type = 'customer_receivables';
+                        return activeRow(a.label, a.amount, type);
+                    }).join('');
+                    document.getElementById('assets-total').textContent = fmt(bs.total_assets);
+                    
+                    document.getElementById('liabilities').innerHTML = bs.liabilities.map(l => {
+                        let type = '';
+                        if (l.label === 'Supplier Payables') type = 'supplier_payables';
+                        return activeRow(l.label, l.amount, type);
+                    }).join('');
+                    document.getElementById('liabilities-total').textContent = fmt(bs.total_liabilities);
+                    
+                    document.getElementById('equity').innerHTML = bs.equity.map(e => activeRow(e.label, e.amount, '')).join('');
+                    document.getElementById('equity-total').textContent = fmt(bs.total_equity);
+                    
+                    const pnl = d.pnl;
+                    let h = '';
+                    h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Income</div>';
+                    h += activeRow('Total Revenue', pnl.income[0].amount, 'total_revenue');
+                    h += activeRow('Less Returns', pnl.income[1].amount, 'returns');
+                    h += activeRow('Net Revenue', pnl.income[2].amount, '');
+                    h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Cost of Sales</div>';
+                    h += activeRow('Cost of Goods Sold', pnl.expenses[0].amount, 'cogs');
+                    h += activeRow('Discounts Given', pnl.expenses[1].amount, 'discounts');
+                    h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Expenses</div>';
+                    h += pnl.expenses_detail.map(e => {
+                        const type = 'expense_' + e.label.toLowerCase().replace(/ /g, '_');
+                        return activeRow(e.label, e.amount, type);
+                    }).join('');
+                    h += activeRow('Total Expenses', pnl.total_expenses, 'total_expenses');
+                    
+                    document.getElementById('pnl-items').innerHTML = h;
+                    document.getElementById('pnl-total').textContent = fmt(pnl.net_profit);
+                    
+                    document.getElementById('uncat-total').textContent = fmt(pnl.uncategorized);
+                    document.getElementById('uncat-items').innerHTML = nullRow('Uncategorized');
+                });
+        }
+        
+        function clearDates() {
+            document.getElementById('df').value = '';
+            document.getElementById('dt').value = '';
+            loadSummary();
+        }
+        
         function showDetails(type) {
             // Redirect to actual pages for certain types
             const redirects = {
@@ -326,7 +394,13 @@
                 return;
             }
             
-            fetch('/api/summary/details/' + type)
+            var df = document.getElementById('df').value;
+            var dt = document.getElementById('dt').value;
+            var url = '/api/summary/details/' + type + '?';
+            if (df) url += 'date_from=' + df + '&';
+            if (dt) url += 'date_to=' + dt;
+            
+            fetch(url)
                 .then(r => r.json())
                 .then(d => {
                     document.getElementById('modalTitle').textContent = d.title;
@@ -411,52 +485,7 @@
             }
         });
         
-        fetch('/api/summary')
-            .then(r => r.json())
-            .then(d => {
-                const bs = d.balance_sheet;
-                
-                document.getElementById('assets').innerHTML = bs.assets.map(a => {
-                    let type = '';
-                    if (a.label === 'Cash / Bank') type = 'cash_bank';
-                    else if (a.label === 'Inventory Value') type = 'inventory';
-                    else if (a.label === 'Customer Receivables') type = 'customer_receivables';
-                    return activeRow(a.label, a.amount, type);
-                }).join('');
-                document.getElementById('assets-total').textContent = fmt(bs.total_assets);
-                
-                document.getElementById('liabilities').innerHTML = bs.liabilities.map(l => {
-                    let type = '';
-                    if (l.label === 'Supplier Payables') type = 'supplier_payables';
-                    return activeRow(l.label, l.amount, type);
-                }).join('');
-                document.getElementById('liabilities-total').textContent = fmt(bs.total_liabilities);
-                
-                document.getElementById('equity').innerHTML = bs.equity.map(e => activeRow(e.label, e.amount, '')).join('');
-                document.getElementById('equity-total').textContent = fmt(bs.total_equity);
-                
-                const pnl = d.pnl;
-                let h = '';
-                h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Income</div>';
-                h += activeRow('Total Revenue', pnl.income[0].amount, 'total_revenue');
-                h += activeRow('Less Returns', pnl.income[1].amount, 'returns');
-                h += activeRow('Net Revenue', pnl.income[2].amount, '');
-                h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Cost of Sales</div>';
-                h += activeRow('Cost of Goods Sold', pnl.expenses[0].amount, 'cogs');
-                h += activeRow('Discounts Given', pnl.expenses[1].amount, 'discounts');
-                h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Expenses</div>';
-                h += pnl.expenses_detail.map(e => {
-                    const type = 'expense_' + e.label.toLowerCase().replace(/ /g, '_');
-                    return activeRow(e.label, e.amount, type);
-                }).join('');
-                h += activeRow('Total Expenses', pnl.total_expenses, 'total_expenses');
-                
-                document.getElementById('pnl-items').innerHTML = h;
-                document.getElementById('pnl-total').textContent = fmt(pnl.net_profit);
-                
-                document.getElementById('uncat-total').textContent = fmt(pnl.uncategorized);
-                document.getElementById('uncat-items').innerHTML = nullRow('Uncategorized');
-            });
+        loadSummary();
     </script>
 </body>
 </html>

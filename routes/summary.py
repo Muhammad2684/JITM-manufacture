@@ -8,17 +8,35 @@ summary_bp = Blueprint('summary', __name__, url_prefix='/api')
 @summary_bp.route('/summary')
 @login_required
 def summary():
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
     with get_db() as db:
+        date_filter = ''
+        date_params = []
+        if date_from and date_to:
+            date_filter = " AND date(created_at) BETWEEN ? AND ?"
+            date_params = [date_from, date_to]
+        elif date_from:
+            date_filter = " AND date(created_at) >= ?"
+            date_params = [date_from]
+        elif date_to:
+            date_filter = " AND date(created_at) <= ?"
+            date_params = [date_to]
+        
         total_revenue = db.execute(
-            "SELECT COALESCE(SUM(total),0) as total FROM sales WHERE status NOT IN ('returned')"
+            "SELECT COALESCE(SUM(total),0) as total FROM sales WHERE status NOT IN ('returned')" + date_filter,
+            date_params
         ).fetchone()
 
         total_returns = db.execute(
-            "SELECT COALESCE(SUM(ABS(total)),0) as total FROM sales WHERE status='returned'"
+            "SELECT COALESCE(SUM(ABS(total)),0) as total FROM sales WHERE status='returned'" + date_filter,
+            date_params
         ).fetchone()
 
         total_discounts = db.execute(
-            "SELECT COALESCE(SUM(discount),0) as total FROM sales WHERE status NOT IN ('returned')"
+            "SELECT COALESCE(SUM(discount),0) as total FROM sales WHERE status NOT IN ('returned')" + date_filter,
+            date_params
         ).fetchone()
 
         inventory_value = db.execute(
@@ -34,7 +52,8 @@ def summary():
             'SELECT COALESCE(SUM(si.quantity * si.cost_price),0) as total '
             'FROM sale_items si '
             'JOIN sales s ON s.id=si.sale_id '
-            "WHERE s.status NOT IN ('returned') AND si.is_return=0"
+            "WHERE s.status NOT IN ('returned') AND si.is_return=0" + date_filter,
+            date_params
         ).fetchone()
 
         supplier_balance = db.execute(
@@ -45,8 +64,21 @@ def summary():
             'SELECT COALESCE(SUM(balance),0) as total FROM accounts'
         ).fetchone()
 
+        expense_date_filter = ''
+        expense_date_params = []
+        if date_from and date_to:
+            expense_date_filter = " WHERE date(created_at) BETWEEN ? AND ?"
+            expense_date_params = [date_from, date_to]
+        elif date_from:
+            expense_date_filter = " WHERE date(created_at) >= ?"
+            expense_date_params = [date_from]
+        elif date_to:
+            expense_date_filter = " WHERE date(created_at) <= ?"
+            expense_date_params = [date_to]
+        
         expense_rows = db.execute(
-            "SELECT category, COALESCE(SUM(amount),0) as total FROM expenses GROUP BY category"
+            "SELECT category, COALESCE(SUM(amount),0) as total FROM expenses" + expense_date_filter + " GROUP BY category",
+            expense_date_params
         ).fetchall()
 
         expense_map = {r['category']: r['total'] for r in expense_rows}
@@ -106,7 +138,22 @@ def summary():
 @login_required
 def summary_details(detail_type):
     """Get transaction details for summary items."""
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
     with get_db() as db:
+        date_filter = ''
+        date_params = []
+        if date_from and date_to:
+            date_filter = " AND date(created_at) BETWEEN ? AND ?"
+            date_params = [date_from, date_to]
+        elif date_from:
+            date_filter = " AND date(created_at) >= ?"
+            date_params = [date_from]
+        elif date_to:
+            date_filter = " AND date(created_at) <= ?"
+            date_params = [date_to]
+        
         if detail_type == 'cash_bank':
             rows = db.execute(
                 'SELECT a.name, a.type, a.balance FROM accounts a ORDER BY a.name'
@@ -166,8 +213,9 @@ def summary_details(detail_type):
         elif detail_type == 'total_revenue':
             rows = db.execute(
                 "SELECT receipt, customer_name, total, created_at FROM sales "
-                "WHERE status NOT IN ('returned') "
-                "ORDER BY created_at DESC LIMIT 50"
+                "WHERE status NOT IN ('returned')" + date_filter + " "
+                "ORDER BY created_at DESC LIMIT 50",
+                date_params
             ).fetchall()
             return jsonify({
                 'title': 'Total Revenue (Last 50 Sales)',
@@ -181,8 +229,9 @@ def summary_details(detail_type):
         elif detail_type == 'returns':
             rows = db.execute(
                 "SELECT receipt, customer_name, ABS(total) as amount, created_at FROM sales "
-                "WHERE status='returned' "
-                "ORDER BY created_at DESC LIMIT 50"
+                "WHERE status='returned'" + date_filter + " "
+                "ORDER BY created_at DESC LIMIT 50",
+                date_params
             ).fetchall()
             return jsonify({
                 'title': 'Sales Returns (Last 50)',
@@ -196,8 +245,9 @@ def summary_details(detail_type):
         elif detail_type == 'discounts':
             rows = db.execute(
                 "SELECT receipt, customer_name, discount, created_at FROM sales "
-                "WHERE discount > 0 AND status NOT IN ('returned') "
-                "ORDER BY created_at DESC LIMIT 50"
+                "WHERE discount > 0 AND status NOT IN ('returned')" + date_filter + " "
+                "ORDER BY created_at DESC LIMIT 50",
+                date_params
             ).fetchall()
             return jsonify({
                 'title': 'Discounts Given (Last 50)',
@@ -214,8 +264,9 @@ def summary_details(detail_type):
                 'FROM sale_items si '
                 'JOIN sales s ON s.id=si.sale_id '
                 'JOIN products p ON p.id=si.product_id '
-                "WHERE s.status NOT IN ('returned') AND si.is_return=0 "
-                'ORDER BY s.created_at DESC LIMIT 50'
+                "WHERE s.status NOT IN ('returned') AND si.is_return=0" + date_filter + " "
+                'ORDER BY s.created_at DESC LIMIT 50',
+                date_params
             ).fetchall()
             return jsonify({
                 'title': 'Cost of Goods Sold (Last 50 Items)',
@@ -228,11 +279,20 @@ def summary_details(detail_type):
         
         elif detail_type.startswith('expense_'):
             category = detail_type.replace('expense_', '').replace('_', ' ').title()
-            rows = db.execute(
-                'SELECT category, amount, note, created_at FROM expenses '
-                'WHERE category=? ORDER BY created_at DESC LIMIT 50',
-                (category,)
-            ).fetchall()
+            expense_sql = 'SELECT category, amount, note, created_at FROM expenses WHERE category=?'
+            expense_params = [category]
+            if date_from and date_to:
+                expense_sql += " AND date(created_at) BETWEEN ? AND ?"
+                expense_params.extend([date_from, date_to])
+            elif date_from:
+                expense_sql += " AND date(created_at) >= ?"
+                expense_params.append(date_from)
+            elif date_to:
+                expense_sql += " AND date(created_at) <= ?"
+                expense_params.append(date_to)
+            expense_sql += " ORDER BY created_at DESC LIMIT 50"
+            
+            rows = db.execute(expense_sql, expense_params).fetchall()
             return jsonify({
                 'title': f'{category} Expenses',
                 'columns': ['Category', 'Amount', 'Note', 'Date'],
@@ -243,8 +303,21 @@ def summary_details(detail_type):
             })
         
         elif detail_type == 'total_expenses':
+            expense_total_filter = ''
+            expense_total_params = []
+            if date_from and date_to:
+                expense_total_filter = " WHERE date(created_at) BETWEEN ? AND ?"
+                expense_total_params = [date_from, date_to]
+            elif date_from:
+                expense_total_filter = " WHERE date(created_at) >= ?"
+                expense_total_params = [date_from]
+            elif date_to:
+                expense_total_filter = " WHERE date(created_at) <= ?"
+                expense_total_params = [date_to]
+            
             rows = db.execute(
-                'SELECT category, SUM(amount) as total FROM expenses GROUP BY category ORDER BY total DESC'
+                'SELECT category, SUM(amount) as total FROM expenses' + expense_total_filter + ' GROUP BY category ORDER BY total DESC',
+                expense_total_params
             ).fetchall()
             return jsonify({
                 'title': 'Total Expenses by Category',

@@ -633,27 +633,44 @@ def delete_sales_invoice(sale_id):
 @pos_bp.route('/sales')
 @login_required
 def sales_list():
-    """List recent sales with optional search filter and pagination."""
+    """List recent sales with optional search filter, date range, and pagination."""
     search_query = request.args.get('q', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
     offset = (page - 1) * per_page
     
     with get_db() as db:
+        where_clauses = []
+        params = []
+        
         if search_query:
-            count_row = db.execute(
-                'SELECT COUNT(*) as cnt FROM sales WHERE receipt LIKE ? OR customer_name LIKE ?',
-                (f'%{search_query}%', f'%{search_query}%')
-            ).fetchone()
-            total = count_row['cnt']
-            rows = db.execute(
-                'SELECT * FROM sales WHERE receipt LIKE ? OR customer_name LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?',
-                (f'%{search_query}%', f'%{search_query}%', per_page, offset)
-            ).fetchall()
-        else:
-            count_row = db.execute('SELECT COUNT(*) as cnt FROM sales').fetchone()
-            total = count_row['cnt']
-            rows = db.execute('SELECT * FROM sales ORDER BY id DESC LIMIT ? OFFSET ?', (per_page, offset)).fetchall()
+            where_clauses.append('(receipt LIKE ? OR customer_name LIKE ?)')
+            params.extend([f'%{search_query}%', f'%{search_query}%'])
+        if date_from and date_to:
+            where_clauses.append('date(created_at) BETWEEN ? AND ?')
+            params.extend([date_from, date_to])
+        elif date_from:
+            where_clauses.append('date(created_at) >= ?')
+            params.append(date_from)
+        elif date_to:
+            where_clauses.append('date(created_at) <= ?')
+            params.append(date_to)
+        
+        where_sql = ' AND '.join(where_clauses)
+        if where_sql:
+            where_sql = 'WHERE ' + where_sql
+        
+        count_row = db.execute(
+            'SELECT COUNT(*) as cnt FROM sales ' + where_sql, params
+        ).fetchone()
+        total = count_row['cnt']
+        
+        rows = db.execute(
+            'SELECT * FROM sales ' + where_sql + ' ORDER BY id DESC LIMIT ? OFFSET ?',
+            params + [per_page, offset]
+        ).fetchall()
         
         result = []
         for row in rows:

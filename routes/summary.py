@@ -259,14 +259,26 @@ def summary_details(detail_type):
             })
         
         elif detail_type == 'cogs':
+            cogs_date_filter = ''
+            cogs_date_params = []
+            if date_from and date_to:
+                cogs_date_filter = " AND date(s.created_at) BETWEEN ? AND ?"
+                cogs_date_params = [date_from, date_to]
+            elif date_from:
+                cogs_date_filter = " AND date(s.created_at) >= ?"
+                cogs_date_params = [date_from]
+            elif date_to:
+                cogs_date_filter = " AND date(s.created_at) <= ?"
+                cogs_date_params = [date_to]
+            
             rows = db.execute(
                 'SELECT p.name, si.quantity, si.cost_price, (si.quantity * si.cost_price) as total_cost, s.receipt '
                 'FROM sale_items si '
                 'JOIN sales s ON s.id=si.sale_id '
                 'JOIN products p ON p.id=si.product_id '
-                "WHERE s.status NOT IN ('returned') AND si.is_return=0" + date_filter + " "
+                "WHERE s.status NOT IN ('returned') AND si.is_return=0" + cogs_date_filter + " "
                 'ORDER BY s.created_at DESC LIMIT 50',
-                date_params
+                cogs_date_params
             ).fetchall()
             return jsonify({
                 'title': 'Cost of Goods Sold (Last 50 Items)',

@@ -1,5 +1,6 @@
 import os
 from flask import Flask, render_template, redirect, session
+from markupsafe import escape
 from database import init_db
 from routes.auth import auth_bp, login_required, permission_required
 from routes.products import prod_bp
@@ -240,11 +241,11 @@ def view_sales_invoice(sale_id):
         
         item_rows = []
         for item in sale_items:
-            description = item['product_name']
+            description = str(escape(item['product_name']))
             if item['variant_label']:
-                description += ' (' + item['variant_label'] + ')'
+                description += ' (' + str(escape(item['variant_label'])) + ')'
             if item['sku']:
-                description += '<br><span style="font-size:10px;color:#9ca3af">' + item['sku'] + '</span>'
+                description += '<br><span style="font-size:10px;color:#9ca3af">' + str(escape(item['sku'])) + '</span>'
             item_rows.append([description, abs(item['quantity']), format_amount(item['price']), format_amount(item['total'])])
         
         totals = [
@@ -334,7 +335,7 @@ def view_purchase_invoice(invoice_id):
         
         item_rows = []
         for item in invoice_items:
-            item_rows.append([item['item'] or '', item['qty'], format_amount(item['unit_price']), format_amount(item['total'])])
+            item_rows.append([str(escape(item['item'] or '')), item['qty'], format_amount(item['unit_price']), format_amount(item['total'])])
         
         totals = [
             ('Invoice Amount', format_amount(invoice['invoice_amount']), True),

@@ -131,11 +131,28 @@ def create_purchase_invoice():
 @login_required
 @manager_required
 def update_purchase_invoice(invoice_id):
-    """Update a purchase invoice and adjust supplier balance accordingly."""
+    """Update a purchase invoice: reverse old stock, apply new items, adjust supplier balance."""
     request_data = request.get_json()
     with get_db() as db:
         try:
-            old_invoice = db.execute('SELECT balance_due, supplier_id FROM purchase_invoices WHERE id=?', (invoice_id,)).fetchone()
+            old_invoice = db.execute(
+                'SELECT * FROM purchase_invoices WHERE id=?', (invoice_id,)
+            ).fetchone()
+            if not old_invoice:
+                return jsonify({'error': 'Invoice not found'}), 404
+            old_invoice = dict(old_invoice)
+            
+            old_items = db.execute(
+                'SELECT * FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,)
+            ).fetchall()
+            
+            staff_member = session.get('name', '')
+            reference = 'PI #' + old_invoice['invoice_no']
+            
+            for old_item in old_items:
+                if old_item['product_id']:
+                    apply_stock_change(db, old_item['product_id'], -int(old_item['qty']), float(old_item['unit_price'] or 0), reference, staff_member)
+            
             db.execute(
                 'UPDATE purchase_invoices SET invoice_no=?, issue_date=?, due_date=?, supplier_id=?, description=?, invoice_amount=?, balance_due=?, status=? WHERE id=?',
                 (request_data['invoice_no'], request_data.get('issue_date', ''), request_data.get('due_date', ''),
@@ -144,7 +161,21 @@ def update_purchase_invoice(invoice_id):
                  request_data.get('status', 'Unpaid'), invoice_id)
             )
             
-            if old_invoice and old_invoice['supplier_id']:
+            db.execute('DELETE FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,))
+            
+            new_reference = 'PI #' + request_data['invoice_no']
+            for item in request_data.get('items', []):
+                product_id = auto_link_product(db, item)
+                db.execute(
+                    'INSERT INTO purchase_invoice_items (invoice_id, line_number, item, product_id, qty, unit_price, total) VALUES (?,?,?,?,?,?,?)',
+                    (invoice_id, int(item.get('line_number', 0)), item.get('item', ''),
+                     product_id, float(item.get('qty', 1)),
+                     float(item.get('unit_price', 0)), float(item.get('total', 0)))
+                )
+                if product_id:
+                    apply_stock_change(db, product_id, int(float(item.get('qty', 1))), float(item.get('unit_price', 0)), new_reference, staff_member)
+            
+            if old_invoice['supplier_id']:
                 old_balance = float(old_invoice['balance_due'] or 0)
                 new_balance = float(request_data.get('balance_due', 0))
                 new_supplier_id = request_data.get('supplier_id')

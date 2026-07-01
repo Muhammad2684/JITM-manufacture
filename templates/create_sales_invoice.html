@@ -167,14 +167,15 @@ function loadAccounts() {
 
 function loadCustomers() {
     fetch('/api/customers').then(r=>r.json()).then(d=>{
-        customers=d;
-        document.getElementById('customer_id').innerHTML='<option value="">-- Walk-in / No Customer --</option>'+d.map(c=>'<option value="'+c.id+'">'+c.name+'</option>').join('');
+        customers = d.items || d;
+        var custData = customers;
+        document.getElementById('customer_id').innerHTML='<option value="">-- Walk-in / No Customer --</option>'+custData.map(c=>'<option value="'+c.id+'">'+c.name+'</option>').join('');
     });
 }
 function loadProducts() {
-    fetch('/api/products').then(r=>r.json()).then(d=>{
-        products=d;
-        d.forEach(function(p){
+    fetch('/api/products?per_page=10000').then(r=>r.json()).then(d=>{
+        products = d.items || d;
+        products.forEach(function(p){
             var stock = (p.variants||[]).reduce(function(s,v){return s+(v.stock||0);},0);
             stockMap[p.id] = stock;
         });

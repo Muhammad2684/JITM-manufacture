@@ -101,9 +101,12 @@
                 position: absolute !important;
                 left: 0 !important;
                 top: 0 !important;
+                width: 100% !important;
             }
             .print-page {
                 display: grid;
+                grid-template-columns: repeat(auto-fill, 1.5in);
+                grid-auto-rows: 1in;
                 page-break-after: always;
                 box-sizing: border-box;
             }
@@ -116,6 +119,8 @@
                 align-items: center;
                 justify-content: center;
                 box-sizing: border-box;
+                width: 1.5in;
+                height: 1in;
             }
             .print-label svg {
                 display: block;
@@ -180,21 +185,6 @@
                                     <input type="number" id="copies" value="1" min="1" max="100" onchange="renderPreview()">
                                 </div>
                                 <div>
-                                    <label>Paper Size</label>
-                                    <select id="paperSize" onchange="renderPreview()">
-                                        <optgroup label="Custom Sizes">
-                                            <option value="2x4">2" × 4"</option>
-                                            <option value="4x4">4" × 4"</option>
-                                            <option value="4x6">4" × 6"</option>
-                                        </optgroup>
-                                        <optgroup label="Standard Sizes">
-                                            <option value="letter" selected>Letter (8.5" × 11")</option>
-                                            <option value="a4">A4 (8.27" × 11.69")</option>
-                                            <option value="legal">Legal (8.5" × 14")</option>
-                                        </optgroup>
-                                    </select>
-                                </div>
-                                <div>
                                     <label>Barcode Type</label>
                                     <select id="barcodeType" onchange="renderPreview()">
                                         <option value="CODE128" selected>Code 128</option>
@@ -227,22 +217,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
         var queue = [], queueId = 0, hlIdx = -1;
-        
-        // Label size options: 1.5" × 1" (landscape) or 1" × 1.5" (portrait)
-        var labelWidthLandscape = 1.5;
-        var labelHeightLandscape = 1.0;
-        var labelWidthPortrait = 1.0;
-        var labelHeightPortrait = 1.5;
-        
-        // Paper sizes in inches (both custom and standard)
-        var paperSizes = {
-            '2x4': { width: 2, height: 4, label: '2" × 4"' },
-            '4x4': { width: 4, height: 4, label: '4" × 4"' },
-            '4x6': { width: 4, height: 6, label: '4" × 6"' },
-            'letter': { width: 8.5, height: 11, label: 'Letter (8.5" × 11")' },
-            'a4': { width: 8.27, height: 11.69, label: 'A4 (8.27" × 11.69")' },
-            'legal': { width: 8.5, height: 14, label: 'Legal (8.5" × 14")' }
-        };
         
         var searchInput = document.getElementById('searchInput');
         var searchResults = document.getElementById('searchResults');
@@ -424,40 +398,6 @@
             return check.toString();
         }
         
-        function calculateGrid(paperSize) {
-            var paper = paperSizes[paperSize];
-            var pxPerInch = 96;
-            
-            // Try landscape orientation first (1.5" × 1")
-            var landscapeCols = Math.floor(paper.width / labelWidthLandscape);
-            var landscapeRows = Math.floor(paper.height / labelHeightLandscape);
-            var landscapeTotal = landscapeCols * landscapeRows;
-            
-            // Try portrait orientation (1" × 1.5")
-            var portraitCols = Math.floor(paper.width / labelWidthPortrait);
-            var portraitRows = Math.floor(paper.height / labelHeightPortrait);
-            var portraitTotal = portraitCols * portraitRows;
-            
-            // Prioritize landscape unless portrait fits significantly better (20% more labels)
-            var usePortrait = portraitTotal > landscapeTotal * 1.2;
-            
-            var cols = usePortrait ? portraitCols : landscapeCols;
-            var rows = usePortrait ? portraitRows : landscapeRows;
-            var total = cols * rows;
-            
-            var labelWidth = usePortrait ? labelWidthPortrait * pxPerInch : labelWidthLandscape * pxPerInch;
-            var labelHeight = usePortrait ? labelHeightPortrait * pxPerInch : labelHeightLandscape * pxPerInch;
-            
-            return {
-                cols: cols,
-                rows: rows,
-                total: total,
-                labelWidth: Math.round(labelWidth),
-                labelHeight: Math.round(labelHeight),
-                usePortrait: usePortrait
-            };
-        }
-        
         function renderPreview() {
             var area = document.getElementById('previewArea');
             if (!queue.length) {
@@ -465,19 +405,16 @@
                 return;
             }
             
-            var paperSize = document.getElementById('paperSize').value;
             var barcodeType = document.getElementById('barcodeType').value;
-            var grid = calculateGrid(paperSize);
-            var barcodeHeight = Math.round(grid.labelHeight * 0.4);
             
-            var html = '<div class="preview-grid" style="grid-template-columns:repeat(' + grid.cols + ',' + grid.labelWidth + 'px)">';
+            // Preview shows a simple grid of labels
+            var html = '<div class="preview-grid" style="grid-template-columns:repeat(auto-fill, 144px)">';
             
             queue.forEach(function(q) {
                 var prepared = prepareBarcodeData(q.sku, barcodeType);
                 for (var c = 0; c < q.copies; c++) {
-                    var rotateStyle = grid.usePortrait ? 'transform:rotate(90deg);' : '';
-                    html += '<div class="preview-label" style="width:' + grid.labelWidth + 'px;height:' + grid.labelHeight + 'px">';
-                    html += '<svg id="pv-' + q.id + '-' + c + '" style="' + rotateStyle + '"></svg>';
+                    html += '<div class="preview-label" style="width:144px;height:96px">';
+                    html += '<svg id="pv-' + q.id + '-' + c + '"></svg>';
                     html += '<div class="pl-sku">' + q.sku + '</div>';
                     if (prepared.warning) {
                         html += '<div class="pl-warn">' + prepared.warning + '</div>';
@@ -498,7 +435,7 @@
                             JsBarcode('#pv-' + q.id + '-' + c, prepared.data, {
                                 format: barcodeType,
                                 width: 2,
-                                height: barcodeHeight,
+                                height: 38,
                                 fontSize: 8,
                                 margin: 2,
                                 textMargin: 1,
@@ -533,11 +470,7 @@
                 return;
             }
             
-            var paperSize = document.getElementById('paperSize').value;
             var barcodeType = document.getElementById('barcodeType').value;
-            var paper = paperSizes[paperSize];
-            var grid = calculateGrid(paperSize);
-            var barcodeHeight = Math.round(grid.labelHeight * 0.4);
             
             var pa = document.getElementById('printArea');
             pa.innerHTML = '';
@@ -549,73 +482,53 @@
                 }
             });
             
-            var totalPages = Math.ceil(allLabels.length / grid.total);
+            // Create a single page div with CSS grid that auto-fills
+            var pageDiv = document.createElement('div');
+            pageDiv.className = 'print-page';
             
-            for (var pageNum = 0; pageNum < totalPages; pageNum++) {
-                var pageDiv = document.createElement('div');
-                pageDiv.className = 'print-page';
-                pageDiv.style.width = paper.width + 'in';
-                pageDiv.style.height = paper.height + 'in';
-                pageDiv.style.gridTemplateColumns = 'repeat(' + grid.cols + ', 1fr)';
-                pageDiv.style.gridTemplateRows = 'repeat(' + grid.rows + ', 1fr)';
+            allLabels.forEach(function(label, i) {
+                var div = document.createElement('div');
+                div.className = 'print-label';
                 
-                var startIdx = pageNum * grid.total;
-                var endIdx = Math.min(startIdx + grid.total, allLabels.length);
+                var svgId = 'pl-' + i;
+                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('id', svgId);
+                div.appendChild(svg);
                 
-                for (var i = startIdx; i < endIdx; i++) {
-                    var label = allLabels[i];
-                    var div = document.createElement('div');
-                    div.className = 'print-label';
-                    
-                    var svgId = 'pl-' + pageNum + '-' + i;
-                    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                    svg.setAttribute('id', svgId);
-                    if (grid.usePortrait) {
-                        svg.style.transform = 'rotate(90deg)';
-                    }
-                    div.appendChild(svg);
-                    
-                    var skuDiv = document.createElement('div');
-                    skuDiv.className = 'pl-sku';
-                    skuDiv.textContent = label.sku;
-                    div.appendChild(skuDiv);
-                    
-                    var nameDiv = document.createElement('div');
-                    nameDiv.className = 'pl-name';
-                    nameDiv.textContent = label.name;
-                    div.appendChild(nameDiv);
-                    
-                    pageDiv.appendChild(div);
-                }
+                var skuDiv = document.createElement('div');
+                skuDiv.className = 'pl-sku';
+                skuDiv.textContent = label.sku;
+                div.appendChild(skuDiv);
                 
-                pa.appendChild(pageDiv);
-            }
+                var nameDiv = document.createElement('div');
+                nameDiv.className = 'pl-name';
+                nameDiv.textContent = label.name;
+                div.appendChild(nameDiv);
+                
+                pageDiv.appendChild(div);
+            });
+            
+            pa.appendChild(pageDiv);
             
             setTimeout(function() {
-                for (var pageNum = 0; pageNum < totalPages; pageNum++) {
-                    var startIdx = pageNum * grid.total;
-                    var endIdx = Math.min(startIdx + grid.total, allLabels.length);
+                allLabels.forEach(function(label, i) {
+                    var svgId = 'pl-' + i;
+                    var prepared = prepareBarcodeData(label.sku, barcodeType);
                     
-                    for (var i = startIdx; i < endIdx; i++) {
-                        var label = allLabels[i];
-                        var svgId = 'pl-' + pageNum + '-' + i;
-                        var prepared = prepareBarcodeData(label.sku, barcodeType);
-                        
-                        try {
-                            JsBarcode('#' + svgId, prepared.data, {
-                                format: barcodeType,
-                                width: 2,
-                                height: barcodeHeight,
-                                fontSize: 8,
-                                margin: 2,
-                                textMargin: 1,
-                                displayValue: false
-                            });
-                        } catch (e) {
-                            console.error('Print error for', label.sku, e);
-                        }
+                    try {
+                        JsBarcode('#' + svgId, prepared.data, {
+                            format: barcodeType,
+                            width: 2,
+                            height: 38,
+                            fontSize: 8,
+                            margin: 2,
+                            textMargin: 1,
+                            displayValue: false
+                        });
+                    } catch (e) {
+                        console.error('Print error for', label.sku, e);
                     }
-                }
+                });
                 
                 setTimeout(function() {
                     window.print();

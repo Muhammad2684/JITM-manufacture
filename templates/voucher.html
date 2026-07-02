@@ -41,8 +41,10 @@
 
         <div class="s">
             <div>
-                <span class="l">Employee:</span> {{employee.name}}<br>
-                <span class="l">Nickname:</span> {{employee.nickname or '—'}}<br>
+                <span class="l">Name:</span> {{employee.name}}<br>
+                <span class="l">Father's Name:</span> {{employee.father_name or '—'}}<br>
+                <span class="l">CNIC:</span> {{employee.cnic or '—'}}<br>
+                <span class="l">Phone:</span> {{employee.phone or '—'}}<br>
                 <span class="l">Salary:</span> Rs {{'%.2f'|format(employee.salary or 0)}}
             </div>
             <div style="text-align:right">

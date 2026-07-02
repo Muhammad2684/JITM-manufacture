@@ -5,6 +5,10 @@ from routes.auth import login_required
 payroll_bp = Blueprint('payroll', __name__, url_prefix='/api')
 
 
+def fmt(v):
+    return float(v or 0)
+
+
 @payroll_bp.route('/employees')
 @login_required
 def list_employees():
@@ -12,7 +16,8 @@ def list_employees():
     with get_db() as db:
         if month:
             rows = db.execute('''
-                SELECT e.id, e.name, e.nickname, e.salary,
+                SELECT e.id, e.name, e.nickname, e.father_name, e.cnic, e.phone,
+                       e.salary, e.leaves, e.absents, e.overtime, e.advance,
                        COALESCE((
                            SELECT SUM(si.commission)
                            FROM sale_items si
@@ -39,8 +44,12 @@ def add_employee():
         return jsonify({'error': 'Name is required'}), 400
     with get_db() as db:
         db.execute(
-            'INSERT INTO employees (name, nickname, salary, commissions) VALUES (?,?,?,?)',
-            (d['name'], d.get('nickname', '') or '', float(d.get('salary', 0) or 0), float(d.get('commissions', 0) or 0))
+            '''INSERT INTO employees (name, nickname, father_name, cnic, phone, salary, commissions, leaves, absents, overtime, advance)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+            (d['name'], d.get('nickname', '') or '', d.get('father_name', '') or '',
+             d.get('cnic', '') or '', d.get('phone', '') or '',
+             fmt(d.get('salary')), fmt(d.get('commissions')),
+             fmt(d.get('leaves')), fmt(d.get('absents')), fmt(d.get('overtime')), fmt(d.get('advance')))
         )
     return jsonify({'ok': True})
 
@@ -53,8 +62,12 @@ def update_employee(eid):
         return jsonify({'error': 'No data'}), 400
     with get_db() as db:
         db.execute(
-            'UPDATE employees SET name=?, nickname=?, salary=?, commissions=? WHERE id=?',
-            (d['name'], d.get('nickname', '') or '', float(d.get('salary', 0) or 0), float(d.get('commissions', 0) or 0), eid)
+            '''UPDATE employees SET name=?, nickname=?, father_name=?, cnic=?, phone=?,
+               salary=?, commissions=?, leaves=?, absents=?, overtime=?, advance=? WHERE id=?''',
+            (d['name'], d.get('nickname', '') or '', d.get('father_name', '') or '',
+             d.get('cnic', '') or '', d.get('phone', '') or '',
+             fmt(d.get('salary')), fmt(d.get('commissions')),
+             fmt(d.get('leaves')), fmt(d.get('absents')), fmt(d.get('overtime')), fmt(d.get('advance')), eid)
         )
     return jsonify({'ok': True})
 

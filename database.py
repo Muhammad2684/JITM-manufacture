@@ -289,6 +289,35 @@ def init_db():
             pass
 
         try:
+            db.execute('ALTER TABLE employees ADD COLUMN father_name TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE employees ADD COLUMN cnic TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE employees ADD COLUMN phone TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE employees ADD COLUMN leaves REAL NOT NULL DEFAULT 0')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE employees ADD COLUMN absents REAL NOT NULL DEFAULT 0')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE employees ADD COLUMN overtime REAL NOT NULL DEFAULT 0')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE employees ADD COLUMN advance REAL NOT NULL DEFAULT 0')
+        except Exception:
+            pass
+
+        try:
             db.execute('ALTER TABLE purchase_invoices ADD COLUMN description TEXT DEFAULT \'\'')
         except Exception:
             pass

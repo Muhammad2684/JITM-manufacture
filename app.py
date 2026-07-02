@@ -13,6 +13,42 @@ from routes.summary import summary_bp
 from routes.categories import cat_bp
 from routes.sizes import sizes_bp
 from routes.purchase_invoices import pi_bp
+
+ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+        'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+        'Seventeen', 'Eighteen', 'Nineteen']
+TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+
+def num_to_words(n):
+    if n == 0:
+        return 'Zero'
+    def under_1000(x):
+        s = ''
+        if x >= 100:
+            s += ONES[x // 100] + ' Hundred '
+            x %= 100
+        if x >= 20:
+            s += TENS[x // 10] + ' '
+            x %= 10
+        if x > 0:
+            s += ONES[x] + ' '
+        return s.strip()
+    result = ''
+    if n >= 10000000:
+        result += under_1000(n // 10000000) + ' Crore '
+        n %= 10000000
+    if n >= 100000:
+        result += under_1000(n // 100000) + ' Lakh '
+        n %= 100000
+    if n >= 1000:
+        result += under_1000(n // 1000) + ' Thousand '
+        n %= 1000
+    if n >= 100:
+        result += under_1000(n // 100) + ' Hundred '
+        n %= 100
+    if n > 0:
+        result += under_1000(n)
+    return result.strip()
 from routes.accounts import acc_bp
 from routes.transactions import txn_bp
 from routes.ledger import ledger_bp
@@ -182,7 +218,7 @@ def payroll():
 @login_required
 @permission_required('staff')
 def payroll_voucher(eid):
-    """Print commission voucher for an employee in a given month."""
+    """Commission details for an employee in a given month."""
     month = request.args.get('month', '')
     from database import get_db
     with get_db() as db:
@@ -211,6 +247,40 @@ def payroll_voucher(eid):
     return render_template('voucher.html',
                            employee=emp, month=month, sales=sales,
                            total_commission=total_commission, name=session['name'])
+
+
+@app.route('/payroll/print/<int:eid>', strict_slashes=False)
+@login_required
+@permission_required('staff')
+def payroll_print(eid):
+    """Printable salary slip for an employee in a given month."""
+    month = request.args.get('month', '')
+    from database import get_db
+    with get_db() as db:
+        emp = db.execute('SELECT * FROM employees WHERE id=? AND active=1', (eid,)).fetchone()
+        if not emp:
+            return 'Employee not found', 404
+        emp = dict(emp)
+
+        commission = 0
+        if month:
+            row = db.execute('''
+                SELECT COALESCE(SUM(si.commission),0) as total
+                FROM sale_items si
+                JOIN sales s ON s.id = si.sale_id
+                WHERE si.staff_id = ?
+                  AND strftime('%Y-%m', s.created_at) = ?
+            ''', (eid, month)).fetchone()
+            commission = row['total'] if row else 0
+
+        total = (emp['salary'] or 0) + (commission or 0) + (emp['overtime'] or 0) - (emp['advance'] or 0)
+        total_words = num_to_words(abs(int(total))) + (' Rupees' if total >= 0 else ' Negative Rupees')
+
+    return render_template('print_voucher.html',
+                           employee=emp, month=month,
+                           commission=commission,
+                           total=total, total_words=total_words,
+                           name=session['name'])
 
 
 @app.route('/accounts', strict_slashes=False)

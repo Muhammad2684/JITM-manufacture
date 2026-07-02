@@ -13,13 +13,15 @@ def list_employees():
         if month:
             rows = db.execute('''
                 SELECT e.id, e.name, e.nickname, e.salary,
-                       COALESCE(SUM(si.commission), 0) as commissions
+                       COALESCE((
+                           SELECT SUM(si.commission)
+                           FROM sale_items si
+                           JOIN sales s ON s.id = si.sale_id
+                           WHERE si.staff_id = e.id
+                             AND strftime('%Y-%m', s.created_at) = ?
+                       ), 0) as commissions
                 FROM employees e
-                LEFT JOIN sale_items si ON si.staff_id = e.id
-                LEFT JOIN sales s ON s.id = si.sale_id
-                    AND strftime('%%Y-%%m', s.created_at) = ?
                 WHERE e.active = 1
-                GROUP BY e.id
                 ORDER BY e.name
             ''', (month,)).fetchall()
         else:

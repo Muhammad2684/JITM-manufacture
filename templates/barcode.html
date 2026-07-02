@@ -33,7 +33,10 @@
         .queue-item:last-child { border-bottom: none; }
         .queue-item .qi-name { flex: 1; font-weight: 600; }
         .queue-item .qi-sku { color: #3b4fe2; font-family: monospace; }
-        .queue-item .qi-copies { color: #6b7280; min-width: 36px; text-align: center; }
+        .queue-item .qi-copies-input {
+            width: 46px; padding: 2px 4px; border: 1px solid #e2e1de;
+            border-radius: 4px; font-size: 12px; text-align: center;
+        }
         .queue-item .qi-remove {
             color: #dc2626; cursor: pointer; font-size: 14px;
             padding: 2px 6px; background: none; border: none;
@@ -117,6 +120,7 @@
                 align-items: center;
                 justify-content: center;
                 box-sizing: border-box;
+                break-inside: avoid;
             }
             .print-label svg {
                 display: block;
@@ -177,10 +181,6 @@
                         <div class="card-body">
                             <div class="controls">
                                 <div>
-                                    <label>Copies</label>
-                                    <input type="number" id="copies" value="1" min="1" max="100" onchange="renderPreview()">
-                                </div>
-                                <div>
                                     <label>Orientation</label>
                                     <select id="orientation" onchange="renderPreview()">
                                         <option value="landscape" selected>1.5" × 1" (Landscape)</option>
@@ -188,13 +188,8 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label>Gap</label>
-                                    <select id="gap" onchange="renderPreview()">
-                                        <option value="0">No Gap</option>
-                                        <option value="2" selected>Small (2px)</option>
-                                        <option value="4">Medium (4px)</option>
-                                        <option value="8">Large (8px)</option>
-                                    </select>
+                                    <label>Gap (px)</label>
+                                    <input type="number" id="gap" value="2" min="0" max="20" onchange="renderPreview()">
                                 </div>
                                 <div>
                                     <label>Barcode Type</label>
@@ -309,7 +304,7 @@
         function addToQueue(vid, sku, name, variant) {
             var existing = queue.find(function(q) { return q.sku === sku; });
             if (existing) {
-                existing.copies += parseInt(document.getElementById('copies').value) || 1;
+                existing.copies += 1;
             } else {
                 queue.push({
                     id: queueId++,
@@ -317,7 +312,7 @@
                     sku: sku,
                     name: name,
                     variant: variant,
-                    copies: parseInt(document.getElementById('copies').value) || 1
+                    copies: 1
                 });
             }
             closeSearch();
@@ -350,10 +345,18 @@
                 return '<div class="queue-item">' +
                     '<span class="qi-name">' + q.name + '</span>' +
                     '<span class="qi-sku">' + q.sku + '</span>' +
-                    '<span class="qi-copies">x' + q.copies + '</span>' +
+                    '<input class="qi-copies-input" type="number" value="' + q.copies + '" min="1" max="999" onchange="updateCopies(' + q.id + ',this.value)">' +
                     '<button class="qi-remove" onclick="removeFromQueue(' + q.id + ')">&times;</button>' +
                     '</div>';
             }).join('');
+        }
+        
+        function updateCopies(id, val) {
+            var item = queue.find(function(q) { return q.id === id; });
+            if (item) {
+                item.copies = parseInt(val) || 1;
+                renderPreview();
+            }
         }
         
         function prepareBarcodeData(sku, barcodeType) {

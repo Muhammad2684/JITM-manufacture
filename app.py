@@ -16,6 +16,7 @@ from routes.purchase_invoices import pi_bp
 from routes.accounts import acc_bp
 from routes.transactions import txn_bp
 from routes.ledger import ledger_bp
+from routes.payroll import payroll_bp
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-change-in-prod')
@@ -34,6 +35,7 @@ app.register_blueprint(pi_bp)
 app.register_blueprint(acc_bp)
 app.register_blueprint(txn_bp)
 app.register_blueprint(ledger_bp)
+app.register_blueprint(payroll_bp)
 
 
 def render_sidebar(active_page):
@@ -84,7 +86,7 @@ def render_sidebar(active_page):
             {'url': '/accounts/transfers', 'label': 'Inter Account Transfers'},
         ]},
         {'url': '/staff', 'label': 'User Accounts', 'permission': 'staff'},
-        {'url': '/payroll', 'label': 'Payroll', 'permission': 'staff'},
+        {'url': '/payroll', 'label': 'Payroll', 'permission': 'payroll'},
         {'url': '/summary', 'label': 'Summary', 'permission': 'summary'},
     ]
     

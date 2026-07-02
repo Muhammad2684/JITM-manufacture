@@ -250,6 +250,15 @@ def init_db():
                 unit_price REAL NOT NULL DEFAULT 0,
                 total REAL NOT NULL DEFAULT 0
             );
+
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                nickname TEXT DEFAULT '',
+                salary REAL NOT NULL DEFAULT 0,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
         ''')
 
         # migrations

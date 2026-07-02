@@ -95,6 +95,8 @@
         
         .print-area { display: none; }
         
+        body .main { margin-left: 0; }
+        
         @media print {
             @page { margin: 0; }
             body * { visibility: hidden !important; }
@@ -143,7 +145,6 @@
     </style>
 </head>
 <body>
-    {{sidebar|safe}}
     <div class="main">
         <div class="topbar">
             <h2>Barcode Generator</h2>

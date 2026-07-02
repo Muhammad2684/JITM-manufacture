@@ -54,8 +54,10 @@
         .preview-label {
             border: 1px solid #e2e1de; border-radius: 4px; padding: 6px;
             text-align: center; background: #fff;
+            box-sizing: border-box; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        .preview-label svg { display: block; margin: 0 auto; }
+        .preview-label svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
         .preview-label .pl-sku { font-size: 10px; font-weight: 700; font-family: monospace; margin-top: 2px; }
         .preview-label .pl-name { font-size: 8px; color: #6b7280; margin-top: 1px; }
         .preview-label .pl-warn { font-size: 8px; color: #d97706; margin-top: 1px; font-style: italic; }
@@ -400,14 +402,16 @@
             
             queue.forEach(function(q) {
                 var prepared = prepareBarcodeData(q.sku, barcodeType);
-                html += '<div class="preview-label" style="width:' + dims.width + 'px;height:' + dims.height + 'px">';
-                html += '<svg id="pv-' + q.id + '"></svg>';
-                html += '<div class="pl-sku">' + q.sku + '</div>';
-                if (prepared.warning) {
-                    html += '<div class="pl-warn">' + prepared.warning + '</div>';
+                for (var c = 0; c < q.copies; c++) {
+                    html += '<div class="preview-label" style="width:' + dims.width + 'px;height:' + dims.height + 'px">';
+                    html += '<svg id="pv-' + q.id + '-' + c + '"></svg>';
+                    html += '<div class="pl-sku">' + q.sku + '</div>';
+                    if (prepared.warning) {
+                        html += '<div class="pl-warn">' + prepared.warning + '</div>';
+                    }
+                    html += '<div class="pl-name">' + q.name + '</div>';
+                    html += '</div>';
                 }
-                html += '<div class="pl-name">' + q.name + '</div>';
-                html += '</div>';
             });
             
             html += '</div>';
@@ -416,21 +420,23 @@
             setTimeout(function() {
                 queue.forEach(function(q) {
                     var prepared = prepareBarcodeData(q.sku, barcodeType);
-                    try {
-                        JsBarcode('#pv-' + q.id, prepared.data, {
-                            format: barcodeType,
-                            width: 2,
-                            height: barcodeHeight,
-                            fontSize: 10,
-                            margin: 4,
-                            textMargin: 2,
-                            displayValue: false
-                        });
-                    } catch (e) {
-                        console.error('Preview error for', q.sku, e);
-                        var svg = document.getElementById('pv-' + q.id);
-                        if (svg) {
-                            svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#dc2626" font-size="12">Error</text>';
+                    for (var c = 0; c < q.copies; c++) {
+                        try {
+                            JsBarcode('#pv-' + q.id + '-' + c, prepared.data, {
+                                format: barcodeType,
+                                width: 2,
+                                height: barcodeHeight,
+                                fontSize: 10,
+                                margin: 4,
+                                textMargin: 2,
+                                displayValue: false
+                            });
+                        } catch (e) {
+                            console.error('Preview error for', q.sku, e);
+                            var svg = document.getElementById('pv-' + q.id + '-' + c);
+                            if (svg) {
+                                svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#dc2626" font-size="12">Error</text>';
+                            }
                         }
                     }
                 });

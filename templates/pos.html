@@ -238,7 +238,7 @@
             else if (e.key === 'ArrowUp') { e.preventDefault(); hlIdx = Math.max(hlIdx - 1, 0); highlight(items); }
             else if (e.key === 'Enter') {
                 if (scMode) { scanBarcode(e.target.value); }
-                else if (hlIdx >= 0 && hlIdx < items.length) { var it = items[hlIdx]; add(parseInt(it.dataset.vid), parseFloat(it.dataset.price)); }
+                else if (items.length) { var idx = hlIdx >= 0 ? hlIdx : 0; var it = items[idx]; add(parseInt(it.dataset.vid), parseFloat(it.dataset.price)); }
                 else if (e.target.value.length >= 1) search();
             }
         });
@@ -256,7 +256,7 @@
                 else { f('No product found'); }
             }).catch(function () { f('Search failed'); });
         }
-        function search() { fetch('/api/products/search?q=' + encodeURIComponent(document.getElementById('s').value)).then(function (r) { return r.json() }).then(function (d) { allP = d; renderP(d) }).catch(function () { allP = []; }); }
+        function search() { fetch('/api/products/search?q=' + encodeURIComponent(document.getElementById('s').value)).then(function (r) { if (!r.ok) throw Error(r.status); return r.json() }).then(function (d) { allP = d; renderP(d) }).catch(function () { allP = []; f('Search failed'); }); }
         function renderP(l) {
             var g = document.getElementById('prods'); hlIdx = -1; if (!l.length) { g.style.display = 'none'; g.innerHTML = ''; return; }
             g.style.display = 'block'; g.innerHTML = l.map(function (p, i) { var pr = p.price || 0; return '<div class="pd-item" data-vid="' + p.vid + '" data-price="' + pr + '"><div class="pd-name">' + p.name + '</div><div class="pd-detail">' + (p.size || '') + ' ' + (p.color || '') + ' | ' + p.sku + ' &middot; ' + p.stock + ' in stock</div><div class="pd-price">Rs ' + pr.toFixed(2) + '</div></div>'; }).join('');

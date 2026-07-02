@@ -55,10 +55,10 @@
                 <tr><td class="c">1</td><td>Salary</td><td class="r">{{'%.2f'|format(employee.salary or 0)}}</td></tr>
                 <tr><td class="c">2</td><td>Commission</td><td class="r">{{'%.2f'|format(commission or 0)}}</td></tr>
                 {% if overtime_count > 0 %}
-                <tr><td class="c">3</td><td>Overtime ({{'%.0f'|format(overtime_count)}} day{{'s' if overtime_count != 1}} &times; Rs {{'%.2f'|format(ds)}})</td><td class="r">{{'%.2f'|format(overtime_pay)}}</td></tr>
+                <tr><td class="c">3</td><td>Overtime {{'%.0f'|format(overtime_count)}} day{{'s' if overtime_count != 1}} &times; Rs {{'%.2f'|format(ds)}}</td><td class="r">{{'%.2f'|format(overtime_pay)}}</td></tr>
                 {% endif %}
                 {% if absent_count > 0 %}
-                <tr><td class="c">4</td><td>Absent Deduction ({{'%.0f'|format(absent_count)}} day{{'s' if absent_count != 1}} &times; Rs {{'%.2f'|format(ds)}})</td><td class="r">{{'%.2f'|format(absent_deduction)}}</td></tr>
+                <tr><td class="c">4</td><td>Absent Deduction {{'%.0f'|format(absent_count)}} day{{'s' if absent_count != 1}} &times; Rs {{'%.2f'|format(ds)}}</td><td class="r">{{'%.2f'|format(absent_deduction)}}</td></tr>
                 {% endif %}
                 <tr><td class="c">5</td><td>Advance</td><td class="r">({{'%.2f'|format(employee.advance or 0)}})</td></tr>
             </tbody>

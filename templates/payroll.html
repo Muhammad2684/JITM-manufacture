@@ -245,19 +245,32 @@
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     atData = {};
-                    (d || []).forEach(function(a) { atData[a.date] = a.status; });
-                    // Auto-mark past Sundays as "off" if not already set
+                    var existing = {};
+                    (d || []).forEach(function(a) { atData[a.date] = a.status; existing[a.date] = true; });
+                    // Auto-insert present/off defaults for all past days not yet recorded
                     var parts = month.split('-');
                     var year = parseInt(parts[0]), mon = parseInt(parts[1]);
                     var daysInMonth = new Date(year, mon, 0).getDate();
                     var today = pktToday();
+                    var batch = [];
                     for (var d = 1; d <= daysInMonth; d++) {
                         var ds = month + '-' + (d < 10 ? '0' : '') + d;
-                        if (ds > today) continue;
+                        if (ds > today || existing[ds]) continue;
                         var dt = new Date(year, mon - 1, d);
-                        if (dt.getDay() === 0 && !atData[ds]) {
-                            atData[ds] = 'off';
-                        }
+                        var status = dt.getDay() === 0 ? 'off' : 'present';
+                        atData[ds] = status;
+                        batch.push({employee_id: atEmpId, date: ds, status: status});
+                    }
+                    if (batch.length) {
+                        fetch('/api/attendance/batch', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(batch)
+                        });
+                    }
+                    renderCalendar(month);
+                });
+        }
                     }
                     renderCalendar(month);
                 });

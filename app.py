@@ -287,16 +287,22 @@ def payroll_print(eid):
         else:
             at = []
         at_counts = {r['status']: r['cnt'] for r in at}
-        leaves = at_counts.get('leave', 0) + at_counts.get('half-day', 0) * 0.5
+        absent_count = at_counts.get('absent', 0) + at_counts.get('half-day', 0) * 0.5
+        overtime_count = at_counts.get('overtime', 0)
 
-        total = (emp['salary'] or 0) + (commission or 0) + (emp['overtime'] or 0) - (emp['advance'] or 0)
+        ds = (emp['salary'] or 0) * 12 / 365
+        absent_deduction = absent_count * ds
+        overtime_pay = overtime_count * ds
+
+        total = (emp['salary'] or 0) + (commission or 0) + overtime_pay - (emp['advance'] or 0) - absent_deduction
         total_words = num_to_words(abs(int(total))) + (' Rupees' if total >= 0 else ' Negative Rupees')
 
     return render_template('print_voucher.html',
                            employee=emp, month=month,
-                           commission=commission,
+                           commission=commission, ds=ds,
+                           absent_count=absent_count, absent_deduction=absent_deduction,
+                           overtime_count=overtime_count, overtime_pay=overtime_pay,
                            total=total, total_words=total_words,
-                           leaves=leaves, absents=at_counts.get('absent', 0),
                            name=session['name'])
 
 

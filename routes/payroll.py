@@ -105,7 +105,26 @@ def upsert_attendance():
         db.execute(
             '''INSERT INTO attendance (employee_id, date, status)
                VALUES (?,?,?)
-               ON CONFLICT(employee_id, date) DO UPDATE SET status=excluded.status''',
+                ON CONFLICT(employee_id, date) DO UPDATE SET status=excluded.status''',
             (d['employee_id'], d['date'], d['status'])
         )
+    return jsonify({'ok': True})
+
+
+@payroll_bp.route('/attendance/batch', methods=['POST'])
+@login_required
+def batch_attendance():
+    data = request.get_json()
+    if not data or not isinstance(data, list):
+        return jsonify({'error': 'Array of {employee_id, date, status} expected'}), 400
+    with get_db() as db:
+        for d in data:
+            if not d.get('employee_id') or not d.get('date') or not d.get('status'):
+                continue
+            db.execute(
+                '''INSERT INTO attendance (employee_id, date, status)
+                   VALUES (?,?,?)
+                   ON CONFLICT(employee_id, date) DO UPDATE SET status=excluded.status''',
+                (d['employee_id'], d['date'], d['status'])
+            )
     return jsonify({'ok': True})

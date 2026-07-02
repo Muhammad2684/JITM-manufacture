@@ -52,9 +52,11 @@
             <h2 id="ft">Product</h2>
             <form onsubmit="save(event)">
                 <label>Name</label><input id="pn" required>
-                <label>Size</label>
-                <select id="psize" onchange="sizePicker()"></select>
-                <input id="psize_new" style="display:none" placeholder="New size name">
+                <div style="max-width:220px">
+                    <label>Size</label>
+                    <select id="psize" onchange="sizePicker()"></select>
+                    <input id="psize_new" style="display:none" placeholder="New size name">
+                </div>
                 <div class="form-row">
                     <div>
                         <label>SKU</label>

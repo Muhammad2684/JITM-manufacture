@@ -75,6 +75,10 @@
                     <div><label>Price (Rs)</label><input id="pp" type="number" step="0.01" required></div>
                     <div><label>Low Stock Alert</label><input id="pl" type="number" value="5"></div>
                 </div>
+                <div class="form-row" id="pos_row">
+                    <div><label>Opening Stock</label><input id="pos" type="number" min="0" value="0"></div>
+                    <div></div>
+                </div>
                 <div class="form-row">
                     <div><label>Category</label><select id="pcat" onchange="categoryPicker()"></select><input id="pcat_new" style="display:none" placeholder="New category name"></div>
                     <div><label>Commission Class</label><select id="pcc" onchange="commissionPicker()"></select><input id="pcc_new" style="display:none" placeholder="New class name"></div>
@@ -255,6 +259,7 @@
         function showAdd() {
             editing = null; document.getElementById('ft').textContent = 'New Product';
             document.getElementById('pa').checked = true; document.getElementById('ps').disabled = true; document.getElementById('ps').value = ''; autoSku(true);
+            document.getElementById('pos').value = 0; document.getElementById('pos_row').style.display = '';
             document.getElementById('psize').style.display = ''; document.getElementById('psize_new').style.display = 'none';
             populateSizes(); document.getElementById('psize').value = '';
             document.getElementById('pcat').style.display = ''; document.getElementById('pcat_new').style.display = 'none';
@@ -265,6 +270,7 @@
         }
         function edit(id) {
             const p = all.find(x => x.id === id); if (!p) return; editing = id; document.getElementById('ft').textContent = 'Edit ' + p.name;
+            document.getElementById('pos_row').style.display = 'none';
             document.getElementById('pn').value = p.name; document.getElementById('ps').value = p.sku; document.getElementById('pb').value = p.barcode || '';
             document.getElementById('pp').value = p.base_price; document.getElementById('pc').value = p.cost_price;
             var ec = p.cost_price || 0, ep = p.base_price || 0;
@@ -324,7 +330,7 @@
                 name: document.getElementById('pn').value, sku: document.getElementById('ps').value, barcode: document.getElementById('pb').value || null,
                 base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
                 commission_class: commission_class || null,
-                low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0,
+                low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: document.getElementById('pos').value || 0,
                 size: psize || ''
             };
             if (cat && !catList.some(c => c.name === cat)) {

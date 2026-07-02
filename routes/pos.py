@@ -258,6 +258,18 @@ def complete_sale():
                  sale_item['variant_label'], sale_item['sku'], sale_item['quantity'], sale_item['price'],
                  sale_item['total'], sale_item['is_return'], sale_item['staff_id'], sale_item['cost_price'])
             )
+            
+            # Calculate and add commission if a staff member is assigned
+            if sale_item['staff_id']:
+                prod = db.execute('SELECT commission_class FROM products WHERE id=?', (sale_item['product_id'],)).fetchone()
+                if prod and prod['commission_class']:
+                    cc = db.execute('SELECT percentage FROM commission_classes WHERE name=?', (prod['commission_class'],)).fetchone()
+                    if cc and cc['percentage']:
+                        commission = abs(sale_item['total']) * cc['percentage'] / 100
+                        if commission > 0:
+                            multiplier = -1 if is_return else 1
+                            db.execute('UPDATE employees SET commissions=commissions+? WHERE id=?',
+                                       (commission * multiplier, sale_item['staff_id']))
         
         recorded_amount = record_payments(db, sale_id, payment_list, is_return, customer_id, receipt_number)
         

@@ -287,13 +287,6 @@
                         </div>
                         <div class="card-body" id="pnl-items"></div>
                     </div>
-                    <div class="manager-card">
-                        <div class="card-header">
-                            <span>Drawings</span>
-                            <span id="drawings-total">0.00</span>
-                        </div>
-                        <div class="card-body" id="drawings-items"></div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -376,8 +369,13 @@
                     }).join('');
                     h += activeRow('Total Expenses', pnl.total_expenses, 'total_expenses');
                     
+                    var dw = pnl.drawings || {};
+                    h += '<div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 4px">Drawings</div>';
+                    h += activeRow('P1', dw.p1 || 0, 'drawing_p1');
+                    h += activeRow('P2', dw.p2 || 0, 'drawing_p2');
+                    
                     document.getElementById('pnl-items').innerHTML = h;
-                    document.getElementById('pnl-total').textContent = fmt(pnl.net_profit);
+                    document.getElementById('pnl-total').textContent = fmt(pnl.net_profit - (dw.p1 || 0) - (dw.p2 || 0));
                     
                     var dw = pnl.drawings || {};
                     document.getElementById('drawings-total').textContent = fmt((dw.p1 || 0) + (dw.p2 || 0));

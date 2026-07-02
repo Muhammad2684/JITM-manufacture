@@ -83,8 +83,7 @@ def render_sidebar(active_page):
             {'url': '/accounts/receipts', 'label': 'Receipts'},
             {'url': '/accounts/transfers', 'label': 'Inter Account Transfers'},
         ]},
-        {'url': '/staff', 'label': 'Accounts', 'permission': 'staff'},
-        {'url': '/staff', 'label': 'Staff', 'permission': 'staff'},
+        {'url': '/staff', 'label': 'User Accounts', 'permission': 'staff'},
         {'url': '/summary', 'label': 'Summary', 'permission': 'summary'},
     ]
     

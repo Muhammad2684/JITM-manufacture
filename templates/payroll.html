@@ -288,8 +288,8 @@
                         var defaultStatus = isSunday ? 'off' : 'present';
                         var curStatus = atData[dateStr] || defaultStatus;
                         var isPast = (dateStr < today);
-                        var disabled = isFuture || (isPast && atData[dateStr] === undefined);
-                        html += '<td style="border:1px solid #ddd;padding:4px;vertical-align:top;' + (dateStr === today ? 'background:#fffde7' : '') + (isSunday ? 'background:#f3f4f6' : '') + '">';
+                        var disabled = isFuture;
+                        html += '<td style="border:1px solid #ddd;padding:4px;vertical-align:top;' + (dateStr === today ? 'background:#fffde7' : '') + (isSunday ? 'background:#f3f4f6' : '') + (isFuture ? 'background:#f9fafb' : '') + '">';
                         html += '<div style="font-weight:600;margin-bottom:3px;font-size:11px">' + day + '</div>';
                         html += '<select style="font-size:10px;padding:2px;width:100%;' + (disabled ? 'opacity:0.5' : '') + '" ' + (disabled ? 'disabled' : '') + ' data-date="' + dateStr + '" onchange="markAttendance(this)">';
                         STATUSES.forEach(function(s) {

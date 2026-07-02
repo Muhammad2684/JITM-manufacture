@@ -8,10 +8,24 @@ payroll_bp = Blueprint('payroll', __name__, url_prefix='/api')
 @payroll_bp.route('/employees')
 @login_required
 def list_employees():
+    month = request.args.get('month')
     with get_db() as db:
-        rows = db.execute(
-            'SELECT * FROM employees WHERE active=1 ORDER BY name'
-        ).fetchall()
+        if month:
+            rows = db.execute('''
+                SELECT e.id, e.name, e.nickname, e.salary,
+                       COALESCE(SUM(si.commission), 0) as commissions
+                FROM employees e
+                LEFT JOIN sale_items si ON si.staff_id = e.id
+                LEFT JOIN sales s ON s.id = si.sale_id
+                    AND strftime('%%Y-%%m', s.created_at) = ?
+                WHERE e.active = 1
+                GROUP BY e.id
+                ORDER BY e.name
+            ''', (month,)).fetchall()
+        else:
+            rows = db.execute(
+                'SELECT * FROM employees WHERE active=1 ORDER BY name'
+            ).fetchall()
     return jsonify([dict(r) for r in rows])
 
 

@@ -361,6 +361,11 @@ def init_db():
             pass
 
         try:
+            db.execute('ALTER TABLE sale_items ADD COLUMN commission REAL DEFAULT 0')
+        except Exception:
+            pass
+
+        try:
             db.execute('ALTER TABLE customers ADD COLUMN credit_limit REAL DEFAULT NULL')
         except Exception:
             pass

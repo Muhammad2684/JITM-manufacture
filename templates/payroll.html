@@ -18,7 +18,13 @@
         <div class="content">
             <div class="card">
                 <div class="card-body">
-                    <div class="search"><input id="s" placeholder="Search..." oninput="load()"></div>
+                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                        <div class="search" style="flex:1;min-width:180px"><input id="s" placeholder="Search..." oninput="load()"></div>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151">
+                            Month:
+                            <input id="m" type="month" onchange="load()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+                        </label>
+                    </div>
                     <div class="table-wrap">
                         <table>
                             <thead><tr>
@@ -57,10 +63,12 @@
     </div>
 
     <script>
-        var list = [], sortIdx = -1, sortDir = 1, editId = null;
+        var list = [], sortIdx = -1, sortDir = 1, editId = null, curMonth = new Date().toISOString().slice(0, 7);
 
         function load() {
-            fetch('/api/employees')
+            var m = document.getElementById('m').value || curMonth;
+            var url = m ? '/api/employees?month=' + encodeURIComponent(m) : '/api/employees';
+            fetch(url)
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     list = d;
@@ -169,6 +177,7 @@
 
         function cl(id) { document.getElementById(id).classList.remove('show'); }
 
+        document.getElementById('m').value = curMonth;
         load();
     </script>
 </body>

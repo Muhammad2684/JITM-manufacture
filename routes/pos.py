@@ -251,25 +251,26 @@ def complete_sale():
         
         for sale_item in sale_items:
             sale_item['sale_id'] = sale_id
-            db.execute(
-                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id, cost_price) '
-                'VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-                (sale_id, sale_item['product_id'], sale_item['variant_id'], sale_item['product_name'],
-                 sale_item['variant_label'], sale_item['sku'], sale_item['quantity'], sale_item['price'],
-                 sale_item['total'], sale_item['is_return'], sale_item['staff_id'], sale_item['cost_price'])
-            )
-            
-            # Calculate and add commission if a staff member is assigned
+            commission_val = 0
             if sale_item['staff_id']:
                 prod = db.execute('SELECT commission_class FROM products WHERE id=?', (sale_item['product_id'],)).fetchone()
                 if prod and prod['commission_class']:
                     cc = db.execute('SELECT percentage FROM commission_classes WHERE name=?', (prod['commission_class'],)).fetchone()
                     if cc and cc['percentage']:
-                        commission = abs(sale_item['total']) * cc['percentage'] / 100
-                        if commission > 0:
-                            multiplier = -1 if is_return else 1
-                            db.execute('UPDATE employees SET commissions=commissions+? WHERE id=?',
-                                       (commission * multiplier, sale_item['staff_id']))
+                        commission_val = abs(sale_item['total']) * cc['percentage'] / 100
+            
+            db.execute(
+                'INSERT INTO sale_items (sale_id, product_id, variant_id, product_name, variant_label, sku, quantity, price, total, is_return, staff_id, cost_price, commission) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                (sale_id, sale_item['product_id'], sale_item['variant_id'], sale_item['product_name'],
+                 sale_item['variant_label'], sale_item['sku'], sale_item['quantity'], sale_item['price'],
+                 sale_item['total'], sale_item['is_return'], sale_item['staff_id'], sale_item['cost_price'], commission_val)
+            )
+            
+            if commission_val > 0:
+                multiplier = -1 if is_return else 1
+                db.execute('UPDATE employees SET commissions=commissions+? WHERE id=?',
+                           (commission_val * multiplier, sale_item['staff_id']))
         
         recorded_amount = record_payments(db, sale_id, payment_list, is_return, customer_id, receipt_number)
         

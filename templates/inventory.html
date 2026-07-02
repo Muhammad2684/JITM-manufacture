@@ -52,12 +52,12 @@
             <h2 id="ft">Product</h2>
             <form onsubmit="save(event)">
                 <label>Name</label><input id="pn" required>
-                <div style="max-width:220px;display:inline-block">
-                    <label>Size</label>
-                    <select id="psize" onchange="sizePicker()"></select>
-                    <input id="psize_new" style="display:none" placeholder="New size name">
-                </div>
                 <div class="form-row">
+                    <div>
+                        <label>Size</label>
+                        <select id="psize" onchange="sizePicker()"></select>
+                        <input id="psize_new" style="display:none" placeholder="New size name">
+                    </div>
                     <div>
                         <label>SKU</label>
                         <div style="display:flex;gap:6px;align-items:center">
@@ -67,7 +67,10 @@
                             </label>
                         </div>
                     </div>
+                </div>
+                <div class="form-row">
                     <div><label>Barcode</label><input id="pb"></div>
+                    <div></div>
                 </div>
                 <div class="form-row">
                     <div><label>Cost (Rs)</label><input id="pc" type="number" step="0.01" value="0" oninput="autoPrice()"></div>

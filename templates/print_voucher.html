@@ -58,7 +58,7 @@
                 <tr><td class="c">3</td><td>Overtime</td><td class="r">{{'%.2f'|format(overtime_pay)}}</td></tr>
                 {% endif %}
                 {% if absent_count > 0 %}
-                <tr><td class="c">4</td><td>Absent Deduction</td><td class="r">{{'%.2f'|format(absent_deduction)}}</td></tr>
+                <tr><td class="c">4</td><td>Absent Deduction</td><td class="r">({{'%.2f'|format(absent_deduction)}})</td></tr>
                 {% endif %}
                 <tr><td class="c">5</td><td>Advance</td><td class="r">({{'%.2f'|format(employee.advance or 0)}})</td></tr>
             </tbody>
@@ -69,7 +69,7 @@
                 <span class="l">Absents:</span> {{'%.0f'|format(absent_count)}}<br>
                 <span class="l">Overtime:</span> {{'%.0f'|format(overtime_count)}} day{{'s' if overtime_count != 1}}<br>
                 {% if employee.remaining_advance %}
-                <span class="l">Remaining Advance (To be deducted):</span> Rs {{'%.2f'|format(employee.remaining_advance)}}
+                <span class="l">Balance deducted:</span> Rs {{'%.2f'|format(employee.remaining_advance)}}
                 {% endif %}
             </div>
             <div class="tot">Total: Rs {{'%.2f'|format(total)}}</div>

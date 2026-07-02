@@ -63,7 +63,7 @@
         .print-area { display: none; }
         
         @media print {
-            @page { size: auto; margin: 8mm; }
+            @page { margin: 0; }
             body * { visibility: hidden !important; }
             .print-area, .print-area * { visibility: visible !important; }
             .print-area {
@@ -72,19 +72,31 @@
                 left: 0 !important; top: 0 !important;
                 width: 100% !important;
             }
-            .print-grid { display: grid !important; gap: 6px !important; }
-            .print-label {
-                border: 1px dashed #ccc !important;
-                padding: 6px !important; text-align: center !important;
-                page-break-inside: avoid !important;
+            .print-page {
+                width: 100%;
+                height: 100vh;
+                display: grid;
+                page-break-after: always;
+                box-sizing: border-box;
+                padding: 4mm;
             }
-            .print-label svg { display: block !important; margin: 0 auto !important; }
+            .print-label {
+                border: 1px dashed #ccc;
+                padding: 4px;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+            }
+            .print-label svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
             .print-label .pl-sku {
-                font-size: 10px !important; font-weight: 700 !important;
-                font-family: monospace !important; margin-top: 2px !important;
+                font-size: 9px; font-weight: 700;
+                font-family: monospace; margin-top: 2px;
             }
             .print-label .pl-name {
-                font-size: 8px !important; color: #333 !important; margin-top: 1px !important;
+                font-size: 7px; color: #333; margin-top: 1px;
             }
         }
     </style>
@@ -132,19 +144,11 @@
                                     <input type="number" id="copies" value="1" min="1" max="100" onchange="renderPreview()">
                                 </div>
                                 <div>
-                                    <label>Columns</label>
-                                    <input type="number" id="cols" value="4" min="1" max="10" onchange="renderPreview()">
-                                </div>
-                                <div>
-                                    <label>Rows</label>
-                                    <input type="number" id="rows" value="3" min="1" max="20" onchange="renderPreview()">
-                                </div>
-                                <div>
-                                    <label>Label Size</label>
-                                    <select id="labelSize" onchange="renderPreview()">
-                                        <option value="small">Small (200x80)</option>
-                                        <option value="medium" selected>Medium (300x120)</option>
-                                        <option value="large">Large (400x160)</option>
+                                    <label>Page Size</label>
+                                    <select id="pageSize" onchange="renderPreview()">
+                                        <option value="2x4" selected>2" x 4" (8 labels)</option>
+                                        <option value="4x4">4" x 4" (16 labels)</option>
+                                        <option value="4x6">4" x 6" (24 labels)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -180,10 +184,11 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
         var queue = [], queueId = 0, hlIdx = -1;
-        var labelSizes = {
-            small: { w: 200, h: 80, fs: 10 },
-            medium: { w: 300, h: 120, fs: 12 },
-            large: { w: 400, h: 160, fs: 14 }
+        
+        var pageSizes = {
+            '2x4': { cols: 2, rows: 4, labels: 8, widthIn: 2, heightIn: 4 },
+            '4x4': { cols: 4, rows: 4, labels: 16, widthIn: 4, heightIn: 4 },
+            '4x6': { cols: 4, rows: 6, labels: 24, widthIn: 4, heightIn: 6 }
         };
         
         var searchInput = document.getElementById('searchInput');
@@ -366,6 +371,19 @@
             return check.toString();
         }
         
+        function getLabelDimensions(pageSize) {
+            var page = pageSizes[pageSize];
+            var pxPerInch = 96;
+            var labelWidth = (page.widthIn * pxPerInch) / page.cols;
+            var labelHeight = (page.heightIn * pxPerInch) / page.rows;
+            return {
+                width: Math.round(labelWidth),
+                height: Math.round(labelHeight),
+                cols: page.cols,
+                rows: page.rows
+            };
+        }
+        
         function renderPreview() {
             var area = document.getElementById('previewArea');
             if (!queue.length) {
@@ -373,16 +391,16 @@
                 return;
             }
             
-            var sz = labelSizes[document.getElementById('labelSize').value];
-            var cols = parseInt(document.getElementById('cols').value) || 4;
+            var pageSize = document.getElementById('pageSize').value;
             var barcodeType = document.getElementById('barcodeType').value;
-            var barcodeHeight = Math.round(sz.h * 0.45);
+            var dims = getLabelDimensions(pageSize);
+            var barcodeHeight = Math.round(dims.height * 0.4);
             
-            var html = '<div class="preview-grid" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px)">';
+            var html = '<div class="preview-grid" style="grid-template-columns:repeat(' + dims.cols + ',' + dims.width + 'px)">';
             
             queue.forEach(function(q) {
                 var prepared = prepareBarcodeData(q.sku, barcodeType);
-                html += '<div class="preview-label" style="width:' + sz.w + 'px;min-height:' + sz.h + 'px">';
+                html += '<div class="preview-label" style="width:' + dims.width + 'px;height:' + dims.height + 'px">';
                 html += '<svg id="pv-' + q.id + '"></svg>';
                 html += '<div class="pl-sku">' + q.sku + '</div>';
                 if (prepared.warning) {
@@ -403,9 +421,9 @@
                             format: barcodeType,
                             width: 2,
                             height: barcodeHeight,
-                            fontSize: sz.fs,
-                            margin: 6,
-                            textMargin: 3,
+                            fontSize: 10,
+                            margin: 4,
+                            textMargin: 2,
                             displayValue: false
                         });
                     } catch (e) {
@@ -436,70 +454,89 @@
                 return;
             }
             
-            var sz = labelSizes[document.getElementById('labelSize').value];
-            var cols = parseInt(document.getElementById('cols').value) || 4;
-            var rows = parseInt(document.getElementById('rows').value) || 3;
+            var pageSize = document.getElementById('pageSize').value;
             var barcodeType = document.getElementById('barcodeType').value;
-            var maxLabels = cols * rows;
-            var barcodeHeight = Math.round(sz.h * 0.45);
+            var page = pageSizes[pageSize];
+            var dims = getLabelDimensions(pageSize);
+            var barcodeHeight = Math.round(dims.height * 0.4);
             
             var pa = document.getElementById('printArea');
-            pa.innerHTML = '<div class="print-grid" style="grid-template-columns:repeat(' + cols + ',' + sz.w + 'px)"></div>';
-            var grid = pa.querySelector('.print-grid');
+            pa.innerHTML = '';
             
-            var labelCount = 0;
-            var svgIds = [];
-            
+            var allLabels = [];
             queue.forEach(function(q) {
-                for (var c = 0; c < q.copies && labelCount < maxLabels; c++) {
+                for (var c = 0; c < q.copies; c++) {
+                    allLabels.push({ sku: q.sku, name: q.name, id: q.id });
+                }
+            });
+            
+            var totalPages = Math.ceil(allLabels.length / page.labels);
+            
+            for (var pageNum = 0; pageNum < totalPages; pageNum++) {
+                var pageDiv = document.createElement('div');
+                pageDiv.className = 'print-page';
+                pageDiv.style.gridTemplateColumns = 'repeat(' + page.cols + ', 1fr)';
+                pageDiv.style.gridTemplateRows = 'repeat(' + page.rows + ', 1fr)';
+                
+                var startIdx = pageNum * page.labels;
+                var endIdx = Math.min(startIdx + page.labels, allLabels.length);
+                
+                for (var i = startIdx; i < endIdx; i++) {
+                    var label = allLabels[i];
                     var div = document.createElement('div');
                     div.className = 'print-label';
-                    div.style.width = sz.w + 'px';
-                    div.style.height = sz.h + 'px';
                     
-                    var svgId = 'pl-' + q.id + '-' + c;
+                    var svgId = 'pl-' + pageNum + '-' + i;
                     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                     svg.setAttribute('id', svgId);
                     div.appendChild(svg);
-                    svgIds.push({ id: svgId, sku: q.sku, name: q.name });
                     
                     var skuDiv = document.createElement('div');
                     skuDiv.className = 'pl-sku';
-                    skuDiv.textContent = q.sku;
+                    skuDiv.textContent = label.sku;
                     div.appendChild(skuDiv);
                     
                     var nameDiv = document.createElement('div');
                     nameDiv.className = 'pl-name';
-                    nameDiv.textContent = q.name;
+                    nameDiv.textContent = label.name;
                     div.appendChild(nameDiv);
                     
-                    grid.appendChild(div);
-                    labelCount++;
+                    pageDiv.appendChild(div);
                 }
-            });
+                
+                pa.appendChild(pageDiv);
+            }
             
             setTimeout(function() {
-                svgIds.forEach(function(item) {
-                    var prepared = prepareBarcodeData(item.sku, barcodeType);
-                    try {
-                        JsBarcode('#' + item.id, prepared.data, {
-                            format: barcodeType,
-                            width: 2,
-                            height: barcodeHeight,
-                            fontSize: sz.fs,
-                            margin: 6,
-                            textMargin: 3,
-                            displayValue: false
-                        });
-                    } catch (e) {
-                        console.error('Print error for', item.sku, e);
+                for (var pageNum = 0; pageNum < totalPages; pageNum++) {
+                    var startIdx = pageNum * page.labels;
+                    var endIdx = Math.min(startIdx + page.labels, allLabels.length);
+                    
+                    for (var i = startIdx; i < endIdx; i++) {
+                        var label = allLabels[i];
+                        var svgId = 'pl-' + pageNum + '-' + i;
+                        var prepared = prepareBarcodeData(label.sku, barcodeType);
+                        
+                        try {
+                            JsBarcode('#' + svgId, prepared.data, {
+                                format: barcodeType,
+                                width: 2,
+                                height: barcodeHeight,
+                                fontSize: 10,
+                                margin: 4,
+                                textMargin: 2,
+                                displayValue: false
+                            });
+                        } catch (e) {
+                            console.error('Print error for', label.sku, e);
+                        }
                     }
-                });
+                }
                 
                 setTimeout(function() {
                     window.print();
-                }, 100);
-            }, 150);
+                }, 200);
+            }, 200);
         }
     </script>
 </body>

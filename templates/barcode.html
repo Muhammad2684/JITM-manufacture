@@ -201,6 +201,7 @@
                                     <select id="barcodeType" onchange="renderPreview()">
                                         <option value="CODE128" selected>Code 128</option>
                                         <option value="CODE11">Code 11</option>
+                                        <option value="ITF">Code 2 of 5 Interleaved</option>
                                         <option value="ITF14">ITF-14</option>
                                         <option value="pharmacode">Pharmacode</option>
                                     </select>
@@ -358,6 +359,7 @@
         function prepareBarcodeData(sku, barcodeType) {
             var data = sku;
             var warning = null;
+            var format = barcodeType;
             
             if (barcodeType === 'CODE11') {
                 data = sku.replace(/[^0-9-]/g, '');
@@ -367,6 +369,19 @@
                 if (!data) {
                     data = '0';
                     warning = 'No valid chars, using fallback';
+                }
+                // JsBarcode does not support CODE11 natively; render as CODE128
+                format = 'CODE128';
+                warning = (warning ? warning + '; ' : '') + 'Rendered as Code 128';
+            } else if (barcodeType === 'ITF') {
+                data = sku.replace(/[^0-9]/g, '');
+                if (data.length % 2 !== 0) {
+                    data = '0' + data;
+                    warning = 'Prepended 0 to make even digit count';
+                }
+                if (!data) {
+                    data = '00';
+                    warning = 'No valid digits, using fallback';
                 }
             } else if (barcodeType === 'ITF14') {
                 data = sku.replace(/[^0-9]/g, '');
@@ -397,7 +412,7 @@
                 }
             }
             
-            return { data: data, warning: warning };
+            return { data: data, warning: warning, format: format };
         }
         
         function calculateITF14CheckDigit(data) {
@@ -458,7 +473,7 @@
                     for (var c = 0; c < q.copies; c++) {
                         try {
                             JsBarcode('#pv-' + q.id + '-' + c, prepared.data, {
-                                format: barcodeType,
+                                format: prepared.format,
                                 width: 2,
                                 height: barcodeHeight,
                                 fontSize: 8,
@@ -564,7 +579,7 @@
                     
                     try {
                         JsBarcode('#' + svgId, prepared.data, {
-                            format: barcodeType,
+                            format: prepared.format,
                             width: 2,
                             height: barcodeHeight,
                             fontSize: 8,

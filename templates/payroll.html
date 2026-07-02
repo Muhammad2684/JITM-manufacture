@@ -26,6 +26,7 @@
                                 <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Name <span id="si1"></span></th>
                                 <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Nickname <span id="si2"></span></th>
                                 <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Salary <span id="si3"></span></th>
+                                <th onclick="sortCol(4)" style="cursor:pointer;user-select:none">Commissions <span id="si4"></span></th>
                                 <th>Actions</th>
                             </tr></thead>
                             <tbody id="tb"></tbody>
@@ -48,6 +49,8 @@
                 <input id="fnn">
                 <label>Salary</label>
                 <input id="fs" type="number" step="0.01" min="0">
+                <label>Commissions</label>
+                <input id="fc" type="number" step="0.01" min="0">
                 <button class="btn btn-p">Save</button>
             </form>
         </div>
@@ -78,6 +81,7 @@
                     function(e) { return (e.name || '').toLowerCase(); },
                     function(e) { return (e.nickname || '').toLowerCase(); },
                     function(e) { return e.salary || 0; },
+                    function(e) { return e.commissions || 0; },
                 ];
                 filtered.sort(function(a, b) {
                     var va = extractors[idx](a), vb = extractors[idx](b);
@@ -91,14 +95,16 @@
                     '<td>' + (e.name || '') + '</td>' +
                     '<td>' + (e.nickname || '') + '</td>' +
                     '<td>Rs ' + (e.salary || 0).toFixed(2) + '</td>' +
+                    '<td>Rs ' + (e.commissions || 0).toFixed(2) + '</td>' +
                     '<td>' +
                         '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + e.id + ')">Edit</button> ' +
                         '<button class="btn btn-xs btn-d" onclick="del(' + e.id + ')">Delete</button>' +
                     '</td></tr>';
             }).join('');
-            document.getElementById('tb').innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:30px">No employees found</td></tr>';
-            var total = filtered.reduce(function(s, e) { return s + (e.salary || 0); }, 0);
-            document.getElementById('tf').innerHTML = '<tr style="font-weight:700;background:#f8f7f4"><td colspan="3">Total</td><td>Rs ' + total.toFixed(2) + '</td><td></td></tr>';
+            document.getElementById('tb').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:30px">No employees found</td></tr>';
+            var totalSal = filtered.reduce(function(s, e) { return s + (e.salary || 0); }, 0);
+            var totalCom = filtered.reduce(function(s, e) { return s + (e.commissions || 0); }, 0);
+            document.getElementById('tf').innerHTML = '<tr style="font-weight:700;background:#f8f7f4"><td colspan="3">Total</td><td>Rs ' + totalSal.toFixed(2) + '</td><td>Rs ' + totalCom.toFixed(2) + '</td><td></td></tr>';
         }
 
         function sortCol(i) {
@@ -117,6 +123,7 @@
             document.getElementById('fn').value = '';
             document.getElementById('fnn').value = '';
             document.getElementById('fs').value = '';
+            document.getElementById('fc').value = '';
             document.getElementById('fm').classList.add('show');
         }
 
@@ -128,6 +135,7 @@
             document.getElementById('fn').value = e.name || '';
             document.getElementById('fnn').value = e.nickname || '';
             document.getElementById('fs').value = e.salary || 0;
+            document.getElementById('fc').value = e.commissions || 0;
             document.getElementById('fm').classList.add('show');
         }
 
@@ -138,7 +146,8 @@
             var data = {
                 name: name,
                 nickname: document.getElementById('fnn').value.trim(),
-                salary: parseFloat(document.getElementById('fs').value) || 0
+                salary: parseFloat(document.getElementById('fs').value) || 0,
+                commissions: parseFloat(document.getElementById('fc').value) || 0
             };
             var url = editId ? '/api/employees/' + editId : '/api/employees';
             var method = editId ? 'PUT' : 'POST';

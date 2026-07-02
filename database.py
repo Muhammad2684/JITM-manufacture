@@ -256,6 +256,7 @@ def init_db():
                 name TEXT NOT NULL,
                 nickname TEXT DEFAULT '',
                 salary REAL NOT NULL DEFAULT 0,
+                commissions REAL NOT NULL DEFAULT 0,
                 active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
@@ -279,6 +280,11 @@ def init_db():
 
         try:
             db.execute('ALTER TABLE purchase_invoices ADD COLUMN due_date TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE employees ADD COLUMN commissions REAL NOT NULL DEFAULT 0')
         except Exception:
             pass
 

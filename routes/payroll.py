@@ -23,8 +23,8 @@ def add_employee():
         return jsonify({'error': 'Name is required'}), 400
     with get_db() as db:
         db.execute(
-            'INSERT INTO employees (name, nickname, salary) VALUES (?,?,?)',
-            (d['name'], d.get('nickname', '') or '', float(d.get('salary', 0) or 0))
+            'INSERT INTO employees (name, nickname, salary, commissions) VALUES (?,?,?,?)',
+            (d['name'], d.get('nickname', '') or '', float(d.get('salary', 0) or 0), float(d.get('commissions', 0) or 0))
         )
     return jsonify({'ok': True})
 
@@ -37,8 +37,8 @@ def update_employee(eid):
         return jsonify({'error': 'No data'}), 400
     with get_db() as db:
         db.execute(
-            'UPDATE employees SET name=?, nickname=?, salary=? WHERE id=?',
-            (d['name'], d.get('nickname', '') or '', float(d.get('salary', 0) or 0), eid)
+            'UPDATE employees SET name=?, nickname=?, salary=?, commissions=? WHERE id=?',
+            (d['name'], d.get('nickname', '') or '', float(d.get('salary', 0) or 0), float(d.get('commissions', 0) or 0), eid)
         )
     return jsonify({'ok': True})
 

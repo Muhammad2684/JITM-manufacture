@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, redirect, session
+from flask import Flask, render_template, redirect, session, request
 from markupsafe import escape
 from database import init_db
 from routes.auth import auth_bp, login_required, permission_required
@@ -176,6 +176,41 @@ def staff():
 def payroll():
     """Display the payroll page."""
     return render_page('payroll.html', '/payroll')
+
+
+@app.route('/payroll/voucher/<int:eid>', strict_slashes=False)
+@login_required
+@permission_required('staff')
+def payroll_voucher(eid):
+    """Print commission voucher for an employee in a given month."""
+    month = request.args.get('month', '')
+    from database import get_db
+    with get_db() as db:
+        emp = db.execute('SELECT * FROM employees WHERE id=? AND active=1', (eid,)).fetchone()
+        if not emp:
+            return 'Employee not found', 404
+        emp = dict(emp)
+
+        sales = []
+        if month:
+            rows = db.execute('''
+                SELECT s.id, s.receipt, s.created_at, s.total,
+                       si.product_name, si.quantity, si.price, si.total as line_total, si.commission
+                FROM sale_items si
+                JOIN sales s ON s.id = si.sale_id
+                WHERE si.staff_id = ?
+                  AND strftime('%Y-%m', s.created_at) = ?
+                ORDER BY s.created_at
+            ''', (eid, month)).fetchall()
+            sales = [dict(r) for r in rows]
+
+            total_commission = sum(r['commission'] or 0 for r in rows)
+        else:
+            total_commission = emp['commissions']
+
+    return render_template('voucher.html',
+                           employee=emp, month=month, sales=sales,
+                           total_commission=total_commission, name=session['name'])
 
 
 @app.route('/accounts', strict_slashes=False)

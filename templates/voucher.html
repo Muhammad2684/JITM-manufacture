@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Commission Voucher · {{employee.name}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Courier New', monospace; font-size: 13px; color: #111; padding: 30px; }
+        .v { max-width: 700px; margin: 0 auto; border: 2px solid #111; padding: 30px; }
+        .h { text-align: center; border-bottom: 2px double #111; padding-bottom: 15px; margin-bottom: 20px; }
+        .h h1 { font-size: 22px; letter-spacing: 2px; }
+        .h p { font-size: 11px; color: #555; margin-top: 4px; }
+        .s { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .s div { line-height: 1.8; }
+        .s .l { font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; font-size: 12px; }
+        th { background: #eee; font-weight: 700; }
+        .r { text-align: right; }
+        .c { text-align: center; }
+        .tf { font-weight: 700; border-top: 2px solid #111; }
+        .tf td { padding: 8px; }
+        .sig { display: flex; justify-content: space-between; margin-top: 35px; padding-top: 10px; }
+        .sig div { text-align: center; width: 45%; border-top: 1px solid #333; padding-top: 8px; font-size: 11px; }
+        .nop { text-align: center; padding: 30px; color: #888; font-style: italic; }
+        .bp { text-align: center; margin-top: 20px; }
+        .bp button { padding: 10px 30px; font-size: 14px; cursor: pointer; }
+        @media print {
+            body { padding: 0.5in; }
+            .bp { display: none; }
+            .v { border: none; padding: 0; }
+            th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+    <div class="v">
+        <div class="h">
+            <h1>JITM</h1>
+            <p>Commission Voucher</p>
+        </div>
+
+        <div class="s">
+            <div>
+                <span class="l">Employee:</span> {{employee.name}}<br>
+                <span class="l">Nickname:</span> {{employee.nickname or '—'}}<br>
+                <span class="l">Salary:</span> Rs {{'%.2f'|format(employee.salary or 0)}}
+            </div>
+            <div style="text-align:right">
+                <span class="l">Month:</span> {{month or 'Lifetime'}}<br>
+                <span class="l">Date:</span> <span id="dt"></span>
+            </div>
+        </div>
+
+        {% if sales %}
+        <table>
+            <thead><tr>
+                <th class="c">#</th>
+                <th>Date</th>
+                <th>Receipt</th>
+                <th>Product</th>
+                <th class="c">Qty</th>
+                <th class="r">Price</th>
+                <th class="r">Commission</th>
+            </tr></thead>
+            <tbody>
+                {% for s in sales %}
+                <tr>
+                    <td class="c">{{loop.index}}</td>
+                    <td>{{s.created_at[:10]}}</td>
+                    <td>{{s.receipt}}</td>
+                    <td>{{s.product_name}}</td>
+                    <td class="c">{{s.quantity}}</td>
+                    <td class="r">Rs {{'%.2f'|format(s.price or 0)}}</td>
+                    <td class="r">Rs {{'%.2f'|format(s.commission or 0)}}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="tf">
+                    <td colspan="6" style="text-align:right">Total Commission:</td>
+                    <td class="r">Rs {{'%.2f'|format(sales|sum(attribute='commission'))}}</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="nop">No commission records for this period.</div>
+        {% endif %}
+
+        <div class="sig">
+            <div>Employee Signature</div>
+            <div>Authorised Signature</div>
+        </div>
+    </div>
+
+    <div class="bp">
+        <button onclick="window.print()">🖨 Print</button>
+        <button onclick="window.close()">Close</button>
+    </div>
+
+    <script>
+        document.getElementById('dt').textContent = new Date().toLocaleDateString('en-GB');
+    </script>
+</body>
+</html>

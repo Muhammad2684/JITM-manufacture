@@ -106,6 +106,7 @@
                     '<td>Rs ' + (e.commissions || 0).toFixed(2) + '</td>' +
                     '<td>' +
                         '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + e.id + ')">Edit</button> ' +
+                        '<button class="btn btn-xs btn-ghost" onclick="printVoucher(' + e.id + ')">Print</button> ' +
                         '<button class="btn btn-xs btn-d" onclick="del(' + e.id + ')">Delete</button>' +
                     '</td></tr>';
             }).join('');
@@ -176,6 +177,11 @@
         }
 
         function cl(id) { document.getElementById(id).classList.remove('show'); }
+
+        function printVoucher(id) {
+            var m = document.getElementById('m').value || curMonth;
+            window.open('/payroll/voucher/' + id + '?month=' + encodeURIComponent(m), '_blank');
+        }
 
         document.getElementById('m').value = curMonth;
         load();

@@ -46,7 +46,7 @@ def render_sidebar(active_page):
     user_permissions = []
     if user_role == 'manager':
         # Managers have all permissions
-        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary']
+        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary', 'payroll']
     elif user_id:
         from database import get_db
         import json
@@ -84,6 +84,7 @@ def render_sidebar(active_page):
             {'url': '/accounts/transfers', 'label': 'Inter Account Transfers'},
         ]},
         {'url': '/staff', 'label': 'User Accounts', 'permission': 'staff'},
+        {'url': '/payroll', 'label': 'Payroll', 'permission': 'staff'},
         {'url': '/summary', 'label': 'Summary', 'permission': 'summary'},
     ]
     
@@ -165,6 +166,14 @@ def customers():
 def staff():
     """Display the staff management page."""
     return render_page('staff.html', '/staff')
+
+
+@app.route('/payroll', strict_slashes=False)
+@login_required
+@permission_required('staff')
+def payroll():
+    """Display the payroll page."""
+    return render_page('payroll.html', '/payroll')
 
 
 @app.route('/accounts', strict_slashes=False)

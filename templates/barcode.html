@@ -433,8 +433,8 @@
                 var prepared = prepareBarcodeData(q.sku, barcodeType);
                 for (var c = 0; c < q.copies; c++) {
                     var rotateStyle = orientation === 'portrait' ? 'transform:rotate(90deg);' : '';
-                    html += '<div class="preview-label" style="width:' + labelWidth + 'px;height:' + labelHeight + 'px">';
-                    html += '<svg id="pv-' + q.id + '-' + c + '" style="' + rotateStyle + '"></svg>';
+                    html += '<div class="preview-label" style="width:' + labelWidth + 'px;height:' + labelHeight + 'px;' + rotateStyle + '">';
+                    html += '<svg id="pv-' + q.id + '-' + c + '"></svg>';
                     html += '<div class="pl-sku">' + q.sku + '</div>';
                     if (prepared.warning) {
                         html += '<div class="pl-warn">' + prepared.warning + '</div>';
@@ -521,13 +521,13 @@
                 div.className = 'print-label';
                 div.style.width = labelWidth;
                 div.style.height = labelHeight;
+                if (orientation === 'portrait') {
+                    div.style.transform = 'rotate(90deg)';
+                }
                 
                 var svgId = 'pl-' + i;
                 var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 svg.setAttribute('id', svgId);
-                if (orientation === 'portrait') {
-                    svg.style.transform = 'rotate(90deg)';
-                }
                 div.appendChild(svg);
                 
                 var skuDiv = document.createElement('div');

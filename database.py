@@ -257,6 +257,14 @@ def init_db():
                 nickname TEXT DEFAULT '',
                 salary REAL NOT NULL DEFAULT 0,
                 commissions REAL NOT NULL DEFAULT 0,
+                advance REAL NOT NULL DEFAULT 0,
+                remaining_advance REAL NOT NULL DEFAULT 0,
+                overtime REAL NOT NULL DEFAULT 0,
+                father_name TEXT DEFAULT '',
+                cnic TEXT DEFAULT '',
+                phone TEXT DEFAULT '',
+                leaves REAL NOT NULL DEFAULT 0,
+                absents REAL NOT NULL DEFAULT 0,
                 active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
@@ -323,6 +331,10 @@ def init_db():
             pass
         try:
             db.execute('ALTER TABLE employees ADD COLUMN advance REAL NOT NULL DEFAULT 0')
+        except Exception:
+            pass
+        try:
+            db.execute('ALTER TABLE employees ADD COLUMN remaining_advance REAL NOT NULL DEFAULT 0')
         except Exception:
             pass
 

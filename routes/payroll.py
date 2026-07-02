@@ -17,7 +17,7 @@ def list_employees():
         if month:
             rows = db.execute('''
                 SELECT e.id, e.name, e.nickname, e.father_name, e.cnic, e.phone,
-                       e.salary, e.leaves, e.absents, e.overtime, e.advance,
+                       e.salary, e.leaves, e.absents, e.overtime, e.advance, e.remaining_advance,
                        COALESCE((
                            SELECT SUM(si.commission)
                            FROM sale_items si
@@ -44,12 +44,12 @@ def add_employee():
         return jsonify({'error': 'Name is required'}), 400
     with get_db() as db:
         db.execute(
-            '''INSERT INTO employees (name, nickname, father_name, cnic, phone, salary, commissions, leaves, absents, overtime, advance)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+            '''INSERT INTO employees (name, nickname, father_name, cnic, phone, salary, commissions, leaves, absents, overtime, advance, remaining_advance)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
             (d['name'], d.get('nickname', '') or '', d.get('father_name', '') or '',
              d.get('cnic', '') or '', d.get('phone', '') or '',
              fmt(d.get('salary')), fmt(d.get('commissions')),
-             fmt(d.get('leaves')), fmt(d.get('absents')), fmt(d.get('overtime')), fmt(d.get('advance')))
+             fmt(d.get('leaves')), fmt(d.get('absents')), fmt(d.get('overtime')), fmt(d.get('advance')), fmt(d.get('remaining_advance')))
         )
     return jsonify({'ok': True})
 
@@ -63,11 +63,11 @@ def update_employee(eid):
     with get_db() as db:
         db.execute(
             '''UPDATE employees SET name=?, nickname=?, father_name=?, cnic=?, phone=?,
-               salary=?, commissions=?, leaves=?, absents=?, overtime=?, advance=? WHERE id=?''',
+               salary=?, commissions=?, leaves=?, absents=?, overtime=?, advance=?, remaining_advance=? WHERE id=?''',
             (d['name'], d.get('nickname', '') or '', d.get('father_name', '') or '',
              d.get('cnic', '') or '', d.get('phone', '') or '',
              fmt(d.get('salary')), fmt(d.get('commissions')),
-             fmt(d.get('leaves')), fmt(d.get('absents')), fmt(d.get('overtime')), fmt(d.get('advance')), eid)
+             fmt(d.get('leaves')), fmt(d.get('absents')), fmt(d.get('overtime')), fmt(d.get('advance')), fmt(d.get('remaining_advance')), eid)
         )
     return jsonify({'ok': True})
 

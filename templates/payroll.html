@@ -63,7 +63,7 @@
                 </div>
                 <div class="form-row">
                     <div><label>Advance Deduction</label><input id="fad" type="number" step="0.01" min="0" value="0"></div>
-                    <div></div>
+                    <div><label>Remaining Advance (To be deducted)</label><input id="fra" type="number" step="0.01" min="0" value="0"></div>
                 </div>
                 <button class="btn btn-p">Save</button>
             </form>
@@ -166,6 +166,7 @@
             document.getElementById('fnn').value = '';
             document.getElementById('fs').value = '';
             document.getElementById('fad').value = '0';
+            document.getElementById('fra').value = '0';
             document.getElementById('fm').classList.add('show');
         }
 
@@ -181,6 +182,7 @@
             document.getElementById('fnn').value = e.nickname || '';
             document.getElementById('fs').value = e.salary || 0;
             document.getElementById('fad').value = e.advance || 0;
+            document.getElementById('fra').value = e.remaining_advance || 0;
             document.getElementById('fm').classList.add('show');
         }
 
@@ -195,7 +197,8 @@
                 phone: document.getElementById('fph').value.trim(),
                 nickname: document.getElementById('fnn').value.trim(),
                 salary: parseFloat(document.getElementById('fs').value) || 0,
-                advance: parseFloat(document.getElementById('fad').value) || 0
+                advance: parseFloat(document.getElementById('fad').value) || 0,
+                remaining_advance: parseFloat(document.getElementById('fra').value) || 0
             };
             var url = editId ? '/api/employees/' + editId : '/api/employees';
             var method = editId ? 'PUT' : 'POST';

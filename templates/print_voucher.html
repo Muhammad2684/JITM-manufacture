@@ -61,6 +61,9 @@
                 <tr><td class="c">4</td><td>Absent Deduction ({{'%.0f'|format(absent_count)}} day{{'s' if absent_count != 1}} &times; Rs {{'%.2f'|format(ds)}})</td><td class="r">({{'%.2f'|format(absent_deduction)}})</td></tr>
                 {% endif %}
                 <tr><td class="c">5</td><td>Advance</td><td class="r">({{'%.2f'|format(employee.advance or 0)}})</td></tr>
+                {% if employee.remaining_advance %}
+                <tr><td class="c">6</td><td>Remaining Advance (To be deducted)</td><td class="r">{{'%.2f'|format(employee.remaining_advance)}}</td></tr>
+                {% endif %}
             </tbody>
         </table>
 

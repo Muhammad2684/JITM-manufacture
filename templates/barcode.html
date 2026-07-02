@@ -49,18 +49,46 @@
         .controls select { padding: 6px 8px; border: 1px solid #e2e1de; border-radius: 4px; font-size: 13px; }
         
         .preview-grid {
-            display: grid; gap: 8px; padding: 12px; justify-content: center;
+            display: grid;
+            gap: 0;
+            padding: 0;
+            justify-content: center;
         }
         .preview-label {
-            border: 1px solid #e2e1de; border-radius: 4px; padding: 6px;
-            text-align: center; background: #fff;
-            box-sizing: border-box; overflow: hidden;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 1px solid #e2e1de;
+            padding: 2px;
+            text-align: center;
+            background: #fff;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        .preview-label svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
-        .preview-label .pl-sku { font-size: 10px; font-weight: 700; font-family: monospace; margin-top: 2px; }
-        .preview-label .pl-name { font-size: 8px; color: #6b7280; margin-top: 1px; }
-        .preview-label .pl-warn { font-size: 8px; color: #d97706; margin-top: 1px; font-style: italic; }
+        .preview-label svg {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
+        }
+        .preview-label .pl-sku {
+            font-size: 8px;
+            font-weight: 700;
+            font-family: monospace;
+            margin-top: 1px;
+        }
+        .preview-label .pl-name {
+            font-size: 6px;
+            color: #6b7280;
+            margin-top: 1px;
+        }
+        .preview-label .pl-warn {
+            font-size: 6px;
+            color: #d97706;
+            margin-top: 1px;
+            font-style: italic;
+        }
         
         .print-area { display: none; }
         
@@ -71,20 +99,17 @@
             .print-area {
                 display: block !important;
                 position: absolute !important;
-                left: 0 !important; top: 0 !important;
-                width: 100% !important;
+                left: 0 !important;
+                top: 0 !important;
             }
             .print-page {
-                width: 100%;
-                height: 100vh;
                 display: grid;
                 page-break-after: always;
                 box-sizing: border-box;
-                padding: 4mm;
             }
             .print-label {
                 border: 1px dashed #ccc;
-                padding: 4px;
+                padding: 2px;
                 text-align: center;
                 display: flex;
                 flex-direction: column;
@@ -92,13 +117,22 @@
                 justify-content: center;
                 box-sizing: border-box;
             }
-            .print-label svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+            .print-label svg {
+                display: block;
+                margin: 0 auto;
+                max-width: 100%;
+                height: auto;
+            }
             .print-label .pl-sku {
-                font-size: 9px; font-weight: 700;
-                font-family: monospace; margin-top: 2px;
+                font-size: 8px;
+                font-weight: 700;
+                font-family: monospace;
+                margin-top: 1px;
             }
             .print-label .pl-name {
-                font-size: 7px; color: #333; margin-top: 1px;
+                font-size: 6px;
+                color: #333;
+                margin-top: 1px;
             }
         }
     </style>
@@ -146,11 +180,11 @@
                                     <input type="number" id="copies" value="1" min="1" max="100" onchange="renderPreview()">
                                 </div>
                                 <div>
-                                    <label>Page Size</label>
-                                    <select id="pageSize" onchange="renderPreview()">
-                                        <option value="2x4" selected>2" x 4" (8 labels)</option>
-                                        <option value="4x4">4" x 4" (16 labels)</option>
-                                        <option value="4x6">4" x 6" (24 labels)</option>
+                                    <label>Paper Size</label>
+                                    <select id="paperSize" onchange="renderPreview()">
+                                        <option value="letter" selected>Letter (8.5" × 11")</option>
+                                        <option value="a4">A4 (8.27" × 11.69")</option>
+                                        <option value="legal">Legal (8.5" × 14")</option>
                                     </select>
                                 </div>
                                 <div>
@@ -187,10 +221,15 @@
     <script>
         var queue = [], queueId = 0, hlIdx = -1;
         
-        var pageSizes = {
-            '2x4': { cols: 2, rows: 4, labels: 8, widthIn: 2, heightIn: 4 },
-            '4x4': { cols: 4, rows: 4, labels: 16, widthIn: 4, heightIn: 4 },
-            '4x6': { cols: 4, rows: 6, labels: 24, widthIn: 4, heightIn: 6 }
+        // Label size options: 1.5" × 1" or 1" × 1.5"
+        var labelWidthIn = 1.5;
+        var labelHeightIn = 1.0;
+        
+        // Paper sizes in inches
+        var paperSizes = {
+            'letter': { width: 8.5, height: 11 },
+            'a4': { width: 8.27, height: 11.69 },
+            'legal': { width: 8.5, height: 14 }
         };
         
         var searchInput = document.getElementById('searchInput');
@@ -373,16 +412,36 @@
             return check.toString();
         }
         
-        function getLabelDimensions(pageSize) {
-            var page = pageSizes[pageSize];
+        function calculateGrid(paperSize) {
+            var paper = paperSizes[paperSize];
             var pxPerInch = 96;
-            var labelWidth = (page.widthIn * pxPerInch) / page.cols;
-            var labelHeight = (page.heightIn * pxPerInch) / page.rows;
+            
+            // Try both orientations
+            var landscapeCols = Math.floor(paper.width / labelWidthIn);
+            var landscapeRows = Math.floor(paper.height / labelHeightIn);
+            var landscapeTotal = landscapeCols * landscapeRows;
+            
+            var portraitCols = Math.floor(paper.width / labelHeightIn);
+            var portraitRows = Math.floor(paper.height / labelWidthIn);
+            var portraitTotal = portraitCols * portraitRows;
+            
+            // Choose orientation that fits more labels
+            var usePortrait = portraitTotal > landscapeTotal;
+            
+            var cols = usePortrait ? portraitCols : landscapeCols;
+            var rows = usePortrait ? portraitRows : landscapeRows;
+            var total = cols * rows;
+            
+            var labelWidth = usePortrait ? labelHeightIn * pxPerInch : labelWidthIn * pxPerInch;
+            var labelHeight = usePortrait ? labelWidthIn * pxPerInch : labelHeightIn * pxPerInch;
+            
             return {
-                width: Math.round(labelWidth),
-                height: Math.round(labelHeight),
-                cols: page.cols,
-                rows: page.rows
+                cols: cols,
+                rows: rows,
+                total: total,
+                labelWidth: Math.round(labelWidth),
+                labelHeight: Math.round(labelHeight),
+                usePortrait: usePortrait
             };
         }
         
@@ -393,17 +452,17 @@
                 return;
             }
             
-            var pageSize = document.getElementById('pageSize').value;
+            var paperSize = document.getElementById('paperSize').value;
             var barcodeType = document.getElementById('barcodeType').value;
-            var dims = getLabelDimensions(pageSize);
-            var barcodeHeight = Math.round(dims.height * 0.4);
+            var grid = calculateGrid(paperSize);
+            var barcodeHeight = Math.round(grid.labelHeight * 0.4);
             
-            var html = '<div class="preview-grid" style="grid-template-columns:repeat(' + dims.cols + ',' + dims.width + 'px)">';
+            var html = '<div class="preview-grid" style="grid-template-columns:repeat(' + grid.cols + ',' + grid.labelWidth + 'px)">';
             
             queue.forEach(function(q) {
                 var prepared = prepareBarcodeData(q.sku, barcodeType);
                 for (var c = 0; c < q.copies; c++) {
-                    html += '<div class="preview-label" style="width:' + dims.width + 'px;height:' + dims.height + 'px">';
+                    html += '<div class="preview-label" style="width:' + grid.labelWidth + 'px;height:' + grid.labelHeight + 'px">';
                     html += '<svg id="pv-' + q.id + '-' + c + '"></svg>';
                     html += '<div class="pl-sku">' + q.sku + '</div>';
                     if (prepared.warning) {
@@ -426,9 +485,9 @@
                                 format: barcodeType,
                                 width: 2,
                                 height: barcodeHeight,
-                                fontSize: 10,
-                                margin: 4,
-                                textMargin: 2,
+                                fontSize: 8,
+                                margin: 2,
+                                textMargin: 1,
                                 displayValue: false
                             });
                         } catch (e) {
@@ -460,11 +519,11 @@
                 return;
             }
             
-            var pageSize = document.getElementById('pageSize').value;
+            var paperSize = document.getElementById('paperSize').value;
             var barcodeType = document.getElementById('barcodeType').value;
-            var page = pageSizes[pageSize];
-            var dims = getLabelDimensions(pageSize);
-            var barcodeHeight = Math.round(dims.height * 0.4);
+            var paper = paperSizes[paperSize];
+            var grid = calculateGrid(paperSize);
+            var barcodeHeight = Math.round(grid.labelHeight * 0.4);
             
             var pa = document.getElementById('printArea');
             pa.innerHTML = '';
@@ -476,16 +535,18 @@
                 }
             });
             
-            var totalPages = Math.ceil(allLabels.length / page.labels);
+            var totalPages = Math.ceil(allLabels.length / grid.total);
             
             for (var pageNum = 0; pageNum < totalPages; pageNum++) {
                 var pageDiv = document.createElement('div');
                 pageDiv.className = 'print-page';
-                pageDiv.style.gridTemplateColumns = 'repeat(' + page.cols + ', 1fr)';
-                pageDiv.style.gridTemplateRows = 'repeat(' + page.rows + ', 1fr)';
+                pageDiv.style.width = paper.width + 'in';
+                pageDiv.style.height = paper.height + 'in';
+                pageDiv.style.gridTemplateColumns = 'repeat(' + grid.cols + ', 1fr)';
+                pageDiv.style.gridTemplateRows = 'repeat(' + grid.rows + ', 1fr)';
                 
-                var startIdx = pageNum * page.labels;
-                var endIdx = Math.min(startIdx + page.labels, allLabels.length);
+                var startIdx = pageNum * grid.total;
+                var endIdx = Math.min(startIdx + grid.total, allLabels.length);
                 
                 for (var i = startIdx; i < endIdx; i++) {
                     var label = allLabels[i];
@@ -515,8 +576,8 @@
             
             setTimeout(function() {
                 for (var pageNum = 0; pageNum < totalPages; pageNum++) {
-                    var startIdx = pageNum * page.labels;
-                    var endIdx = Math.min(startIdx + page.labels, allLabels.length);
+                    var startIdx = pageNum * grid.total;
+                    var endIdx = Math.min(startIdx + grid.total, allLabels.length);
                     
                     for (var i = startIdx; i < endIdx; i++) {
                         var label = allLabels[i];
@@ -528,9 +589,9 @@
                                 format: barcodeType,
                                 width: 2,
                                 height: barcodeHeight,
-                                fontSize: 10,
-                                margin: 4,
-                                textMargin: 2,
+                                fontSize: 8,
+                                margin: 2,
+                                textMargin: 1,
                                 displayValue: false
                             });
                         } catch (e) {

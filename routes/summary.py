@@ -138,8 +138,8 @@ def summary():
                 'total_expenses': round(total_expenses, 2),
                 'net_profit': round(net_profit, 2),
                 'drawings': {
-                    'p1': 0,
-                    'p2': 0,
+                    'p1': round(expense_map.get('P1', 0), 2),
+                    'p2': round(expense_map.get('P2', 0), 2),
                 },
             }
         

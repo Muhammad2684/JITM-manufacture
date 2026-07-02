@@ -375,7 +375,7 @@ def delete_transaction(tid):
 @login_required
 def list_expense_categories():
     """Return the standard expense categories used in the summary, with current totals."""
-    cats = ['Utility Expense', 'Staff Salaries', 'Staff Commissions', 'Maintenance Expense', 'Miscellaneous Expense']
+    cats = ['Utility Expense', 'Staff Salaries', 'Staff Commissions', 'Maintenance Expense', 'Miscellaneous Expense', 'P1', 'P2']
     with get_db() as db:
         rows = db.execute(
             "SELECT category, COALESCE(SUM(amount),0) as total FROM expenses GROUP BY category"

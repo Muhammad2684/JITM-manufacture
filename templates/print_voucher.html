@@ -69,7 +69,7 @@
                 <span class="l">Absents:</span> {{'%.0f'|format(absent_count)}}<br>
                 <span class="l">Overtime:</span> {{'%.0f'|format(overtime_count)}} day{{'s' if overtime_count != 1}}<br>
                 {% if employee.remaining_advance %}
-                <span class="l">Balance deducted:</span> Rs {{'%.2f'|format(employee.remaining_advance)}}
+                <span class="l">Remaining Advance (To be deducted):</span> Rs {{'%.2f'|format(employee.remaining_advance)}}
                 {% endif %}
             </div>
             <div class="tot">Total: Rs {{'%.2f'|format(total)}}</div>

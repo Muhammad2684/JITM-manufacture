@@ -105,8 +105,6 @@
             }
             .print-page {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, 1.5in);
-                grid-auto-rows: 1in;
                 page-break-after: always;
                 box-sizing: border-box;
             }
@@ -119,8 +117,6 @@
                 align-items: center;
                 justify-content: center;
                 box-sizing: border-box;
-                width: 1.5in;
-                height: 1in;
             }
             .print-label svg {
                 display: block;
@@ -183,6 +179,22 @@
                                 <div>
                                     <label>Copies</label>
                                     <input type="number" id="copies" value="1" min="1" max="100" onchange="renderPreview()">
+                                </div>
+                                <div>
+                                    <label>Orientation</label>
+                                    <select id="orientation" onchange="renderPreview()">
+                                        <option value="landscape" selected>1.5" × 1" (Landscape)</option>
+                                        <option value="portrait">1" × 1.5" (Portrait)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Gap</label>
+                                    <select id="gap" onchange="renderPreview()">
+                                        <option value="0">No Gap</option>
+                                        <option value="2" selected>Small (2px)</option>
+                                        <option value="4">Medium (4px)</option>
+                                        <option value="8">Large (8px)</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label>Barcode Type</label>
@@ -406,15 +418,23 @@
             }
             
             var barcodeType = document.getElementById('barcodeType').value;
+            var orientation = document.getElementById('orientation').value;
+            var gap = document.getElementById('gap').value;
+            
+            // Set dimensions based on orientation
+            var labelWidth = orientation === 'landscape' ? 144 : 96;
+            var labelHeight = orientation === 'landscape' ? 96 : 144;
+            var barcodeHeight = orientation === 'landscape' ? 38 : 57;
             
             // Preview shows a simple grid of labels
-            var html = '<div class="preview-grid" style="grid-template-columns:repeat(auto-fill, 144px)">';
+            var html = '<div class="preview-grid" style="grid-template-columns:repeat(auto-fill, ' + labelWidth + 'px);gap:' + gap + 'px">';
             
             queue.forEach(function(q) {
                 var prepared = prepareBarcodeData(q.sku, barcodeType);
                 for (var c = 0; c < q.copies; c++) {
-                    html += '<div class="preview-label" style="width:144px;height:96px">';
-                    html += '<svg id="pv-' + q.id + '-' + c + '"></svg>';
+                    var rotateStyle = orientation === 'portrait' ? 'transform:rotate(90deg);' : '';
+                    html += '<div class="preview-label" style="width:' + labelWidth + 'px;height:' + labelHeight + 'px">';
+                    html += '<svg id="pv-' + q.id + '-' + c + '" style="' + rotateStyle + '"></svg>';
                     html += '<div class="pl-sku">' + q.sku + '</div>';
                     if (prepared.warning) {
                         html += '<div class="pl-warn">' + prepared.warning + '</div>';
@@ -435,7 +455,7 @@
                             JsBarcode('#pv-' + q.id + '-' + c, prepared.data, {
                                 format: barcodeType,
                                 width: 2,
-                                height: 38,
+                                height: barcodeHeight,
                                 fontSize: 8,
                                 margin: 2,
                                 textMargin: 1,
@@ -471,6 +491,8 @@
             }
             
             var barcodeType = document.getElementById('barcodeType').value;
+            var orientation = document.getElementById('orientation').value;
+            var gap = document.getElementById('gap').value;
             
             var pa = document.getElementById('printArea');
             pa.innerHTML = '';
@@ -482,17 +504,30 @@
                 }
             });
             
+            // Set dimensions based on orientation
+            var labelWidth = orientation === 'landscape' ? '1.5in' : '1in';
+            var labelHeight = orientation === 'landscape' ? '1in' : '1.5in';
+            var barcodeHeight = orientation === 'landscape' ? 38 : 57;
+            
             // Create a single page div with CSS grid that auto-fills
             var pageDiv = document.createElement('div');
             pageDiv.className = 'print-page';
+            pageDiv.style.gridTemplateColumns = 'repeat(auto-fill, ' + labelWidth + ')';
+            pageDiv.style.gridAutoRows = labelHeight;
+            pageDiv.style.gap = gap + 'px';
             
             allLabels.forEach(function(label, i) {
                 var div = document.createElement('div');
                 div.className = 'print-label';
+                div.style.width = labelWidth;
+                div.style.height = labelHeight;
                 
                 var svgId = 'pl-' + i;
                 var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 svg.setAttribute('id', svgId);
+                if (orientation === 'portrait') {
+                    svg.style.transform = 'rotate(90deg)';
+                }
                 div.appendChild(svg);
                 
                 var skuDiv = document.createElement('div');
@@ -519,7 +554,7 @@
                         JsBarcode('#' + svgId, prepared.data, {
                             format: barcodeType,
                             width: 2,
-                            height: 38,
+                            height: barcodeHeight,
                             fontSize: 8,
                             margin: 2,
                             textMargin: 1,

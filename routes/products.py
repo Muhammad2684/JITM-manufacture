@@ -84,7 +84,7 @@ def search_products():
             'color': r['color'],
             'sku': r['v_sku'] or r['sku'],
             'barcode': r['v_barcode'] or r['barcode'],
-            'price': r['v_price'] if r['v_price'] else r['base_price'],
+            'price': r['v_price'] if r['v_price'] else (r['base_price'] or 0),
             'base_price': r['base_price'],
             'stock': r['stock'],
             'low_stock': r['low_stock'],

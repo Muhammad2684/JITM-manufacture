@@ -259,7 +259,7 @@
         function search() { fetch('/api/products/search?q=' + encodeURIComponent(document.getElementById('s').value)).then(function (r) { return r.json() }).then(function (d) { allP = d; renderP(d) }).catch(function () { allP = []; }); }
         function renderP(l) {
             var g = document.getElementById('prods'); hlIdx = -1; if (!l.length) { g.style.display = 'none'; g.innerHTML = ''; return; }
-            g.style.display = 'block'; g.innerHTML = l.map(function (p, i) { return '<div class="pd-item" data-vid="' + p.vid + '" data-price="' + p.price + '"><div class="pd-name">' + p.name + '</div><div class="pd-detail">' + (p.size || '') + ' ' + (p.color || '') + ' | ' + p.sku + ' &middot; ' + p.stock + ' in stock</div><div class="pd-price">Rs ' + p.price.toFixed(2) + '</div></div>'; }).join('');
+            g.style.display = 'block'; g.innerHTML = l.map(function (p, i) { var pr = p.price || 0; return '<div class="pd-item" data-vid="' + p.vid + '" data-price="' + pr + '"><div class="pd-name">' + p.name + '</div><div class="pd-detail">' + (p.size || '') + ' ' + (p.color || '') + ' | ' + p.sku + ' &middot; ' + p.stock + ' in stock</div><div class="pd-price">Rs ' + pr.toFixed(2) + '</div></div>'; }).join('');
         }
         document.getElementById('prods').addEventListener('click', function (e) {
             var item = e.target.closest('.pd-item'); if (!item) return;

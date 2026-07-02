@@ -306,6 +306,66 @@ def payroll_print(eid):
                            name=session['name'])
 
 
+@app.route('/payroll/print-all', strict_slashes=False)
+@login_required
+@permission_required('staff')
+def payroll_print_all():
+    """Printable salary slips for all employees in a given month."""
+    month = request.args.get('month', '')
+    from database import get_db
+    with get_db() as db:
+        employees = db.execute('SELECT * FROM employees WHERE active=1 ORDER BY name').fetchall()
+        slips = []
+        for emp_row in employees:
+            emp = dict(emp_row)
+            eid = emp['id']
+
+            commission = 0
+            if month:
+                row = db.execute('''
+                    SELECT COALESCE(SUM(si.commission),0) as total
+                    FROM sale_items si
+                    JOIN sales s ON s.id = si.sale_id
+                    WHERE si.staff_id = ?
+                      AND strftime('%Y-%m', s.created_at) = ?
+                ''', (eid, month)).fetchone()
+                commission = row['total'] if row else 0
+
+            if month:
+                at = db.execute('''
+                    SELECT status, COUNT(*) as cnt FROM attendance
+                    WHERE employee_id=? AND strftime('%Y-%m', date)=?
+                    GROUP BY status
+                ''', (eid, month)).fetchall()
+            else:
+                at = []
+            at_counts = {r['status']: r['cnt'] for r in at}
+            absent_count = at_counts.get('absent', 0) + at_counts.get('half-day', 0) * 0.5
+            overtime_count = at_counts.get('overtime', 0)
+
+            ds = (emp['salary'] or 0) * 12 / 365
+            absent_deduction = absent_count * ds
+            overtime_pay = overtime_count * ds
+
+            total = (emp['salary'] or 0) + (commission or 0) + overtime_pay - (emp['advance'] or 0) - absent_deduction
+            total_words = num_to_words(abs(int(total))) + (' Rupees' if total >= 0 else ' Negative Rupees')
+
+            slips.append({
+                'employee': emp,
+                'month': month,
+                'commission': commission,
+                'ds': ds,
+                'absent_count': absent_count,
+                'absent_deduction': absent_deduction,
+                'overtime_count': overtime_count,
+                'overtime_pay': overtime_pay,
+                'total': total,
+                'total_words': total_words,
+            })
+
+    return render_template('print_all_vouchers.html', slips=slips, month=month, name=session['name'])
+
+
 @app.route('/accounts', strict_slashes=False)
 @login_required
 @permission_required('accounts')

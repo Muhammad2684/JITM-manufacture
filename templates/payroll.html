@@ -24,6 +24,7 @@
                             Month:
                             <input id="m" type="month" onchange="load()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
                         </label>
+                        <button class="btn btn-p btn-sm" onclick="printAll()">Print All</button>
                     </div>
                     <div class="table-wrap">
                         <table>
@@ -219,6 +220,11 @@
         }
 
         function cl(id) { document.getElementById(id).classList.remove('show'); }
+
+        function printAll() {
+            var m = document.getElementById('m').value || curMonth;
+            window.open('/payroll/print-all?month=' + encodeURIComponent(m), '_blank');
+        }
 
         function showAttendance(id) {
             var e = list.find(function(x) { return x.id === id; });

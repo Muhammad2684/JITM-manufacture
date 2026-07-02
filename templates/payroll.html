@@ -93,7 +93,7 @@
         var list = [], sortIdx = -1, sortDir = 1, editId = null;
         var STATUSES = ['present', 'absent', 'leave', 'half-day', 'late', 'overtime', 'off'];
         var atEmpId = null, atData = {};
-        function pktToday() { var f=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Karachi',year:'numeric',month:'2-digit',day:'2-digit'}); return f.format(new Date()); }
+        function pktToday() { var d=new Date(); d.setMinutes(d.getMinutes()+d.getTimezoneOffset()+330); return d.toISOString().slice(0,10); }
         function pktMonth() { return pktToday().slice(0,7); }
         var curMonth = pktMonth();
 

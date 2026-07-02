@@ -266,8 +266,6 @@
             var daysInMonth = new Date(year, mon, 0).getDate();
             var firstDay = new Date(year, mon - 1, 1).getDay();
             var today = new Date().toISOString().slice(0, 10);
-            var todayStr = today.slice(0, 7);
-            var isFuture = (todayStr < month);
             var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
             var html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
@@ -285,6 +283,7 @@
                         var dateStr = month + '-' + (day < 10 ? '0' : '') + day;
                         var dt = new Date(year, mon - 1, day);
                         var isSunday = dt.getDay() === 0;
+                        var isFuture = (dateStr > today);
                         var defaultStatus = isSunday ? 'off' : 'present';
                         var curStatus = atData[dateStr] || defaultStatus;
                         var isPast = (dateStr < today);

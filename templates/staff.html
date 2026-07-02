@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>JITM · Accounts</title>
+    <title>JITM · Staff</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -9,10 +9,10 @@
     {{sidebar|safe}}
     <div class="main">
         <div class="topbar">
-            <h2>Accounts</h2>
+            <h2>Staff</h2>
             <div class="actions">
                 {% if role == 'manager' %}
-                    <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Account</button>
+                    <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Staff</button>
                 {% endif %}
                 <span class="text-muted">{{name}}</span>
             </div>

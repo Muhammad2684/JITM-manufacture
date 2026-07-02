@@ -273,6 +273,18 @@ def payroll_print(eid):
             ''', (eid, month)).fetchone()
             commission = row['total'] if row else 0
 
+        # Attendance counts for the month
+        if month:
+            at = db.execute('''
+                SELECT status, COUNT(*) as cnt FROM attendance
+                WHERE employee_id=? AND strftime('%Y-%m', date)=?
+                GROUP BY status
+            ''', (eid, month)).fetchall()
+        else:
+            at = []
+        at_counts = {r['status']: r['cnt'] for r in at}
+        leaves = at_counts.get('leave', 0) + at_counts.get('half-day', 0) * 0.5
+
         total = (emp['salary'] or 0) + (commission or 0) + (emp['overtime'] or 0) - (emp['advance'] or 0)
         total_words = num_to_words(abs(int(total))) + (' Rupees' if total >= 0 else ' Negative Rupees')
 
@@ -280,6 +292,7 @@ def payroll_print(eid):
                            employee=emp, month=month,
                            commission=commission,
                            total=total, total_words=total_words,
+                           leaves=leaves, absents=at_counts.get('absent', 0),
                            name=session['name'])
 
 

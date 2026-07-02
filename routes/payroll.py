@@ -78,3 +78,34 @@ def delete_employee(eid):
     with get_db() as db:
         db.execute('UPDATE employees SET active=0 WHERE id=?', (eid,))
     return jsonify({'ok': True})
+
+
+@payroll_bp.route('/attendance', methods=['GET'])
+@login_required
+def get_attendance():
+    employee_id = request.args.get('employee_id')
+    month = request.args.get('month')
+    if not employee_id or not month:
+        return jsonify({'error': 'employee_id and month required'}), 400
+    with get_db() as db:
+        rows = db.execute(
+            'SELECT * FROM attendance WHERE employee_id=? AND strftime(\'%Y-%m\', date)=? ORDER BY date',
+            (employee_id, month)
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@payroll_bp.route('/attendance', methods=['PUT'])
+@login_required
+def upsert_attendance():
+    d = request.get_json()
+    if not d or not d.get('employee_id') or not d.get('date') or not d.get('status'):
+        return jsonify({'error': 'employee_id, date, status required'}), 400
+    with get_db() as db:
+        db.execute(
+            '''INSERT INTO attendance (employee_id, date, status)
+               VALUES (?,?,?)
+               ON CONFLICT(employee_id, date) DO UPDATE SET status=excluded.status''',
+            (d['employee_id'], d['date'], d['status'])
+        )
+    return jsonify({'ok': True})

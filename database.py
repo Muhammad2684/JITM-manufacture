@@ -260,6 +260,15 @@ def init_db():
                 active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+                date TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'present',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(employee_id, date)
+            );
         ''')
 
         # migrations

@@ -62,10 +62,6 @@
                     <div><label>Salary</label><input id="fs" type="number" step="0.01" min="0"></div>
                 </div>
                 <div class="form-row">
-                    <div><label>Leaves</label><input id="flv" type="number" step="0.01" min="0" value="0"></div>
-                    <div><label>Absents</label><input id="fab" type="number" step="0.01" min="0" value="0"></div>
-                </div>
-                <div class="form-row">
                     <div><label>Overtime</label><input id="fot" type="number" step="0.01" min="0" value="0"></div>
                     <div><label>Advance</label><input id="fad" type="number" step="0.01" min="0" value="0"></div>
                 </div>
@@ -78,8 +74,25 @@
         </div>
     </div>
 
+    <div class="modal" id="atm">
+        <div class="mc" style="max-width:760px">
+            <button class="mx" onclick="cl('atm')">&times;</button>
+            <h2 id="at_title">Attendance</h2>
+            <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <span id="at_emp_name" style="font-weight:600"></span>
+                <span style="color:#6b7280;font-size:13px" id="at_month_label"></span>
+            </div>
+            <div id="at_calendar" style="min-height:300px"></div>
+            <div id="at_summary" style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;font-size:13px"></div>
+            <button class="btn btn-p btn-sm" onclick="saveAllAttendance()" style="margin-top:12px">Save All</button>
+            <span id="at_msg" style="margin-left:10px;font-size:12px"></span>
+        </div>
+    </div>
+
     <script>
         var list = [], sortIdx = -1, sortDir = 1, editId = null, curMonth = new Date().toISOString().slice(0, 7);
+        var STATUSES = ['present', 'absent', 'leave', 'half-day', 'late', 'overtime'];
+        var atEmpId = null, atData = {};
 
         function load() {
             var m = document.getElementById('m').value || curMonth;
@@ -123,6 +136,7 @@
                     '<td>' +
                         '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + e.id + ')">Edit</button> ' +
                         '<button class="btn btn-xs btn-ghost" onclick="showVoucher(' + e.id + ')">Details</button> ' +
+                        '<button class="btn btn-xs btn-ghost" onclick="showAttendance(' + e.id + ')">Attendance</button> ' +
                         '<button class="btn btn-xs btn-p" onclick="showPrint(' + e.id + ')">Print</button> ' +
                         '<button class="btn btn-xs btn-d" onclick="del(' + e.id + ')">Delete</button>' +
                     '</td></tr>';
@@ -152,8 +166,6 @@
             document.getElementById('fph').value = '';
             document.getElementById('fnn').value = '';
             document.getElementById('fs').value = '';
-            document.getElementById('flv').value = '0';
-            document.getElementById('fab').value = '0';
             document.getElementById('fot').value = '0';
             document.getElementById('fad').value = '0';
             document.getElementById('fc').value = '';
@@ -171,8 +183,6 @@
             document.getElementById('fph').value = e.phone || '';
             document.getElementById('fnn').value = e.nickname || '';
             document.getElementById('fs').value = e.salary || 0;
-            document.getElementById('flv').value = e.leaves || 0;
-            document.getElementById('fab').value = e.absents || 0;
             document.getElementById('fot').value = e.overtime || 0;
             document.getElementById('fad').value = e.advance || 0;
             document.getElementById('fc').value = e.commissions || 0;
@@ -190,8 +200,6 @@
                 phone: document.getElementById('fph').value.trim(),
                 nickname: document.getElementById('fnn').value.trim(),
                 salary: parseFloat(document.getElementById('fs').value) || 0,
-                leaves: parseFloat(document.getElementById('flv').value) || 0,
-                absents: parseFloat(document.getElementById('fab').value) || 0,
                 overtime: parseFloat(document.getElementById('fot').value) || 0,
                 advance: parseFloat(document.getElementById('fad').value) || 0,
                 commissions: parseFloat(document.getElementById('fc').value) || 0
@@ -215,6 +223,111 @@
         }
 
         function cl(id) { document.getElementById(id).classList.remove('show'); }
+
+        function showAttendance(id) {
+            var e = list.find(function(x) { return x.id === id; });
+            if (!e) return;
+            atEmpId = id;
+            document.getElementById('at_emp_name').textContent = e.name || '';
+            var m = document.getElementById('m').value || curMonth;
+            document.getElementById('at_month_label').textContent = m;
+            document.getElementById('at_title').textContent = 'Attendance — ' + (e.name || '');
+            document.getElementById('at_msg').textContent = '';
+            document.getElementById('atm').classList.add('show');
+            loadAttendance(m);
+        }
+
+        function loadAttendance(month) {
+            fetch('/api/attendance?employee_id=' + atEmpId + '&month=' + encodeURIComponent(month))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    atData = {};
+                    (d || []).forEach(function(a) { atData[a.date] = a.status; });
+                    renderCalendar(month);
+                });
+        }
+
+        function renderCalendar(month) {
+            var parts = month.split('-');
+            var year = parseInt(parts[0]), mon = parseInt(parts[1]);
+            var daysInMonth = new Date(year, mon, 0).getDate();
+            var firstDay = new Date(year, mon - 1, 1).getDay();
+            var today = new Date().toISOString().slice(0, 10);
+            var todayStr = today.slice(0, 7);
+            var isFuture = (todayStr < month);
+            var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+            var html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+            dayNames.forEach(function(d) { html += '<th style="padding:6px;text-align:center;background:#eee;border:1px solid #ddd">' + d + '</th>'; });
+            html += '</tr></thead><tbody>';
+
+            var day = 1;
+            for (var row = 0; row < 6; row++) {
+                if (day > daysInMonth) break;
+                html += '<tr>';
+                for (var col = 0; col < 7; col++) {
+                    if ((row === 0 && col < firstDay) || day > daysInMonth) {
+                        html += '<td style="border:1px solid #eee;padding:4px"></td>';
+                    } else {
+                        var dateStr = month + '-' + (day < 10 ? '0' : '') + day;
+                        var curStatus = atData[dateStr] || 'present';
+                        var isPast = (dateStr < today);
+                        var disabled = isFuture || (isPast && atData[dateStr] === undefined);
+                        html += '<td style="border:1px solid #ddd;padding:4px;vertical-align:top;' + (dateStr === today ? 'background:#fffde7' : '') + '">';
+                        html += '<div style="font-weight:600;margin-bottom:3px;font-size:11px">' + day + '</div>';
+                        html += '<select style="font-size:10px;padding:2px;width:100%;' + (disabled ? 'opacity:0.5' : '') + '" ' + (disabled ? 'disabled' : '') + ' data-date="' + dateStr + '" onchange="markAttendance(this)">';
+                        STATUSES.forEach(function(s) {
+                            html += '<option value="' + s + '"' + (s === curStatus ? ' selected' : '') + '>' + s + '</option>';
+                        });
+                        html += '</select>';
+                        html += '</td>';
+                        day++;
+                    }
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+            document.getElementById('at_calendar').innerHTML = html;
+
+            // Summary row
+            var counts = {present:0, absent:0, leave:0, 'half-day':0, late:0, overtime:0};
+            for (var d = 1; d <= daysInMonth; d++) {
+                var ds = month + '-' + (d < 10 ? '0' : '') + d;
+                var s = atData[ds] || 'present';
+                if (ds <= today) counts[s] = (counts[s] || 0) + 1;
+            }
+            var sumHtml = '';
+            STATUSES.forEach(function(s) {
+                sumHtml += '<span style="background:#f3f4f6;padding:4px 10px;border-radius:6px"><strong>' + s + ':</strong> ' + (counts[s] || 0) + '</span>';
+            });
+            document.getElementById('at_summary').innerHTML = sumHtml;
+        }
+
+        function markAttendance(sel) {
+            var date = sel.getAttribute('data-date');
+            atData[date] = sel.value;
+        }
+
+        function saveAllAttendance() {
+            var keys = Object.keys(atData);
+            var promises = [];
+            keys.forEach(function(date) {
+                var status = atData[date];
+                promises.push(
+                    fetch('/api/attendance', {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({employee_id: atEmpId, date: date, status: status})
+                    }).then(function(r) { return r.json(); })
+                );
+            });
+            Promise.all(promises).then(function(results) {
+                var ok = results.every(function(r) { return r.ok; });
+                document.getElementById('at_msg').textContent = ok ? 'Saved!' : 'Some failed';
+                document.getElementById('at_msg').style.color = ok ? 'green' : 'red';
+                if (ok) setTimeout(function() { document.getElementById('at_msg').textContent = ''; }, 2000);
+            });
+        }
 
         function showVoucher(id) {
             var m = document.getElementById('m').value || curMonth;

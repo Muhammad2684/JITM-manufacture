@@ -182,9 +182,16 @@
                                 <div>
                                     <label>Paper Size</label>
                                     <select id="paperSize" onchange="renderPreview()">
-                                        <option value="letter" selected>Letter (8.5" × 11")</option>
-                                        <option value="a4">A4 (8.27" × 11.69")</option>
-                                        <option value="legal">Legal (8.5" × 14")</option>
+                                        <optgroup label="Custom Sizes">
+                                            <option value="2x4">2" × 4"</option>
+                                            <option value="4x4">4" × 4"</option>
+                                            <option value="4x6">4" × 6"</option>
+                                        </optgroup>
+                                        <optgroup label="Standard Sizes">
+                                            <option value="letter" selected>Letter (8.5" × 11")</option>
+                                            <option value="a4">A4 (8.27" × 11.69")</option>
+                                            <option value="legal">Legal (8.5" × 14")</option>
+                                        </optgroup>
                                     </select>
                                 </div>
                                 <div>
@@ -221,15 +228,20 @@
     <script>
         var queue = [], queueId = 0, hlIdx = -1;
         
-        // Label size options: 1.5" × 1" or 1" × 1.5"
-        var labelWidthIn = 1.5;
-        var labelHeightIn = 1.0;
+        // Label size options: 1.5" × 1" (landscape) or 1" × 1.5" (portrait)
+        var labelWidthLandscape = 1.5;
+        var labelHeightLandscape = 1.0;
+        var labelWidthPortrait = 1.0;
+        var labelHeightPortrait = 1.5;
         
-        // Paper sizes in inches
+        // Paper sizes in inches (both custom and standard)
         var paperSizes = {
-            'letter': { width: 8.5, height: 11 },
-            'a4': { width: 8.27, height: 11.69 },
-            'legal': { width: 8.5, height: 14 }
+            '2x4': { width: 2, height: 4, label: '2" × 4"' },
+            '4x4': { width: 4, height: 4, label: '4" × 4"' },
+            '4x6': { width: 4, height: 6, label: '4" × 6"' },
+            'letter': { width: 8.5, height: 11, label: 'Letter (8.5" × 11")' },
+            'a4': { width: 8.27, height: 11.69, label: 'A4 (8.27" × 11.69")' },
+            'legal': { width: 8.5, height: 14, label: 'Legal (8.5" × 14")' }
         };
         
         var searchInput = document.getElementById('searchInput');
@@ -416,24 +428,25 @@
             var paper = paperSizes[paperSize];
             var pxPerInch = 96;
             
-            // Try both orientations
-            var landscapeCols = Math.floor(paper.width / labelWidthIn);
-            var landscapeRows = Math.floor(paper.height / labelHeightIn);
+            // Try landscape orientation first (1.5" × 1")
+            var landscapeCols = Math.floor(paper.width / labelWidthLandscape);
+            var landscapeRows = Math.floor(paper.height / labelHeightLandscape);
             var landscapeTotal = landscapeCols * landscapeRows;
             
-            var portraitCols = Math.floor(paper.width / labelHeightIn);
-            var portraitRows = Math.floor(paper.height / labelWidthIn);
+            // Try portrait orientation (1" × 1.5")
+            var portraitCols = Math.floor(paper.width / labelWidthPortrait);
+            var portraitRows = Math.floor(paper.height / labelHeightPortrait);
             var portraitTotal = portraitCols * portraitRows;
             
-            // Choose orientation that fits more labels
-            var usePortrait = portraitTotal > landscapeTotal;
+            // Prioritize landscape unless portrait fits significantly better (20% more labels)
+            var usePortrait = portraitTotal > landscapeTotal * 1.2;
             
             var cols = usePortrait ? portraitCols : landscapeCols;
             var rows = usePortrait ? portraitRows : landscapeRows;
             var total = cols * rows;
             
-            var labelWidth = usePortrait ? labelHeightIn * pxPerInch : labelWidthIn * pxPerInch;
-            var labelHeight = usePortrait ? labelWidthIn * pxPerInch : labelHeightIn * pxPerInch;
+            var labelWidth = usePortrait ? labelWidthPortrait * pxPerInch : labelWidthLandscape * pxPerInch;
+            var labelHeight = usePortrait ? labelHeightPortrait * pxPerInch : labelHeightLandscape * pxPerInch;
             
             return {
                 cols: cols,
@@ -462,8 +475,9 @@
             queue.forEach(function(q) {
                 var prepared = prepareBarcodeData(q.sku, barcodeType);
                 for (var c = 0; c < q.copies; c++) {
+                    var rotateStyle = grid.usePortrait ? 'transform:rotate(90deg);' : '';
                     html += '<div class="preview-label" style="width:' + grid.labelWidth + 'px;height:' + grid.labelHeight + 'px">';
-                    html += '<svg id="pv-' + q.id + '-' + c + '"></svg>';
+                    html += '<svg id="pv-' + q.id + '-' + c + '" style="' + rotateStyle + '"></svg>';
                     html += '<div class="pl-sku">' + q.sku + '</div>';
                     if (prepared.warning) {
                         html += '<div class="pl-warn">' + prepared.warning + '</div>';
@@ -556,6 +570,9 @@
                     var svgId = 'pl-' + pageNum + '-' + i;
                     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                     svg.setAttribute('id', svgId);
+                    if (grid.usePortrait) {
+                        svg.style.transform = 'rotate(90deg)';
+                    }
                     div.appendChild(svg);
                     
                     var skuDiv = document.createElement('div');

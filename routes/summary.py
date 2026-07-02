@@ -137,7 +137,10 @@ def summary():
                 'expenses_detail': expenses_detail,
                 'total_expenses': round(total_expenses, 2),
                 'net_profit': round(net_profit, 2),
-                'uncategorized': 0,
+                'drawings': {
+                    'p1': 0,
+                    'p2': 0,
+                },
             }
         
         return jsonify(result)
@@ -347,6 +350,21 @@ def summary_details(detail_type):
                     [r['category'], f"Rs {r['total']:.2f}"]
                     for r in rows
                 ]
+            })
+        
+        elif detail_type.startswith('drawing_'):
+            label = 'P1' if 'p1' in detail_type else 'P2'
+            rows = db.execute(
+                'SELECT category, amount, note, created_at FROM expenses WHERE category=?',
+                [label]
+            ).fetchall()
+            return jsonify({
+                'title': f'Drawings — {label}',
+                'columns': ['Category', 'Amount', 'Note', 'Date'],
+                'rows': [
+                    [r['category'], f"Rs {r['amount']:.2f}", r['note'] or '-', (r['created_at'] or '')[:10]]
+                    for r in rows
+                ] if rows else []
             })
         
         return jsonify({'error': 'Invalid detail type'}), 400

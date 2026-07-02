@@ -432,14 +432,19 @@
             queue.forEach(function(q) {
                 var prepared = prepareBarcodeData(q.sku, barcodeType);
                 for (var c = 0; c < q.copies; c++) {
-                    var rotateStyle = orientation === 'portrait' ? 'transform:rotate(90deg);' : '';
-                    html += '<div class="preview-label" style="width:' + labelWidth + 'px;height:' + labelHeight + 'px;' + rotateStyle + '">';
+                    html += '<div class="preview-label" style="width:' + labelWidth + 'px;height:' + labelHeight + 'px;position:relative">';
+                    if (orientation === 'portrait') {
+                        html += '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg);width:144px;height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center">';
+                    }
                     html += '<svg id="pv-' + q.id + '-' + c + '"></svg>';
                     html += '<div class="pl-sku">' + q.sku + '</div>';
                     if (prepared.warning) {
                         html += '<div class="pl-warn">' + prepared.warning + '</div>';
                     }
                     html += '<div class="pl-name">' + q.name + '</div>';
+                    if (orientation === 'portrait') {
+                        html += '</div>';
+                    }
                     html += '</div>';
                 }
             });
@@ -522,23 +527,30 @@
                 div.style.width = labelWidth;
                 div.style.height = labelHeight;
                 if (orientation === 'portrait') {
-                    div.style.transform = 'rotate(90deg)';
+                    div.style.position = 'relative';
+                }
+                
+                var wrapper = div;
+                if (orientation === 'portrait') {
+                    wrapper = document.createElement('div');
+                    wrapper.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg);width:1.5in;height:1in;display:flex;flex-direction:column;align-items:center;justify-content:center';
+                    div.appendChild(wrapper);
                 }
                 
                 var svgId = 'pl-' + i;
                 var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 svg.setAttribute('id', svgId);
-                div.appendChild(svg);
+                wrapper.appendChild(svg);
                 
                 var skuDiv = document.createElement('div');
                 skuDiv.className = 'pl-sku';
                 skuDiv.textContent = label.sku;
-                div.appendChild(skuDiv);
+                wrapper.appendChild(skuDiv);
                 
                 var nameDiv = document.createElement('div');
                 nameDiv.className = 'pl-name';
                 nameDiv.textContent = label.name;
-                div.appendChild(nameDiv);
+                wrapper.appendChild(nameDiv);
                 
                 pageDiv.appendChild(div);
             });

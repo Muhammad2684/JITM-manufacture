@@ -1,4 +1,8 @@
 import os
+import time
+os.environ['TZ'] = 'Asia/Karachi'
+time.tzset()
+
 from flask import Flask, render_template, redirect, session, request
 from markupsafe import escape
 from database import init_db

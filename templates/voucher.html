@@ -100,7 +100,7 @@
     </div>
 
     <script>
-        document.getElementById('dt').textContent = new Date().toLocaleDateString('en-GB');
+        document.getElementById('dt').textContent = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Karachi' }).format(new Date());
     </script>
 </body>
 </html>

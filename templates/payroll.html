@@ -90,9 +90,12 @@
     </div>
 
     <script>
-        var list = [], sortIdx = -1, sortDir = 1, editId = null, curMonth = new Date().toISOString().slice(0, 7);
+        var list = [], sortIdx = -1, sortDir = 1, editId = null;
         var STATUSES = ['present', 'absent', 'leave', 'half-day', 'late', 'overtime', 'off'];
         var atEmpId = null, atData = {};
+        function pktToday() { var f=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Karachi',year:'numeric',month:'2-digit',day:'2-digit'}); return f.format(new Date()); }
+        function pktMonth() { return pktToday().slice(0,7); }
+        var curMonth = pktMonth();
 
         function load() {
             var m = document.getElementById('m').value || curMonth;
@@ -247,7 +250,7 @@
                     var parts = month.split('-');
                     var year = parseInt(parts[0]), mon = parseInt(parts[1]);
                     var daysInMonth = new Date(year, mon, 0).getDate();
-                    var today = new Date().toISOString().slice(0, 10);
+                    var today = pktToday();
                     for (var d = 1; d <= daysInMonth; d++) {
                         var ds = month + '-' + (d < 10 ? '0' : '') + d;
                         if (ds > today) continue;
@@ -265,7 +268,7 @@
             var year = parseInt(parts[0]), mon = parseInt(parts[1]);
             var daysInMonth = new Date(year, mon, 0).getDate();
             var firstDay = new Date(year, mon - 1, 1).getDay();
-            var today = new Date().toISOString().slice(0, 10);
+            var today = pktToday();
             var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
             var html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';

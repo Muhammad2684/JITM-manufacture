@@ -48,7 +48,7 @@ def init_db():
                 role TEXT NOT NULL DEFAULT 'staff',
                 name TEXT NOT NULL,
                 active INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS products (
@@ -61,7 +61,7 @@ def init_db():
                 barcode TEXT UNIQUE DEFAULT NULL,
                 has_variants INTEGER NOT NULL DEFAULT 0,
                 low_stock INTEGER NOT NULL DEFAULT 5,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS variants (
@@ -73,7 +73,7 @@ def init_db():
                 barcode TEXT UNIQUE DEFAULT NULL,
                 price REAL DEFAULT NULL,
                 stock INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS sales (
@@ -92,7 +92,7 @@ def init_db():
                 staff_id INTEGER NOT NULL REFERENCES users(id),
                 staff_name TEXT NOT NULL,
                 notes TEXT DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS sale_items (
@@ -115,7 +115,7 @@ def init_db():
                 method TEXT NOT NULL,
                 amount REAL NOT NULL,
                 reference TEXT DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS customers (
@@ -130,7 +130,7 @@ def init_db():
                 credit REAL NOT NULL DEFAULT 0,
                 total_spent REAL NOT NULL DEFAULT 0,
                 visit_count INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS restock_log (
@@ -142,7 +142,7 @@ def init_db():
                 cost REAL DEFAULT 0,
                 note TEXT DEFAULT '',
                 staff_name TEXT DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS suppliers (
@@ -154,7 +154,7 @@ def init_db():
                 contact_person TEXT DEFAULT '',
                 notes TEXT DEFAULT '',
                 balance REAL NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS expenses (
@@ -162,25 +162,25 @@ def init_db():
                 category TEXT NOT NULL,
                 amount REAL NOT NULL DEFAULT 0,
                 note TEXT DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS commission_classes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS sizes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS settings (
@@ -199,7 +199,7 @@ def init_db():
                 name TEXT NOT NULL,
                 type TEXT NOT NULL DEFAULT 'cash',
                 balance REAL NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS account_transfers (
@@ -209,7 +209,7 @@ def init_db():
                 amount REAL NOT NULL DEFAULT 0,
                 note TEXT DEFAULT '',
                 date TEXT NOT NULL DEFAULT (date('now')),
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS transactions (
@@ -224,7 +224,7 @@ def init_db():
                 reference_id INTEGER DEFAULT NULL,
                 allocations TEXT DEFAULT '[]',
                 date TEXT NOT NULL DEFAULT (date('now')),
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS purchase_invoices (
@@ -237,7 +237,7 @@ def init_db():
                 invoice_amount REAL NOT NULL DEFAULT 0,
                 balance_due REAL NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'Unpaid',
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS purchase_invoice_items (
@@ -258,7 +258,7 @@ def init_db():
                 salary REAL NOT NULL DEFAULT 0,
                 commissions REAL NOT NULL DEFAULT 0,
                 active INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS attendance (
@@ -266,7 +266,7 @@ def init_db():
                 employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
                 date TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'present',
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
                 UNIQUE(employee_id, date)
             );
         ''')

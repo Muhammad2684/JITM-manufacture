@@ -36,9 +36,10 @@ def add_supplier():
     with get_db() as db:
         try:
             cursor = db.execute(
-                'INSERT INTO suppliers (name, phone, email, address, contact_person, notes, company_phone) VALUES (?,?,?,?,?,?,?)',
+                'INSERT INTO suppliers (name, phone, email, address, contact_person, notes, company_phone, balance) VALUES (?,?,?,?,?,?,?,?)',
                 (request_data['name'], request_data.get('phone', ''), request_data.get('email', ''), request_data.get('address', ''),
-                 request_data.get('contact_person', ''), request_data.get('notes', ''), request_data.get('company_phone', ''))
+                 request_data.get('contact_person', ''), request_data.get('notes', ''), request_data.get('company_phone', ''),
+                 float(request_data.get('balance', 0)))
             )
             return jsonify({'ok': True, 'id': cursor.lastrowid})
         except Exception as error:

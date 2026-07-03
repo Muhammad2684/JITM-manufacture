@@ -80,8 +80,8 @@
                         <input id="ca">
                     </div>
                     <div>
-                        <label>Store Credit (Rs)</label>
-                        <input id="cc" type="number" step="0.01" value="0">
+                        <label>Opening Balance (Rs)</label>
+                        <input id="cob" type="number" step="0.01" value="0">
                     </div>
                 </div>
                 
@@ -201,7 +201,7 @@
             document.getElementById('cp').value = '';
             document.getElementById('ce').value = '';
             document.getElementById('ca').value = '';
-            document.getElementById('cc').value = '0';
+            document.getElementById('cob').value = '0';
             document.getElementById('cbn').value = '';
             document.getElementById('cbm').value = '';
             document.getElementById('cno').value = '';
@@ -217,7 +217,7 @@
             document.getElementById('cp').value = c.phone || '';
             document.getElementById('ce').value = c.email || '';
             document.getElementById('ca').value = c.address || '';
-            document.getElementById('cc').value = c.credit;
+            document.getElementById('cob').value = c.credit;
             document.getElementById('cbn').value = c.baby_name || '';
             document.getElementById('cbm').value = c.baby_birth || '';
             document.getElementById('cno').value = c.notes || '';
@@ -234,7 +234,7 @@
                 baby_name: document.getElementById('cbn').value,
                 baby_birth: document.getElementById('cbm').value,
                 notes: document.getElementById('cno').value,
-                credit: document.getElementById('cc').value
+                credit: document.getElementById('cob').value
             };
             
             fetch(editId ? '/api/customers/' + editId : '/api/customers', {

@@ -61,6 +61,8 @@
                 <input id="scph" type="tel">
                 <label>Address</label>
                 <input id="sad">
+                <label>Opening Balance (Rs)</label>
+                <input id="sob" type="number" step="0.01" value="0">
                 <button class="btn btn-p" type="submit">Save</button>
             </form>
         </div>
@@ -194,6 +196,7 @@
             document.getElementById('sph').value = '';
             document.getElementById('scph').value = '';
             document.getElementById('sad').value = '';
+            document.getElementById('sob').value = '0';
         }
         
         function saveS(e) {
@@ -209,7 +212,8 @@
                     contact_person: document.getElementById('scp').value,
                     phone: document.getElementById('sph').value,
                     company_phone: document.getElementById('scph').value,
-                    address: document.getElementById('sad').value
+                    address: document.getElementById('sad').value,
+                    balance: document.getElementById('sob').value
                 })
             })
             .then(r => r.json())

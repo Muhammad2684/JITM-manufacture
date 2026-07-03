@@ -160,8 +160,10 @@
                 <div class="card">
                     <div class="card-body totals">
                         <div class="tr"><span>Subtotal</span><span id="sub">Rs 0.00</span></div>
-                        <div class="tr"><span>Discount %</span><span><input id="discPct" type="number" min="0" step="0.1" placeholder="0" oninput="calc()"> %</span></div>
-                        <div class="tr"><span>Discount Rs</span><span><input id="discAmt" type="number" min="0" step="0.01" placeholder="0" oninput="calc()"> Rs</span></div>
+                        <div class="tr"><span>Addons %</span><span><input id="discPct" type="number" min="0" step="0.1"
+                                    placeholder="0" oninput="calc()"> %</span></div>
+                        <div class="tr"><span>ㅤ </span><span><input id="discAmt" type="number" min="0" step="0.01"
+                                    placeholder="0" oninput="calc()"> Rs</span></div>
                         <div class="tr gt"><span>TOTAL</span><span id="tot">Rs 0.00</span></div>
                     </div>
                 </div>
@@ -243,7 +245,8 @@
             }
         });
         document.getElementById('s').addEventListener('blur', function () { setTimeout(closeDropdown, 200) });
-        document.getElementById('disc').addEventListener('input', calc);
+        document.getElementById('discPct').addEventListener('input', calc);
+        document.getElementById('discAmt').addEventListener('input', calc);
 
         function highlight(items) { items.forEach(function (el, i) { el.classList.toggle('hl', i === hlIdx) }); var h = items[hlIdx]; if (h) h.scrollIntoView({ block: 'nearest' }); }
         function closeDropdown() { var g = document.getElementById('prods'); g.innerHTML = ''; g.style.display = 'none'; hlIdx = -1; }
@@ -304,7 +307,7 @@
         function clearCart() {
             if (!cart.length) return; if (!confirm('Clear?')) return; cart = []; isR = false; selC = null; walkIn = false;
             document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false; document.getElementById('notes').value = '';
-            document.getElementById('disc').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-bl').value = ''; document.getElementById('am-jl').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
+            document.getElementById('discPct').value = ''; document.getElementById('discAmt').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-bl').value = ''; document.getElementById('am-jl').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
             updateModeButton(); renderC(); search();
         }
         function cycleMode() {

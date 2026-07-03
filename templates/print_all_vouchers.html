@@ -138,11 +138,14 @@
         @media print {
             @page {
                 size: A4;
-                margin: 2cm;
+                margin: 1cm;
             }
 
             body {
                 padding: 0;
+                display: flex;
+                flex-direction: column;
+                height: calc(100vh - 2cm);
             }
 
             .bp {
@@ -151,9 +154,12 @@
 
             .v {
                 border: 1px solid #ccc;
-                padding: 10px 15px;
-                margin-bottom: 12px;
+                padding: 15px 20px;
+                margin-bottom: 10px;
                 page-break-inside: avoid;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
             }
 
             .v:nth-child(2n) {
@@ -162,63 +168,66 @@
 
             .v:last-child {
                 page-break-after: auto;
+                margin-bottom: 0;
             }
 
             .h {
-                padding-bottom: 6px;
-                margin-bottom: 8px;
+                padding-bottom: 8px;
+                margin-bottom: 10px;
             }
 
             .h h1 {
-                font-size: 16px;
+                font-size: 18px;
             }
 
             .h p {
-                font-size: 11px;
+                font-size: 12px;
             }
 
             .i {
-                gap: 4px 15px;
-                margin-bottom: 8px;
+                gap: 6px 20px;
+                margin-bottom: 12px;
             }
 
             .i div {
-                line-height: 1.5;
-                font-size: 11px;
+                line-height: 1.6;
+                font-size: 12px;
             }
 
             .i .l {
-                min-width: 90px;
+                min-width: 100px;
             }
 
             table {
-                margin-bottom: 6px;
+                margin-bottom: 10px;
+                flex-grow: 1;
             }
 
             th,
             td {
-                padding: 4px 8px;
-                font-size: 10px;
+                padding: 6px 10px;
+                font-size: 11px;
             }
 
             .tot {
-                font-size: 12px;
-                margin: 6px 0;
+                font-size: 14px;
+                margin: 10px 0;
             }
 
             .tw {
-                font-size: 10px;
-                margin-bottom: 8px;
-                padding-top: 4px;
+                font-size: 11px;
+                margin-bottom: 12px;
+                padding-top: 6px;
             }
 
             .sig {
-                margin-top: 12px;
+                margin-top: auto;
+                padding-top: 15px;
             }
 
             .sig div {
-                font-size: 9px;
-                padding-top: 6px;
+                font-size: 10px;
+                padding-top: 8px;
             }
 
             th {

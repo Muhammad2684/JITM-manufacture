@@ -183,8 +183,8 @@ def complete_sale():
         return jsonify({'error': 'No items'}), 400
     
     is_return = request_data.get('is_return', False)
-    discount = float(request_data.get('discount', 0))
-    discount_type = request_data.get('discount_type', 'percent')
+    discount_pct = float(request_data.get('discount_pct', 0))
+    discount_amt = float(request_data.get('discount_amt', 0))
     payment_method = request_data.get('payment', 'cash')
     customer_phone = request_data.get('customer_phone', '')
     is_walk_in = request_data.get('walk_in', False)
@@ -207,7 +207,7 @@ def complete_sale():
         if errors:
             return jsonify({'error': '; '.join(errors)}), 400
         
-        discount_amount = round(abs(subtotal) * discount / 100, 2) if discount_type == 'percent' else discount
+        discount_amount = round(abs(subtotal) * discount_pct / 100 + discount_amt, 2)
         if subtotal < 0:
             total = round(subtotal + discount_amount, 2)
         else:
@@ -243,7 +243,7 @@ def complete_sale():
         sale_id = db.execute(
             'INSERT INTO sales (receipt, subtotal, discount, discount_type, tax, total, payment, status, customer_id, customer_name, staff_id, staff_name, notes, due_date, paid, cash_tendered, change_given) '
             'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            (receipt_number, round(subtotal, 2), discount_amount, discount_type, tax, total,
+            (receipt_number, round(subtotal, 2), discount_amount, 'amount', tax, total,
              'split' if len(payment_list) > 1 else payment_method, status,
              customer_id, customer_name, session['user_id'], session['name'], notes, due_date,
              paid_amount, cash_tendered, change_given)

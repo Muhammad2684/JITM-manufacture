@@ -160,12 +160,8 @@
                 <div class="card">
                     <div class="card-body totals">
                         <div class="tr"><span>Subtotal</span><span id="sub">Rs 0.00</span></div>
-                        <div class="tr"><span>Discount</span><span><input id="disc" type="number" min="0"
-                                    step="0.1" placeholder="0" oninput="calc()">
-                                <select id="discType" onchange="calc()" style="margin-left:4px;padding:2px 4px;border:1px solid #e2e1de;border-radius:4px;font-size:11px">
-                                    <option value="percent">%</option>
-                                    <option value="amount">Rs</option>
-                                </select></span></div>
+                        <div class="tr"><span>Discount %</span><span><input id="discPct" type="number" min="0" step="0.1" placeholder="0" oninput="calc()"> %</span></div>
+                        <div class="tr"><span>Discount Rs</span><span><input id="discAmt" type="number" min="0" step="0.01" placeholder="0" oninput="calc()"> Rs</span></div>
                         <div class="tr gt"><span>TOTAL</span><span id="tot">Rs 0.00</span></div>
                     </div>
                 </div>
@@ -282,7 +278,7 @@
             const el = document.getElementById('cart'), cnt = document.getElementById('cnt'); let n = 0, h = '';
             if (isR) h += '<div class="rb">RETURN MODE</div>';
             if (!cart.length) { el.innerHTML = h + '<div class="cart-empty">Add items to begin</div>'; cnt.textContent = ''; calc(); return; }
-            h += '<table class="ct"><thead><tr><th></th><th>SKU</th><th>Staff</th><th>Disc%</th><th>Product</th><th>Price</th><th>Qty</th><th>Net Total</th><th></th></tr></thead><tbody>';
+            h += '<table class="ct"><thead><tr><th></th><th>SKU</th><th>Staff</th><th>ㅤ</th><th>Product</th><th>Price</th><th>Qty</th><th>Net Total</th><th></th></tr></thead><tbody>';
             cart.forEach(function (c, i) {
                 n += Math.abs(c.qty); var net = c.qty * c.price * (1 - (c.disc || 0) / 100);
                 var sopts = staffList.map(function (s) { return '<option value="' + s.id + '"' + (s.id == c.staff ? ' selected' : '') + '>' + s.name + '</option>'; }).join('');
@@ -328,13 +324,13 @@
         }
         function calc() {
             let sub = 0;
-            cart.forEach(function(c) {
+            cart.forEach(function (c) {
                 let itemTotal = c.qty * c.price * (1 - (c.disc || 0) / 100);
                 sub += itemTotal;
             });
-            const dv = parseFloat(document.getElementById('disc').value) || 0;
-            const dt = document.getElementById('discType').value;
-            const d = dt === 'percent' ? Math.abs(sub) * dv / 100 : dv;
+            const pct = parseFloat(document.getElementById('discPct').value) || 0;
+            const amt = parseFloat(document.getElementById('discAmt').value) || 0;
+            const d = Math.abs(sub) * pct / 100 + amt;
             const tot = sub - d;
             document.getElementById('sub').textContent = 'Rs ' + sub.toFixed(2);
             document.getElementById('tot').textContent = 'Rs ' + tot.toFixed(2);
@@ -410,15 +406,15 @@
             fetch('/api/sale', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    items, payment: primaryMethod, payments: pd.pays, discount: parseFloat(document.getElementById('disc').value) || 0,
-                    discount_type: document.getElementById('discType').value,
+                    items, payment: primaryMethod, payments: pd.pays, discount_pct: parseFloat(document.getElementById('discPct').value) || 0,
+                    discount_amt: parseFloat(document.getElementById('discAmt').value) || 0,
                     is_return: isR, customer_id: selC ? selC.id : null, customer_name: walkIn ? 'Walk In' : (document.getElementById('cName').value.trim() || (selC ? selC.name : '')), customer_phone: document.getElementById('cPhone').value.trim(), walk_in: walkIn, notes: document.getElementById('notes').value, cash_tendered: pd.cashTendered, change_given: pd.change
                 })
             })
                 .then(r => r.json()).then(d => {
                     if (d.error) { f(d.error); btn.disabled = false; btn.textContent = 'Charge Rs 0.00'; return; }
                     showR(d); cart = []; isR = false; selC = null; walkIn = false; document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false;
-                    document.getElementById('notes').value = ''; document.getElementById('disc').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-bl').value = ''; document.getElementById('am-jl').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
+                    document.getElementById('notes').value = ''; document.getElementById('discPct').value = ''; document.getElementById('discAmt').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-bl').value = ''; document.getElementById('am-jl').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
                     updateModeButton(); renderC(); btn.disabled = false; document.getElementById('s').value = ''; closeDropdown(); document.getElementById('s').focus();
                 })
                 .catch(() => { f('Sale failed'); btn.disabled = false; });
@@ -477,7 +473,7 @@
         window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
         document.getElementById('s').focus();
         document.addEventListener('keydown', function (e) { var t = (e.target || {}).tagName; if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return; if (document.querySelector('.modal.show')) return; document.getElementById('s').focus(); });
-        fetch('/api/employees').then(function (r) { return r.json() }).then(function (d) { staffList = d || []; if (!lastStaff && staffList.length) { lastStaff = staffList[0].id; cart.forEach(function(c){ if (!c.staff) c.staff = lastStaff; }); } renderC(); });
+        fetch('/api/employees').then(function (r) { return r.json() }).then(function (d) { staffList = d || []; if (!lastStaff && staffList.length) { lastStaff = staffList[0].id; cart.forEach(function (c) { if (!c.staff) c.staff = lastStaff; }); } renderC(); });
     </script>
 </body>
 

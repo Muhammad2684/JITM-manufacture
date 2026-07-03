@@ -24,11 +24,23 @@
         .bp { text-align: center; margin-top: 20px; position: fixed; top: 20px; right: 20px; z-index: 100; }
         .bp button { padding: 10px 30px; font-size: 14px; cursor: pointer; margin: 0 5px; }
         @media print {
-            body { padding: 0.3in; }
+            @page { size: A4; margin: 0.3in; }
+            body { padding: 0; }
             .bp { display: none; }
-            .v { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; page-break-inside: avoid; }
-            .v:nth-child(odd) { page-break-after: always; }
+            .v { border: 1px solid #ccc; padding: 6px 10px; margin-bottom: 8px; page-break-inside: avoid; }
+            .v:nth-child(3n) { page-break-after: always; }
             .v:last-child { page-break-after: auto; }
+            .h { padding-bottom: 4px; margin-bottom: 5px; }
+            .h h1 { font-size: 14px; }
+            .h p { font-size: 9px; }
+            .i { gap: 2px 10px; margin-bottom: 5px; }
+            .i div { line-height: 1.4; font-size: 10px; }
+            table { margin-bottom: 4px; }
+            th, td { padding: 2px 5px; font-size: 9px; }
+            .tot { font-size: 11px; margin: 4px 0; }
+            .tw { font-size: 9px; margin-bottom: 6px; padding-top: 3px; }
+            .sig { margin-top: 8px; }
+            .sig div { font-size: 8px; padding-top: 3px; }
             th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>

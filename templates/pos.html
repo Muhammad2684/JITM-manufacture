@@ -160,8 +160,12 @@
                 <div class="card">
                     <div class="card-body totals">
                         <div class="tr"><span>Subtotal</span><span id="sub">Rs 0.00</span></div>
-                        <div class="tr"><span>Discount</span><span><input id="disc" type="number" min="0" max="100"
-                                    step="0.1" placeholder="%" oninput="calc()"> %</span></div>
+                        <div class="tr"><span>Discount</span><span><input id="disc" type="number" min="0"
+                                    step="0.1" placeholder="0" oninput="calc()">
+                                <select id="discType" onchange="calc()" style="margin-left:4px;padding:2px 4px;border:1px solid #e2e1de;border-radius:4px;font-size:11px">
+                                    <option value="percent">%</option>
+                                    <option value="amount">Rs</option>
+                                </select></span></div>
                         <div class="tr gt"><span>TOTAL</span><span id="tot">Rs 0.00</span></div>
                     </div>
                 </div>
@@ -328,8 +332,10 @@
                 let itemTotal = c.qty * c.price * (1 - (c.disc || 0) / 100);
                 sub += itemTotal;
             });
-            const dp = parseFloat(document.getElementById('disc').value) || 0;
-            const d = Math.abs(sub) * dp / 100; const tot = sub - d;
+            const dv = parseFloat(document.getElementById('disc').value) || 0;
+            const dt = document.getElementById('discType').value;
+            const d = dt === 'percent' ? Math.abs(sub) * dv / 100 : dv;
+            const tot = sub - d;
             document.getElementById('sub').textContent = 'Rs ' + sub.toFixed(2);
             document.getElementById('tot').textContent = 'Rs ' + tot.toFixed(2);
             calcSplit(tot);
@@ -405,6 +411,7 @@
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     items, payment: primaryMethod, payments: pd.pays, discount: parseFloat(document.getElementById('disc').value) || 0,
+                    discount_type: document.getElementById('discType').value,
                     is_return: isR, customer_id: selC ? selC.id : null, customer_name: walkIn ? 'Walk In' : (document.getElementById('cName').value.trim() || (selC ? selC.name : '')), customer_phone: document.getElementById('cPhone').value.trim(), walk_in: walkIn, notes: document.getElementById('notes').value, cash_tendered: pd.cashTendered, change_given: pd.change
                 })
             })

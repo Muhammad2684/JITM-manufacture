@@ -159,9 +159,9 @@ function toggleDueDate() {
 
 function loadAccounts() {
     fetch('/api/accounts').then(function(r){return r.json();}).then(function(d){
-        accounts = d;
+        accounts = d.items || d;
         var sel = document.getElementById('account_id');
-        sel.innerHTML = '<option value="">-- Select Account --</option>' + d.map(function(a){return '<option value="'+a.id+'">'+a.name+' ('+a.type+')</option>';}).join('');
+        sel.innerHTML = '<option value="">-- Select Account --</option>' + accounts.map(function(a){return '<option value="'+a.id+'">'+a.name+' ('+a.type+')</option>';}).join('');
     });
 }
 

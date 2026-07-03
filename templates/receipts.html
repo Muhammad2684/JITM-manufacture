@@ -297,8 +297,8 @@
             fetch('/api/accounts')
                 .then(r => r.json())
                 .then(d => {
-                    accts = d;
-                    var o = d.map(function(a) {
+                    accts = d.items || d;
+                    var o = accts.map(function(a) {
                         return '<option value="' + a.id + '">' + a.name + ' (' + a.type + ')</option>';
                     }).join('');
                     document.getElementById('aa').innerHTML = o;

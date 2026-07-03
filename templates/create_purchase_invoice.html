@@ -136,8 +136,8 @@ var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null
 
 function loadSuppliers() {
     fetch('/api/suppliers').then(r=>r.json()).then(d=>{
-        suppliers=d;
-        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+d.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('');
+        suppliers = d.items || d;
+        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('');
     });
 }
 function loadProducts() {

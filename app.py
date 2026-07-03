@@ -61,6 +61,17 @@ from routes.payroll import payroll_bp
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-change-in-prod')
 
+@app.template_filter('format_month')
+def format_month_filter(month_str):
+    if not month_str:
+        return ''
+    try:
+        from datetime import datetime
+        dt = datetime.strptime(month_str, '%Y-%m')
+        return dt.strftime('%B %Y')
+    except:
+        return month_str
+
 app.register_blueprint(auth_bp)
 app.register_blueprint(prod_bp)
 app.register_blueprint(pos_bp)

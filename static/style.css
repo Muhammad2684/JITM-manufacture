@@ -151,15 +151,16 @@ input[type="checkbox"] { width:auto; }
 .ra { display:flex; gap:8px; justify-content:center; margin-top:14px; }
 
 @media print {
-  @page { size:80mm auto; margin:0; }
-  body * { visibility:hidden; }
-  #rp, #rp * { visibility:visible; }
+  @page { margin: 0; }
+  body * { visibility:hidden !important; }
+  #rp, #rp * { visibility:visible !important; }
   #rp { position:absolute; left:0; top:0; width:80mm; padding:2mm; }
-  .rec { font-size:10px; }
+  .mc { padding:0 !important; margin:0 !important; border:none !important; border-radius:0 !important; box-shadow:none !important; max-height:none !important; overflow:visible !important; width:auto !important; max-width:none !important; }
+  .modal { background:none !important; position:static !important; display:block !important; }
+  .rec { font-size:10px; max-width:76mm; }
   .rec .rh h3 { font-size:13px; }
   .rec .rl { font-size:10px; }
-  .ra { display:none; }
-  .mx { display:none; }
+  .ra, .mx { display:none !important; }
 }
 @media print {
   body:not(.printing) * { visibility:hidden; }

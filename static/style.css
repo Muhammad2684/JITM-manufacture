@@ -143,13 +143,24 @@ input[type="checkbox"] { width:auto; }
 #sc { font-size:12px; color:#3b4fe2; font-weight:600; }
 
 /* ─── Receipt ─── */
-.rec { font-family:'Courier New',monospace; font-size:12px; color:#374151; }
-.rec .rh { text-align:center; margin-bottom:12px; }
-.rec .rh h3 { font-size:15px; }
-.rec .ri { border-top:1px dashed #e2e1de; border-bottom:1px dashed #e2e1de; padding:8px 0; margin:8px 0; }
-.rec .rl { display:flex; justify-content:space-between; padding:2px 0; }
+.rec { font-family:'Courier New',monospace; font-size:11px; color:#000; max-width:80mm; padding:0 2mm; }
+.rec .rh { text-align:center; margin-bottom:8px; }
+.rec .rh h3 { font-size:14px; margin:0; }
+.rec .ri { border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 0; margin:6px 0; }
+.rec .rl { display:flex; justify-content:space-between; padding:1px 0; font-size:11px; }
 .ra { display:flex; gap:8px; justify-content:center; margin-top:14px; }
-@media print { #rp, #rp * { visibility:visible; } #rp { position:absolute; left:0; top:0; width:80mm; } }
+
+@media print {
+  @page { size:80mm auto; margin:0; }
+  body * { visibility:hidden; }
+  #rp, #rp * { visibility:visible; }
+  #rp { position:absolute; left:0; top:0; width:80mm; padding:2mm; }
+  .rec { font-size:10px; }
+  .rec .rh h3 { font-size:13px; }
+  .rec .rl { font-size:10px; }
+  .ra { display:none; }
+  .mx { display:none; }
+}
 @media print {
   body:not(.printing) * { visibility:hidden; }
 }

@@ -152,25 +152,51 @@ input[type="checkbox"] { width:auto; }
 
 @media print {
   @page { margin: 0; }
-  body * { visibility:hidden !important; }
-  #rp, #rp * { visibility:visible !important; }
-  #rp { position:absolute; left:0; top:0; width:80mm; padding:2mm; }
-  #rp .mc { padding:0 !important; margin:0 !important; border:none !important; border-radius:0 !important; box-shadow:none !important; max-height:none !important; overflow:visible !important; width:auto !important; max-width:none !important; }
-  #rp .modal { background:none !important; position:static !important; display:block !important; }
+  
+  /* Hide everything */
+  body > * { visibility:hidden !important; }
+  
+  /* Show receipt modal */
+  #rm { visibility:visible !important; }
+  
+  /* Reset modal styling */
+  #rm {
+    position:static !important;
+    background:none !important;
+    inset:auto !important;
+    width:auto !important;
+    height:auto !important;
+    overflow:visible !important;
+    display:block !important;
+  }
+  
+  #rp {
+    position:static !important;
+    width:80mm !important;
+    padding:2mm !important;
+    margin:0 !important;
+  }
+  
+  /* Reset modal content */
+  #rm .mc {
+    padding:0 !important;
+    margin:0 !important;
+    border:none !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+    max-height:none !important;
+    overflow:visible !important;
+    width:auto !important;
+    max-width:none !important;
+  }
+  
+  /* Receipt styling */
   .rec { font-size:10px; max-width:76mm; }
   .rec .rh h3 { font-size:13px; }
   .rec .rl { font-size:10px; }
+  
+  /* Hide buttons */
   .ra, .mx { display:none !important; }
-  body.printing .sidebar, body.printing .topbar, body.printing .search, body.printing .btn-print,
-  body.printing .actions, body.printing .topbar .actions, body.printing .modal, body.printing .flash,
-  body.printing #flash { display:none !important; }
-  body.printing .main { margin-left:0 !important; }
-  body.printing .content { padding:10px 20px !important; max-width:none !important; }
-  body.printing body, body.printing .table-wrap { background:#fff !important; }
-  body.printing .table-wrap { border:none !important; box-shadow:none !important; }
-  body.printing tr:hover td { background:transparent !important; }
-  body.printing th, body.printing td { padding:6px 10px !important; }
-  body.printing .main, body.printing .content, body.printing .content * { visibility:visible !important; }
 }
 
 /* ─── Customer Cards ─── */

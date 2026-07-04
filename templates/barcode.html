@@ -186,6 +186,7 @@
                                     <select id="orientation" onchange="renderPreview()">
                                         <option value="landscape" selected>1.5" × 1" (Landscape)</option>
                                         <option value="portrait">1" × 1.5" (Portrait)</option>
+                                        <option value="large">21.5cm × 15.5cm</option>
                                     </select>
                                 </div>
                                 <div>
@@ -441,9 +442,16 @@
             var gap = document.getElementById('gap').value;
             
             // Set dimensions based on orientation
-            var labelWidth = orientation === 'landscape' ? 144 : 96;
-            var labelHeight = orientation === 'landscape' ? 96 : 144;
-            var barcodeHeight = orientation === 'landscape' ? 38 : 57;
+            var labelWidth, labelHeight, barcodeHeight;
+            if (orientation === 'large') {
+                labelWidth = 213;  // 21.5cm in px at ~10dpi, but using CSS mm
+                labelHeight = 153; // 15.5cm in px
+                barcodeHeight = 50;
+            } else {
+                labelWidth = orientation === 'landscape' ? 144 : 96;
+                labelHeight = orientation === 'landscape' ? 96 : 144;
+                barcodeHeight = orientation === 'landscape' ? 38 : 57;
+            }
             
             // Preview shows a simple grid of labels
             var html = '<div class="preview-grid" style="grid-template-columns:repeat(auto-fill, ' + labelWidth + 'px);gap:' + gap + 'px">';
@@ -529,22 +537,45 @@
             });
             
             // Set dimensions based on orientation
-            var labelWidth = orientation === 'landscape' ? '1.5in' : '1in';
-            var labelHeight = orientation === 'landscape' ? '1in' : '1.5in';
-            var barcodeHeight = orientation === 'landscape' ? 38 : 57;
+            var labelWidth, labelHeight, barcodeHeight, pageCSS;
+            if (orientation === 'large') {
+                labelWidth = '1fr';
+                labelHeight = '1fr';
+                barcodeHeight = 60;
+                pageCSS = '@page { size: 21.5cm 15.5cm; margin: 1.2cm 0.8cm 1.2cm 0.8cm; }';
+            } else {
+                labelWidth = orientation === 'landscape' ? '1.5in' : '1in';
+                labelHeight = orientation === 'landscape' ? '1in' : '1.5in';
+                barcodeHeight = orientation === 'landscape' ? 38 : 57;
+                pageCSS = '';
+            }
             
             // Create a single page div with CSS grid that auto-fills
             var pageDiv = document.createElement('div');
             pageDiv.className = 'print-page';
-            pageDiv.style.gridTemplateColumns = 'repeat(auto-fill, ' + labelWidth + ')';
-            pageDiv.style.gridAutoRows = labelHeight;
+            if (orientation === 'large') {
+                pageDiv.style.gridTemplateColumns = '1fr';
+                pageDiv.style.gridAutoRows = '1fr';
+                pageDiv.style.height = '100%';
+            } else {
+                pageDiv.style.gridTemplateColumns = 'repeat(auto-fill, ' + labelWidth + ')';
+                pageDiv.style.gridAutoRows = labelHeight;
+            }
             pageDiv.style.gap = gap + 'px';
+            if (pageCSS) {
+                pageDiv.style.padding = '0.7cm';
+                var styleTag = document.createElement('style');
+                styleTag.textContent = pageCSS;
+                pa.appendChild(styleTag);
+            }
             
             allLabels.forEach(function(label, i) {
                 var div = document.createElement('div');
                 div.className = 'print-label';
-                div.style.width = labelWidth;
-                div.style.height = labelHeight;
+                if (orientation !== 'large') {
+                    div.style.width = labelWidth;
+                    div.style.height = labelHeight;
+                }
                 if (orientation === 'portrait') {
                     div.style.position = 'relative';
                 }

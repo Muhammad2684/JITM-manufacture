@@ -631,6 +631,7 @@ def inventory_barcode():
     queue_data = []
     invoice_id = request.args.get('invoice_id')
     if invoice_id:
+        from database import get_db
         with get_db() as db:
             items = db.execute(
                 'SELECT pii.qty, v.id as vid, v.sku, p.name, v.price '

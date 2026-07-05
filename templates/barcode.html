@@ -735,9 +735,9 @@
                     html += '<div style="' + cellStyle + '">';
                     if (label) {
                         html += '<svg id="' + opts.prefix + idx + '"></svg>';
-                        html += '<div style="font-size:7px;font-weight:600;color:#333;line-height:1.2;margin-top:1px;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap">' +
+                        html += '<div style="font-size:9px;font-weight:600;color:#333;line-height:1.2;margin-top:1px;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap">' +
                             label.name + '</div>';
-                        html += '<div style="font-size:7px;font-weight:700;font-family:monospace;line-height:1.2">' +
+                        html += '<div style="font-size:8px;font-weight:700;font-family:monospace;line-height:1.3">' +
                             label.sku + ' <span style="font-weight:600;color:#3b4fe2">Rs ' + Number(label.price).toFixed(2) + '</span></div>';
                     }
                     html += '</div>';
@@ -761,9 +761,9 @@
                     try {
                         JsBarcode('#pv-sheet-' + idx, prepared.data, {
                             format: prepared.format,
-                            width: 1.3,
-                            height: 26,
-                            fontSize: 7,
+                            width: 1.5,
+                            height: 30,
+                            fontSize: 8,
                             margin: 1,
                             textMargin: 1,
                             displayValue: false
@@ -842,9 +842,9 @@
                     try {
                         JsBarcode('#pl-' + idx, prepared.data, {
                             format: prepared.format,
-                            width: 1.3,
-                            height: 26,
-                            fontSize: 7,
+                            width: 1.5,
+                            height: 30,
+                            fontSize: 8,
                             margin: 1,
                             textMargin: 1,
                             displayValue: false

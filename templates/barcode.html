@@ -337,9 +337,8 @@
                                 <div>
                                     <label>Sheet Layout</label>
                                     <select id="sheetLayout" onchange="onSheetLayoutChange()">
-                                        <option value="roll" selected>Roll / Continuous Labels</option>
-                                        <option value="sheet5x6">5×6 Sheet — 30 Labels (21.5×15.5cm)</option>
-                                        <option value="sheet5x6clone">5×6 Sheet — 30 Labels (21.5×15.5cm) clone</option>
+                                        <option value="roll">Roll / Continuous Labels</option>
+                                        <option value="sheet5x6" selected>5×6 Sheet — 30 Labels (21.5×15.5cm)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -415,7 +414,7 @@
 
         function onSheetLayoutChange() {
             var v = document.getElementById('sheetLayout').value;
-            var isSheet = v === 'sheet5x6' || v === 'sheet5x6clone';
+            var isSheet = v === 'sheet5x6';
             document.getElementById('orientation').disabled = isSheet;
             renderPreview();
         }
@@ -633,7 +632,7 @@
             var barcodeType = document.getElementById('barcodeType').value;
             var sheetLayout = document.getElementById('sheetLayout').value;
 
-            if (sheetLayout === 'sheet5x6' || sheetLayout === 'sheet5x6clone') {
+            if (sheetLayout === 'sheet5x6') {
                 renderSheetPreview(area, barcodeType);
                 return;
             }
@@ -802,7 +801,7 @@
 
         function applyPageStyle() {
             var sheetLayout = document.getElementById('sheetLayout').value;
-            if (sheetLayout === 'sheet5x6' || sheetLayout === 'sheet5x6clone') {
+            if (sheetLayout === 'sheet5x6') {
                 var s = SHEET_5x6;
                 setPageStyle(
                     '@page { margin: ' + s.marginTop + 'cm ' + s.marginRight + 'cm ' +
@@ -827,7 +826,7 @@
 
             var allLabels = buildLabelList(barcodeType);
 
-            if (sheetLayout === 'sheet5x6' || sheetLayout === 'sheet5x6clone') {
+            if (sheetLayout === 'sheet5x6') {
                 buildSheetPrintPages(pa, allLabels, barcodeType);
             } else {
                 buildRollPrintPage(pa, allLabels, barcodeType);

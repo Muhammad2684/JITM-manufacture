@@ -722,7 +722,10 @@
             var gap = parseInt(document.getElementById('gap').value) || 0;
             var pageBrder = opts.showBorder ? 'border:1px dashed #c7c6c1;' : '';
             var cellBrder = opts.showBorder ? 'border:1px dotted #e2e1de;' : '';
-            var pageStyles = 'width:' + s.usableW + 'cm;height:' + s.usableH + 'cm;' +
+            var dims = opts.showBorder
+                ? 'width:' + s.usableW + 'cm;height:' + s.usableH + 'cm;'
+                : 'width:100%;height:calc(100vh - ' + (s.marginTop + s.marginBottom) + 'cm);';
+            var pageStyles = dims +
                 'display:grid;grid-template-columns:repeat(' + s.cols + ',1fr);' +
                 'grid-template-rows:repeat(' + s.rows + ',1fr);gap:' + gap + 'px;' +
                 pageBrder + 'background:#fff;box-sizing:border-box;overflow:hidden';
@@ -802,8 +805,7 @@
             if (sheetLayout === 'sheet5x6' || sheetLayout === 'sheet5x6clone') {
                 var s = SHEET_5x6;
                 setPageStyle(
-                    '@page { size: ' + s.pageW + 'cm ' + s.pageH + 'cm; ' +
-                    'margin: ' + s.marginTop + 'cm ' + s.marginRight + 'cm ' +
+                    '@page { margin: ' + s.marginTop + 'cm ' + s.marginRight + 'cm ' +
                     s.marginBottom + 'cm ' + s.marginLeft + 'cm; }'
                 );
             } else {

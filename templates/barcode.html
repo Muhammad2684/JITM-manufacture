@@ -417,7 +417,6 @@
             var v = document.getElementById('sheetLayout').value;
             var isSheet = v === 'sheet5x6' || v === 'sheet5x6clone';
             document.getElementById('orientation').disabled = isSheet;
-            document.getElementById('gap').disabled = isSheet;
             renderPreview();
         }
 
@@ -720,11 +719,12 @@
         function buildSheetGridHtml(allLabels, opts) {
             var s = SHEET_5x6;
             var pages = Math.ceil(allLabels.length / s.perPage);
+            var gap = parseInt(document.getElementById('gap').value) || 0;
             var pageBrder = opts.showBorder ? 'border:1px dashed #c7c6c1;' : '';
             var cellBrder = opts.showBorder ? 'border:1px dotted #e2e1de;' : '';
             var pageStyles = 'width:' + s.usableW + 'cm;height:' + s.usableH + 'cm;' +
                 'display:grid;grid-template-columns:repeat(' + s.cols + ',1fr);' +
-                'grid-template-rows:repeat(' + s.rows + ',1fr);gap:0;' +
+                'grid-template-rows:repeat(' + s.rows + ',1fr);gap:' + gap + 'px;' +
                 pageBrder + 'background:#fff;box-sizing:border-box;overflow:hidden';
             var outerStyle = opts.showBorder
                 ? 'display:flex;flex-direction:column;gap:16px;align-items:center'

@@ -147,13 +147,14 @@ def render_sidebar(active_page):
     return render_template('sidebar.html', items=filtered_items, active=active_page, name=user_name, role=user_role)
 
 
-def render_page(template_name, active_page='/'):
+def render_page(template_name, active_page='/', **kwargs):
     """Render a page template with sidebar and user context."""
     return render_template(
         template_name,
         role=session.get('role'),
         name=session.get('name'),
-        sidebar=render_sidebar(active_page)
+        sidebar=render_sidebar(active_page),
+        **kwargs
     )
 
 
@@ -627,7 +628,29 @@ def inventory_commission_classes():
 @permission_required('inventory')
 def inventory_barcode():
     """Display the barcode generator page."""
-    return render_page('barcode.html', '/inventory/barcode')
+    queue_data = []
+    invoice_id = request.args.get('invoice_id')
+    if invoice_id:
+        with get_db() as db:
+            items = db.execute(
+                'SELECT pii.qty, v.id as vid, v.sku, p.name, v.price '
+                'FROM purchase_invoice_items pii '
+                'JOIN products p ON p.id = pii.product_id '
+                'JOIN variants v ON v.product_id = p.id AND v.id = ('
+                '  SELECT MIN(v2.id) FROM variants v2 WHERE v2.product_id = p.id'
+                ') '
+                'WHERE pii.invoice_id = ? AND v.sku IS NOT NULL AND v.sku != \'\'',
+                (invoice_id,)
+            ).fetchall()
+            for row in items:
+                queue_data.append({
+                    'vid': row['vid'],
+                    'sku': row['sku'],
+                    'name': row['name'],
+                    'copies': row['qty'],
+                    'price': float(row['price']) if row['price'] is not None else 0
+                })
+    return render_page('barcode.html', '/inventory/barcode', queue_data=queue_data)
 
 
 @app.route('/ledger/<entity_type>/<int:entity_id>', strict_slashes=False)

@@ -229,6 +229,7 @@
                 '<td>' + dueInfo(p) + '</td>' +
                 '<td>' +
                 '<button class="btn btn-xs btn-ghost" onclick="viewPI(' + p.id + ')">View</button>' +
+                '<button class="btn btn-xs btn-ghost" onclick="window.open(\'/inventory/barcode?invoice_id=' + p.id + '\',\'_blank\')">Barcodes</button>' +
                 ({{role|tojson}} == 'manager' ? 
                     '<button class="btn btn-xs btn-ghost" onclick="window.open(\'/purchase-invoices/create?id=' + p.id + '\',\'_blank\')">Edit</button>' +
                     '<button class="btn btn-xs btn-ghost" onclick="del(' + p.id + ')">Delete</button>' : '') +

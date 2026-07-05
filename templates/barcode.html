@@ -234,6 +234,10 @@
                 display: block !important;
             }
 
+            .pb {
+                page-break-after: always;
+            }
+
             .print-page {
                 display: grid;
                 box-sizing: border-box;
@@ -687,34 +691,54 @@
             return allLabels;
         }
 
-        function renderSheetPreview(area, barcodeType) {
-            var allLabels = buildLabelList(barcodeType);
+        function buildSheetGridHtml(allLabels, opts) {
             var s = SHEET_5x6;
             var pages = Math.ceil(allLabels.length / s.perPage);
-            var html = '<div style="display:flex;flex-direction:column;gap:16px;align-items:center">';
+            var pageBrder = opts.showBorder ? 'border:1px dashed #c7c6c1;' : '';
+            var cellBrder = opts.showBorder ? 'border:1px dotted #e2e1de;' : '';
+            var pageStyles = 'width:' + s.usableW + 'cm;height:' + s.usableH + 'cm;' +
+                'display:grid;grid-template-columns:repeat(' + s.cols + ',1fr);' +
+                'grid-template-rows:repeat(' + s.rows + ',1fr);gap:0;' +
+                pageBrder + 'background:#fff;box-sizing:border-box;overflow:hidden';
+            var outerStyle = opts.showBorder
+                ? 'display:flex;flex-direction:column;gap:16px;align-items:center'
+                : '';
 
+            var html = '<div' + (outerStyle ? ' style="' + outerStyle + '"' : '') + '>';
             for (var p = 0; p < pages; p++) {
-                html += '<div style="width:' + s.usableW + 'cm;height:' + s.usableH + 'cm;' +
-                    'display:grid;grid-template-columns:repeat(' + s.cols + ',1fr);' +
-                    'grid-template-rows:repeat(' + s.rows + ',1fr);gap:0;' +
-                    'border:1px dashed #c7c6c1;background:#fff">';
+                html += '<div style="' + pageStyles + '"' +
+                    (opts.addPageBreaks && p < pages - 1 ? ' class="pb"' : '') + '>';
                 for (var i = 0; i < s.perPage; i++) {
                     var idx = p * s.perPage + i;
                     var label = allLabels[idx];
-                    html += '<div class="preview-label" style="width:' + s.cellW + 'cm;height:' + s.cellH + 'cm;border:1px dotted #e2e1de">';
+                    var cellStyle = 'width:' + s.cellW + 'cm;height:' + s.cellH + 'cm;' +
+                        cellBrder +
+                        'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+                        'box-sizing:border-box;text-align:center;overflow:hidden' +
+                        (opts.showBorder ? ';padding:2px' : '');
+                    html += '<div style="' + cellStyle + '">';
                     if (label) {
-                        html += '<svg id="pv-sheet-' + idx + '"></svg>';
-                        html += '<div class="pl-sku">' + label.sku + '</div>';
+                        html += '<svg id="' + opts.prefix + idx + '"></svg>';
+                        html += '<div style="font-size:8px;font-weight:700;font-family:monospace;margin-top:1px">' +
+                            label.sku + '</div>';
                     }
                     html += '</div>';
                 }
                 html += '</div>';
             }
             html += '</div>';
-            area.innerHTML = html;
+            return { html: html, allLabels: allLabels, pages: pages };
+        }
 
+        function renderSheetPreview(area, barcodeType) {
+            var result = buildSheetGridHtml(buildLabelList(barcodeType), {
+                prefix: 'pv-sheet-',
+                showBorder: true,
+                addPageBreaks: false
+            });
+            area.innerHTML = result.html;
             setTimeout(function () {
-                allLabels.forEach(function (label, idx) {
+                result.allLabels.forEach(function (label, idx) {
                     var prepared = prepareBarcodeData(label.sku, barcodeType);
                     try {
                         JsBarcode('#pv-sheet-' + idx, prepared.data, {
@@ -786,55 +810,19 @@
 
         // 5×6 sheet: 21.5×15.5cm page, 1.2cm top/bottom + 0.8cm left/right
         // margins, 30 labels per page (5 cols × 6 rows), 0 gap — chunk labels
-        // across as many sheet pages as needed.
+        // across as many sheet pages as needed. Uses exact same HTML as preview.
         function buildSheetPrintPages(pa, allLabels, barcodeType) {
-            var s = SHEET_5x6;
-            var pages = Math.ceil(allLabels.length / s.perPage);
-            var svgCounter = 0;
-            var svgJobs = [];
-
-            for (var p = 0; p < pages; p++) {
-                var pageDiv = document.createElement('div');
-                pageDiv.className = 'print-page sheet-5x6';
-                pageDiv.style.height = s.usableH + 'cm';
-                pageDiv.style.gridTemplateColumns = 'repeat(' + s.cols + ', 1fr)';
-                pageDiv.style.gridTemplateRows = 'repeat(' + s.rows + ', 1fr)';
-                pageDiv.style.gap = '0';
-                pageDiv.style.pageBreakAfter = (p < pages - 1) ? 'always' : 'auto';
-
-                for (var i = 0; i < s.perPage; i++) {
-                    var idx = p * s.perPage + i;
-                    var label = allLabels[idx];
-                    var div = document.createElement('div');
-                    div.className = 'print-label';
-                    div.style.border = 'none';
-                    div.style.padding = '0';
-
-                    if (label) {
-                        var svgId = 'sheet-pl-' + idx;
-                        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                        svg.setAttribute('id', svgId);
-                        div.appendChild(svg);
-
-                        var skuDiv = document.createElement('div');
-                        skuDiv.className = 'pl-sku';
-                        skuDiv.textContent = label.sku;
-                        div.appendChild(skuDiv);
-
-                        svgJobs.push({ svgId: svgId, sku: label.sku });
-                    }
-
-                    pageDiv.appendChild(div);
-                }
-
-                pa.appendChild(pageDiv);
-            }
-
+            var result = buildSheetGridHtml(allLabels, {
+                prefix: 'pl-',
+                showBorder: false,
+                addPageBreaks: true
+            });
+            pa.innerHTML = result.html;
             setTimeout(function () {
-                svgJobs.forEach(function (job) {
-                    var prepared = prepareBarcodeData(job.sku, barcodeType);
+                result.allLabels.forEach(function (label, idx) {
+                    var prepared = prepareBarcodeData(label.sku, barcodeType);
                     try {
-                        JsBarcode('#' + job.svgId, prepared.data, {
+                        JsBarcode('#pl-' + idx, prepared.data, {
                             format: prepared.format,
                             width: 1.3,
                             height: 26,
@@ -844,7 +832,7 @@
                             displayValue: false
                         });
                     } catch (e) {
-                        console.error('Print error for', job.sku, e);
+                        console.error('Print error for', label.sku, e);
                     }
                 });
             }, 100);

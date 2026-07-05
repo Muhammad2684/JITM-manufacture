@@ -439,7 +439,7 @@
             } else if (e.key === 'Enter' && hlIdx >= 0 && hlIdx < items.length) {
                 e.preventDefault();
                 var item = items[hlIdx];
-                addToQueue(item.dataset.vid, item.dataset.sku, item.dataset.name, item.dataset.variant);
+                addToQueue(item.dataset.vid, item.dataset.sku, item.dataset.name, item.dataset.variant, item.dataset.price);
             }
         });
 

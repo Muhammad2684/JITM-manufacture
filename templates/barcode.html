@@ -208,6 +208,13 @@
             font-style: italic;
         }
 
+        .preview-label .pl-price {
+            font-size: 8px;
+            font-weight: 700;
+            color: #3b4fe2;
+            margin-top: 1px;
+        }
+
         .print-area {
             display: none;
         }
@@ -276,6 +283,13 @@
             .print-label .pl-name {
                 font-size: 6px;
                 color: #333;
+                margin-top: 1px;
+            }
+
+            .print-label .pl-price {
+                font-size: 7px;
+                font-weight: 700;
+                color: #3b4fe2;
                 margin-top: 1px;
             }
         }
@@ -464,7 +478,7 @@
                 var variant = (p.size || '') + ' ' + (p.color || '');
                 variant = variant.trim();
                 return '<div class="search-item" data-vid="' + p.vid + '" data-sku="' + p.sku + '" ' +
-                    'data-name="' + p.name + '" data-variant="' + variant + '">' +
+                    'data-name="' + p.name + '" data-variant="' + variant + '" data-price="' + (p.price || 0) + '">' +
                     '<div class="si-name">' + p.name + '</div>' +
                     '<div class="si-detail">' + (variant || 'Default variant') +
                     (p.stock ? ' · ' + p.stock + ' in stock' : '') + '</div>' +
@@ -476,10 +490,10 @@
         searchResults.addEventListener('click', function (e) {
             var item = e.target.closest('.search-item');
             if (!item) return;
-            addToQueue(item.dataset.vid, item.dataset.sku, item.dataset.name, item.dataset.variant);
+            addToQueue(item.dataset.vid, item.dataset.sku, item.dataset.name, item.dataset.variant, item.dataset.price);
         });
 
-        function addToQueue(vid, sku, name, variant) {
+        function addToQueue(vid, sku, name, variant, price) {
             var existing = queue.find(function (q) { return q.sku === sku; });
             if (existing) {
                 existing.copies += 1;
@@ -490,6 +504,7 @@
                     sku: sku,
                     name: name,
                     variant: variant,
+                    price: parseFloat(price) || 0,
                     copies: 1
                 });
             }
@@ -645,6 +660,7 @@
                         html += '<div class="pl-warn">' + prepared.warning + '</div>';
                     }
                     html += '<div class="pl-name">' + q.name + '</div>';
+                    html += '<div class="pl-price">Rs ' + Number(q.price || 0).toFixed(2) + '</div>';
                     if (orientation === 'portrait') {
                         html += '</div>';
                     }
@@ -685,7 +701,7 @@
             var allLabels = [];
             queue.forEach(function (q) {
                 for (var c = 0; c < q.copies; c++) {
-                    allLabels.push({ sku: q.sku, name: q.name, id: q.id, seq: c });
+                    allLabels.push({ sku: q.sku, name: q.name, price: q.price, id: q.id, seq: c });
                 }
             });
             return allLabels;
@@ -719,8 +735,10 @@
                     html += '<div style="' + cellStyle + '">';
                     if (label) {
                         html += '<svg id="' + opts.prefix + idx + '"></svg>';
-                        html += '<div style="font-size:8px;font-weight:700;font-family:monospace;margin-top:1px">' +
-                            label.sku + '</div>';
+                        html += '<div style="font-size:7px;font-weight:600;color:#333;line-height:1.2;margin-top:1px;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap">' +
+                            label.name + '</div>';
+                        html += '<div style="font-size:7px;font-weight:700;font-family:monospace;line-height:1.2">' +
+                            label.sku + ' <span style="font-weight:600;color:#3b4fe2">Rs ' + Number(label.price).toFixed(2) + '</span></div>';
                     }
                     html += '</div>';
                 }
@@ -883,6 +901,11 @@
                 nameDiv.className = 'pl-name';
                 nameDiv.textContent = label.name;
                 wrapper.appendChild(nameDiv);
+
+                var priceDiv = document.createElement('div');
+                priceDiv.className = 'pl-price';
+                priceDiv.textContent = 'Rs ' + Number(label.price || 0).toFixed(2);
+                wrapper.appendChild(priceDiv);
 
                 pageDiv.appendChild(div);
             });

@@ -346,6 +346,7 @@
                                     <select id="orientation" onchange="renderPreview()">
                                         <option value="landscape" selected>1.5" × 1" (Landscape)</option>
                                         <option value="portrait">1" × 1.5" (Portrait)</option>
+                                        <option value="sheet">3.82×2.32cm (5×6 sheet size)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -640,9 +641,16 @@
             var gap = document.getElementById('gap').value;
 
             // Set dimensions based on orientation
-            var labelWidth = orientation === 'landscape' ? 144 : 96;
-            var labelHeight = orientation === 'landscape' ? 96 : 144;
-            var barcodeHeight = orientation === 'landscape' ? 38 : 57;
+            var labelWidth, labelHeight, barcodeHeight;
+            if (orientation === 'sheet') {
+                labelWidth = 144;
+                labelHeight = 88;
+                barcodeHeight = 30;
+            } else {
+                labelWidth = orientation === 'landscape' ? 144 : 96;
+                labelHeight = orientation === 'landscape' ? 96 : 144;
+                barcodeHeight = orientation === 'landscape' ? 38 : 57;
+            }
 
             // Preview shows a simple grid of labels
             var html = '<div class="preview-grid" style="grid-template-columns:repeat(auto-fill, ' + labelWidth + 'px);gap:' + gap + 'px">';
@@ -861,9 +869,16 @@
             var orientation = document.getElementById('orientation').value;
             var gap = document.getElementById('gap').value;
 
-            var labelWidth = orientation === 'landscape' ? '1.5in' : '1in';
-            var labelHeight = orientation === 'landscape' ? '1in' : '1.5in';
-            var barcodeHeight = orientation === 'landscape' ? 38 : 57;
+            var labelWidth, labelHeight, barcodeHeight;
+            if (orientation === 'sheet') {
+                labelWidth = '3.82cm';
+                labelHeight = '2.32cm';
+                barcodeHeight = 30;
+            } else {
+                labelWidth = orientation === 'landscape' ? '1.5in' : '1in';
+                labelHeight = orientation === 'landscape' ? '1in' : '1.5in';
+                barcodeHeight = orientation === 'landscape' ? 38 : 57;
+            }
 
             var pageDiv = document.createElement('div');
             pageDiv.className = 'print-page';

@@ -339,6 +339,7 @@
                                     <select id="sheetLayout" onchange="onSheetLayoutChange()">
                                         <option value="roll" selected>Roll / Continuous Labels</option>
                                         <option value="sheet5x6">5×6 Sheet — 30 Labels (21.5×15.5cm)</option>
+                                        <option value="sheet5x6clone">5×6 Sheet — 30 Labels (21.5×15.5cm) clone</option>
                                     </select>
                                 </div>
                                 <div>
@@ -413,7 +414,8 @@
         }
 
         function onSheetLayoutChange() {
-            var isSheet = document.getElementById('sheetLayout').value === 'sheet5x6';
+            var v = document.getElementById('sheetLayout').value;
+            var isSheet = v === 'sheet5x6' || v === 'sheet5x6clone';
             document.getElementById('orientation').disabled = isSheet;
             document.getElementById('gap').disabled = isSheet;
             renderPreview();
@@ -632,7 +634,7 @@
             var barcodeType = document.getElementById('barcodeType').value;
             var sheetLayout = document.getElementById('sheetLayout').value;
 
-            if (sheetLayout === 'sheet5x6') {
+            if (sheetLayout === 'sheet5x6' || sheetLayout === 'sheet5x6clone') {
                 renderSheetPreview(area, barcodeType);
                 return;
             }
@@ -797,7 +799,7 @@
 
         function applyPageStyle() {
             var sheetLayout = document.getElementById('sheetLayout').value;
-            if (sheetLayout === 'sheet5x6') {
+            if (sheetLayout === 'sheet5x6' || sheetLayout === 'sheet5x6clone') {
                 var s = SHEET_5x6;
                 setPageStyle(
                     '@page { size: ' + s.pageW + 'cm ' + s.pageH + 'cm; ' +
@@ -823,7 +825,7 @@
 
             var allLabels = buildLabelList(barcodeType);
 
-            if (sheetLayout === 'sheet5x6') {
+            if (sheetLayout === 'sheet5x6' || sheetLayout === 'sheet5x6clone') {
                 buildSheetPrintPages(pa, allLabels, barcodeType);
             } else {
                 buildRollPrintPage(pa, allLabels, barcodeType);

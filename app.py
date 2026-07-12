@@ -732,4 +732,7 @@ def ledger_page(entity_type, entity_id):
 if __name__ == '__main__':
     init_db()
     debug_mode = not getattr(sys, 'frozen', False)
+    if getattr(sys, 'frozen', False):
+        import webbrowser
+        webbrowser.open('http://localhost:5000')
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)

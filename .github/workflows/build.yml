@@ -25,6 +25,10 @@ jobs:
         run: |
           pyinstaller JITM.spec
 
+      - name: Copy run.bat to dist
+        run: |
+          copy run.bat dist\JITM\
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

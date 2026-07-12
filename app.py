@@ -1,17 +1,24 @@
 import os, sys, time, traceback
 os.environ['TZ'] = 'Asia/Karachi'
-time.tzset()
+if hasattr(time, 'tzset'):
+    time.tzset()
 
 if getattr(sys, 'frozen', False):
-    import atexit
-    log_file = os.path.join(os.path.dirname(sys.executable), 'error.log')
-    fh = open(log_file, 'w', buffering=1)
+    import atexit, tempfile
+    log_file = os.path.join(tempfile.gettempdir(), 'JITM-error.log')
+    try:
+        fh = open(log_file, 'w', buffering=1)
+    except Exception:
+        fh = open(os.devnull, 'w')
     sys.stderr = fh
-    atexit.register(lambda: fh.close() if not fh.closed else None)
+    atexit.register(lambda: fh.closed or fh.close())
 
     def excepthook(tp, val, tb):
-        fh.write(''.join(traceback.format_exception(tp, val, tb)))
-        fh.flush()
+        try:
+            fh.write(''.join(traceback.format_exception(tp, val, tb)))
+            fh.flush()
+        except Exception:
+            pass
     sys.excepthook = excepthook
 
 from flask import Flask, render_template, redirect, session, request

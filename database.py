@@ -25,9 +25,14 @@ Tables:
 
 import sqlite3
 import os
+import sys
 from werkzeug.security import generate_password_hash
 
-DB = os.path.join(os.path.dirname(__file__), 'jitm.db')
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB = os.path.join(BASE_DIR, 'jitm.db')
 
 
 def get_db():

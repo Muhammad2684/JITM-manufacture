@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JITM · Payroll</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Payroll</h2>
+            <div class="actions">
+                <button class="btn btn-p btn-sm" onclick="showAdd()">+ New Employee</button>
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="card">
+                <div class="card-body">
+                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                        <div class="search" style="flex:1;min-width:180px"><input id="s" placeholder="Search..." oninput="load()"></div>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151">
+                            Month:
+                            <input id="m" type="month" onchange="load()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px">
+                        </label>
+                        <button class="btn btn-p btn-sm" onclick="printAll()">Print All</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>
+                                <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                                <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Name <span id="si1"></span></th>
+                                <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Nickname <span id="si2"></span></th>
+                                <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Salary <span id="si3"></span></th>
+                                <th onclick="sortCol(4)" style="cursor:pointer;user-select:none">Commissions <span id="si4"></span></th>
+                                <th>Actions</th>
+                            </tr></thead>
+                            <tbody id="tb"></tbody>
+                            <tfoot id="tf"></tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="fm">
+        <div class="mc" style="max-width:600px">
+            <button class="mx" onclick="cl('fm')">&times;</button>
+            <h2 id="ft">New Employee</h2>
+            <form onsubmit="save(event)">
+                <div class="form-row">
+                    <div><label>Name</label><input id="fn" required></div>
+                    <div><label>Father's Name</label><input id="ffn"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>CNIC</label><input id="fcnic"></div>
+                    <div><label>Phone</label><input id="fph"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>Nickname</label><input id="fnn"></div>
+                    <div><label>Salary</label><input id="fs" type="number" step="0.01" min="0"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>Advance Deduction</label><input id="fad" type="number" step="0.01" min="0" value="0"></div>
+                    <div><label>Remaining Advance (To be deducted)</label><input id="fra" type="number" step="0.01" min="0" value="0"></div>
+                </div>
+                <button class="btn btn-p">Save</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="atm">
+        <div class="mc" style="max-width:760px">
+            <button class="mx" onclick="cl('atm')">&times;</button>
+            <h2 id="at_title">Attendance</h2>
+            <div style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <span id="at_emp_name" style="font-weight:600"></span>
+                <span style="color:#6b7280;font-size:13px" id="at_month_label"></span>
+            </div>
+            <div id="at_calendar" style="min-height:300px"></div>
+            <div id="at_summary" style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;font-size:13px"></div>
+            <button class="btn btn-p btn-sm" onclick="saveAllAttendance()" style="margin-top:12px">Save All</button>
+            <span id="at_msg" style="margin-left:10px;font-size:12px"></span>
+        </div>
+    </div>
+
+    <script>
+        var list = [], sortIdx = -1, sortDir = 1, editId = null;
+        var STATUSES = ['present', 'absent', 'leave', 'half-day', 'late', 'overtime', 'off'];
+        var atEmpId = null, atData = {};
+        function pktToday() { var d=new Date(); d.setMinutes(d.getMinutes()+d.getTimezoneOffset()+330); return d.toISOString().slice(0,10); }
+        function pktMonth() { return pktToday().slice(0,7); }
+        var curMonth = pktMonth();
+
+        function load() {
+            var m = document.getElementById('m').value || curMonth;
+            var url = m ? '/api/employees?month=' + encodeURIComponent(m) : '/api/employees';
+            fetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    list = d;
+                    sortCol(-1);
+                });
+        }
+
+        function render() {
+            var q = (document.getElementById('s').value || '').toLowerCase();
+            var filtered = list.filter(function(e) {
+                return (e.name || '').toLowerCase().includes(q) ||
+                       (e.nickname || '').toLowerCase().includes(q);
+            });
+            if (sortIdx > 0) {
+                var idx = sortIdx, dir = sortDir;
+                var extractors = [
+                    function() { return 0; },
+                    function(e) { return (e.name || '').toLowerCase(); },
+                    function(e) { return (e.nickname || '').toLowerCase(); },
+                    function(e) { return e.salary || 0; },
+                    function(e) { return e.commissions || 0; },
+                ];
+                filtered.sort(function(a, b) {
+                    var va = extractors[idx](a), vb = extractors[idx](b);
+                    if (typeof va === 'string') return dir * va.localeCompare(vb);
+                    return dir * (va - vb);
+                });
+            }
+            var html = filtered.map(function(e, i) {
+                return '<tr>' +
+                    '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                    '<td>' + (e.name || '') + '</td>' +
+                    '<td>' + (e.nickname || '') + '</td>' +
+                    '<td>Rs ' + (e.salary || 0).toFixed(2) + '</td>' +
+                    '<td>Rs ' + (e.commissions || 0).toFixed(2) + '</td>' +
+                    '<td>' +
+                        '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + e.id + ')">Edit</button> ' +
+                        '<button class="btn btn-xs btn-ghost" onclick="showVoucher(' + e.id + ')">Details</button> ' +
+                        '<button class="btn btn-xs btn-ghost" onclick="showAttendance(' + e.id + ')">Attendance</button> ' +
+                        '<button class="btn btn-xs btn-p" onclick="showPrint(' + e.id + ')">Print</button> ' +
+                        '<button class="btn btn-xs btn-d" onclick="del(' + e.id + ')">Delete</button>' +
+                    '</td></tr>';
+            }).join('');
+            document.getElementById('tb').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:30px">No employees found</td></tr>';
+            var totalSal = filtered.reduce(function(s, e) { return s + (e.salary || 0); }, 0);
+            var totalCom = filtered.reduce(function(s, e) { return s + (e.commissions || 0); }, 0);
+            document.getElementById('tf').innerHTML = '<tr style="font-weight:700;background:#f8f7f4"><td colspan="3">Total</td><td>Rs ' + totalSal.toFixed(2) + '</td><td>Rs ' + totalCom.toFixed(2) + '</td><td></td></tr>';
+        }
+
+        function sortCol(i) {
+            if (i < 0) { render(); return; }
+            if (i === sortIdx) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
+            document.querySelectorAll('[id^=si]').forEach(function(el) {
+                var n = parseInt(el.id.replace('si', ''));
+                el.textContent = n === sortIdx ? (sortDir === 1 ? '\u25B2' : '\u25BC') : '';
+            });
+            render();
+        }
+
+        function showAdd() {
+            editId = null;
+            document.getElementById('ft').textContent = 'New Employee';
+            document.getElementById('fn').value = '';
+            document.getElementById('ffn').value = '';
+            document.getElementById('fcnic').value = '';
+            document.getElementById('fph').value = '';
+            document.getElementById('fnn').value = '';
+            document.getElementById('fs').value = '';
+            document.getElementById('fad').value = '0';
+            document.getElementById('fra').value = '0';
+            document.getElementById('fm').classList.add('show');
+        }
+
+        function showEdit(id) {
+            var e = list.find(function(x) { return x.id === id; });
+            if (!e) return;
+            editId = id;
+            document.getElementById('ft').textContent = 'Edit Employee';
+            document.getElementById('fn').value = e.name || '';
+            document.getElementById('ffn').value = e.father_name || '';
+            document.getElementById('fcnic').value = e.cnic || '';
+            document.getElementById('fph').value = e.phone || '';
+            document.getElementById('fnn').value = e.nickname || '';
+            document.getElementById('fs').value = e.salary || 0;
+            document.getElementById('fad').value = e.advance || 0;
+            document.getElementById('fra').value = e.remaining_advance || 0;
+            document.getElementById('fm').classList.add('show');
+        }
+
+        function save(ev) {
+            ev.preventDefault();
+            var name = document.getElementById('fn').value.trim();
+            if (!name) return alert('Name is required');
+            var data = {
+                name: name,
+                father_name: document.getElementById('ffn').value.trim(),
+                cnic: document.getElementById('fcnic').value.trim(),
+                phone: document.getElementById('fph').value.trim(),
+                nickname: document.getElementById('fnn').value.trim(),
+                salary: parseFloat(document.getElementById('fs').value) || 0,
+                advance: parseFloat(document.getElementById('fad').value) || 0,
+                remaining_advance: parseFloat(document.getElementById('fra').value) || 0
+            };
+            var url = editId ? '/api/employees/' + editId : '/api/employees';
+            var method = editId ? 'PUT' : 'POST';
+            fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.error) { alert(d.error); return; }
+                    cl('fm');
+                    load();
+                });
+        }
+
+        function del(id) {
+            if (!confirm('Delete this employee?')) return;
+            fetch('/api/employees/' + id, { method: 'DELETE' })
+                .then(function(r) { return r.json(); })
+                .then(function() { load(); });
+        }
+
+        function cl(id) { document.getElementById(id).classList.remove('show'); }
+
+        function printAll() {
+            var m = document.getElementById('m').value || curMonth;
+            window.open('/payroll/print-all?month=' + encodeURIComponent(m), '_blank');
+        }
+
+        function showAttendance(id) {
+            var e = list.find(function(x) { return x.id === id; });
+            if (!e) return;
+            atEmpId = id;
+            document.getElementById('at_emp_name').textContent = e.name || '';
+            var m = document.getElementById('m').value || curMonth;
+            document.getElementById('at_month_label').textContent = m;
+            document.getElementById('at_title').textContent = 'Attendance — ' + (e.name || '');
+            document.getElementById('at_msg').textContent = '';
+            document.getElementById('atm').classList.add('show');
+            loadAttendance(m);
+        }
+
+        function loadAttendance(month) {
+            fetch('/api/attendance?employee_id=' + atEmpId + '&month=' + encodeURIComponent(month))
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    atData = {};
+                    var existing = {};
+                    (d || []).forEach(function(a) { atData[a.date] = a.status; existing[a.date] = true; });
+                    // Auto-insert present/off defaults for all past days not yet recorded
+                    var parts = month.split('-');
+                    var year = parseInt(parts[0]), mon = parseInt(parts[1]);
+                    var daysInMonth = new Date(year, mon, 0).getDate();
+                    var today = pktToday();
+                    var batch = [];
+                    for (var d = 1; d <= daysInMonth; d++) {
+                        var ds = month + '-' + (d < 10 ? '0' : '') + d;
+                        if (ds > today || existing[ds]) continue;
+                        var dt = new Date(year, mon - 1, d);
+                        var status = dt.getDay() === 0 ? 'off' : 'present';
+                        atData[ds] = status;
+                        batch.push({employee_id: atEmpId, date: ds, status: status});
+                    }
+                    if (batch.length) {
+                        fetch('/api/attendance/batch', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(batch)
+                        });
+                    }
+                    renderCalendar(month);
+                });
+        }
+
+        function renderCalendar(month) {
+            var parts = month.split('-');
+            var year = parseInt(parts[0]), mon = parseInt(parts[1]);
+            var daysInMonth = new Date(year, mon, 0).getDate();
+            var firstDay = new Date(year, mon - 1, 1).getDay();
+            var today = pktToday();
+            var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+            var html = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+            dayNames.forEach(function(d) { html += '<th style="padding:6px;text-align:center;background:#eee;border:1px solid #ddd">' + d + '</th>'; });
+            html += '</tr></thead><tbody>';
+
+            var day = 1;
+            for (var row = 0; row < 6; row++) {
+                if (day > daysInMonth) break;
+                html += '<tr>';
+                for (var col = 0; col < 7; col++) {
+                    if ((row === 0 && col < firstDay) || day > daysInMonth) {
+                        html += '<td style="border:1px solid #eee;padding:4px"></td>';
+                    } else {
+                        var dateStr = month + '-' + (day < 10 ? '0' : '') + day;
+                        var dt = new Date(year, mon - 1, day);
+                        var isSunday = dt.getDay() === 0;
+                        var isFuture = (dateStr > today);
+                        var defaultStatus = isSunday ? 'off' : 'present';
+                        var curStatus = atData[dateStr] || defaultStatus;
+                        var isPast = (dateStr < today);
+                        var disabled = isFuture;
+                        html += '<td style="border:1px solid #ddd;padding:4px;vertical-align:top;' + (dateStr === today ? 'background:#fffde7' : '') + (isSunday ? 'background:#f3f4f6' : '') + (isFuture ? 'background:#f9fafb' : '') + '">';
+                        html += '<div style="font-weight:600;margin-bottom:3px;font-size:11px">' + day + '</div>';
+                        html += '<select style="font-size:10px;padding:2px;width:100%;' + (disabled ? 'opacity:0.5' : '') + '" ' + (disabled ? 'disabled' : '') + ' data-date="' + dateStr + '" onchange="markAttendance(this)">';
+                        STATUSES.forEach(function(s) {
+                            html += '<option value="' + s + '"' + (s === curStatus ? ' selected' : '') + '>' + s + '</option>';
+                        });
+                        html += '</select>';
+                        html += '</td>';
+                        day++;
+                    }
+                }
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+            document.getElementById('at_calendar').innerHTML = html;
+
+            // Summary row
+            var counts = {present:0, absent:0, leave:0, 'half-day':0, late:0, overtime:0, off:0};
+            for (var d = 1; d <= daysInMonth; d++) {
+                var ds = month + '-' + (d < 10 ? '0' : '') + d;
+                var dt = new Date(year, mon - 1, d);
+                var def = dt.getDay() === 0 ? 'off' : 'present';
+                var s = atData[ds] || def;
+                if (ds <= today) counts[s] = (counts[s] || 0) + 1;
+            }
+            var sumHtml = '';
+            STATUSES.forEach(function(s) {
+                sumHtml += '<span style="background:#f3f4f6;padding:4px 10px;border-radius:6px"><strong>' + s + ':</strong> ' + (counts[s] || 0) + '</span>';
+            });
+            document.getElementById('at_summary').innerHTML = sumHtml;
+        }
+
+        function markAttendance(sel) {
+            var date = sel.getAttribute('data-date');
+            atData[date] = sel.value;
+        }
+
+        function saveAllAttendance() {
+            var keys = Object.keys(atData);
+            var promises = [];
+            keys.forEach(function(date) {
+                var status = atData[date];
+                promises.push(
+                    fetch('/api/attendance', {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({employee_id: atEmpId, date: date, status: status})
+                    }).then(function(r) { return r.json(); })
+                );
+            });
+            Promise.all(promises).then(function(results) {
+                var ok = results.every(function(r) { return r.ok; });
+                document.getElementById('at_msg').textContent = ok ? 'Saved!' : 'Some failed';
+                document.getElementById('at_msg').style.color = ok ? 'green' : 'red';
+                if (ok) setTimeout(function() { document.getElementById('at_msg').textContent = ''; }, 2000);
+            });
+        }
+
+        function showVoucher(id) {
+            var m = document.getElementById('m').value || curMonth;
+            window.open('/payroll/voucher/' + id + '?month=' + encodeURIComponent(m), '_blank');
+        }
+
+        function showPrint(id) {
+            var m = document.getElementById('m').value || curMonth;
+            window.open('/payroll/print/' + id + '?month=' + encodeURIComponent(m), '_blank');
+        }
+
+        document.getElementById('m').value = curMonth;
+        load();
+    </script>
+</body>
+</html>

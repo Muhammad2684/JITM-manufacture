@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JITM · Commission Classes</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Commission Classes</h2>
+            <div class="actions">
+                {% if role == 'manager' %}
+                    <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Class</button>
+                {% endif %}
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="search">
+                <input id="s" placeholder="Search classes..." oninput="load()">
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Name <span id="si1"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Percentage <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Created <span id="si3"></span></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tb"></tbody>
+                </table>
+            </div>
+            <div style="margin-top:12px;text-align:right">
+                <button class="btn btn-sm btn-print" onclick="printTable()">Print</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="am">
+        <div class="mc">
+            <button class="mx" onclick="cl('am')">&times;</button>
+            <h2>Add Commission Class</h2>
+            <form onsubmit="saveC(event)">
+                <label>Class Name</label>
+                <input id="cn" required>
+                <label>Percentage (%)</label>
+                <input id="cp" type="number" step="0.01" min="0" max="100" value="0">
+                <button class="btn btn-p" type="submit">Save</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="modal" id="em">
+        <div class="mc">
+            <button class="mx" onclick="cl('em')">&times;</button>
+            <h2>Edit Commission Class</h2>
+            <form onsubmit="editC(event)">
+                <label>Class Name</label>
+                <input id="ecn" required>
+                <label>Percentage (%)</label>
+                <input id="ecp" type="number" step="0.01" min="0" max="100" value="0">
+                <button class="btn btn-p" type="submit">Update</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        var ccList = [], sortIdx = -1, sortDir = 1, editId = null;
+        
+        function load() {
+            var q = document.getElementById('s').value.toLowerCase();
+            fetch('/api/commission-classes')
+                .then(r => r.json())
+                .then(d => {
+                    ccList = d;
+                    render(d.filter(function(c) {
+                        return !q || (c.name || '').toLowerCase().includes(q);
+                    }));
+                });
+        }
+        
+        function render(l) {
+            document.getElementById('tb').innerHTML = l.map((c, i) => 
+                '<tr>' +
+                '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                '<td>' + c.name + '</td>' +
+                '<td>' + (c.percentage || 0) + '%</td>' +
+                '<td style="color:#6b7280;font-size:13px">' + (c.created_at || '').slice(0, 10) + '</td>' +
+                '<td>' + ({{role|tojson}} == 'manager' ? 
+                    '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + c.id + ')">Edit</button>' +
+                    '<button class="btn btn-xs btn-ghost" onclick="del(' + c.id + ')">Delete</button>' : '') +
+                '</td>' +
+                '</tr>'
+            ).join('');
+        }
+        
+        function sortCol(i) {
+            if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
+            for (let j = 0; j < 4; j++) document.getElementById('si' + j).textContent = '';
+            document.getElementById('si' + i).textContent = sortDir === 1 ? ' ▲' : ' ▼';
+            
+            const vals = [
+                () => 0,
+                c => (c.name || '').toLowerCase(),
+                c => c.percentage || 0,
+                c => (c.created_at || '')
+            ];
+            
+            ccList.sort((a, b) => {
+                const va = vals[i](a), vb = vals[i](b);
+                return va < vb ? -sortDir : va > vb ? sortDir : 0;
+            });
+            
+            var q = document.getElementById('s').value.toLowerCase();
+            render(ccList.filter(function(c) {
+                return !q || (c.name || '').toLowerCase().includes(q);
+            }));
+        }
+        
+        function showAdd() {
+            document.getElementById('am').classList.add('show');
+            document.getElementById('cn').value = '';
+            document.getElementById('cp').value = '0';
+        }
+        
+        function saveC(e) {
+            e.preventDefault();
+            const name = document.getElementById('cn').value.trim();
+            const percentage = parseFloat(document.getElementById('cp').value) || 0;
+            if (!name) return;
+            
+            fetch('/api/commission-classes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, percentage: percentage })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.error) { alert(d.error); return; }
+                cl('am');
+                load();
+            });
+        }
+        
+        function showEdit(id) {
+            const c = ccList.find(x => x.id === id);
+            if (!c) return;
+            editId = id;
+            document.getElementById('ecn').value = c.name;
+            document.getElementById('ecp').value = c.percentage || 0;
+            document.getElementById('em').classList.add('show');
+        }
+        
+        function editC(e) {
+            e.preventDefault();
+            const name = document.getElementById('ecn').value.trim();
+            const percentage = parseFloat(document.getElementById('ecp').value) || 0;
+            if (!name) return;
+            
+            fetch('/api/commission-classes/' + editId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, percentage: percentage })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.error) { alert(d.error); return; }
+                cl('em');
+                load();
+            });
+        }
+        
+        function del(id) {
+            if (!confirm('Delete this commission class?')) return;
+            fetch('/api/commission-classes/' + id, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(() => load());
+        }
+        
+        load();
+        
+        function cl(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+        
+        window.onclick = function(e) {
+            document.querySelectorAll('.modal').forEach(m => {
+                if (e.target === m) m.classList.remove('show');
+            });
+        };
+        
+        function printTable() {
+            document.body.classList.add('printing');
+            window.print();
+        }
+        
+        window.addEventListener('afterprint', function() {
+            document.body.classList.remove('printing');
+        });
+    </script>
+</body>
+</html>

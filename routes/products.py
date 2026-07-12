@@ -1,3 +1,6 @@
+import csv, io, os
+
+import openpyxl
 from flask import Blueprint, request, jsonify, session
 from database import get_db
 from routes.auth import login_required, manager_required
@@ -129,6 +132,142 @@ def update_product(pid):
             db.execute('UPDATE variants SET size=? WHERE product_id=?',
                        (d.get('size', ''), pid))
         return jsonify({'ok': True})
+
+
+@prod_bp.route('/products/import-template')
+@login_required
+def import_template():
+    """Return a sample CSV template for bulk product import."""
+    header = 'name,sku,barcode,cost_price,base_price,category,commission_class,low_stock,stock'
+    sample = 'Sample Product,SMP001,,150,250,Apparel,Standard,5,20'
+    output = io.StringIO()
+    output.write(header + '\n' + sample + '\n')
+    return output.getvalue(), 200, {'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=product_import_template.csv'}
+
+
+@prod_bp.route('/products/import', methods=['POST'])
+@login_required
+@manager_required
+def import_products():
+    """Bulk import products from CSV or Excel file. Skips duplicate SKUs, reports errors."""
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    filename = file.filename.lower() if file.filename else ''
+    rows = []
+
+    if filename.endswith('.xlsx'):
+        wb = openpyxl.load_workbook(file, read_only=True)
+        ws = wb.active
+        data_rows = list(ws.iter_rows(values_only=True))
+        if not data_rows:
+            return jsonify({'error': 'Empty file'}), 400
+        headers = [str(h).strip().lower() if h else '' for h in data_rows[0]]
+        for row in data_rows[1:]:
+            d = {}
+            for i, h in enumerate(headers):
+                val = row[i] if i < len(row) else None
+                if val is not None:
+                    val = str(val).strip()
+                d[h] = val
+            rows.append(d)
+    elif filename.endswith('.csv'):
+        content = file.read().decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+        if not reader.fieldnames:
+            return jsonify({'error': 'Empty or invalid CSV'}), 400
+        reader.fieldnames = [h.strip().lower() for h in reader.fieldnames]
+        for row in reader:
+            d = {}
+            for k, v in row.items():
+                d[k.strip().lower()] = v.strip() if v else ''
+            rows.append(d)
+    else:
+        return jsonify({'error': 'Unsupported file format. Use .csv or .xlsx'}), 400
+
+    expected = {'name', 'sku'}
+    if not rows:
+        return jsonify({'error': 'No data rows found'}), 400
+
+    header_cols = set(rows[0].keys())
+    missing_required = expected - header_cols
+    if missing_required:
+        return jsonify({'error': f'Missing required columns: {", ".join(sorted(missing_required))}'}), 400
+
+    created = 0
+    skipped = 0
+    errors = []
+
+    with get_db() as db:
+        existing_skus = set(
+            row['sku'] for row in db.execute('SELECT sku FROM products').fetchall()
+        )
+        existing_barcodes = set(
+            row['barcode'] for row in db.execute('SELECT barcode FROM products WHERE barcode IS NOT NULL').fetchall()
+        )
+
+        db.execute('BEGIN IMMEDIATE')
+        for idx, row in enumerate(rows, start=2):
+            name = (row.get('name') or '').strip()
+            sku = (row.get('sku') or '').strip()
+            if not name:
+                errors.append(f'Row {idx}: name is required')
+                continue
+            if not sku:
+                errors.append(f'Row {idx}: sku is required')
+                continue
+            if sku in existing_skus:
+                skipped += 1
+                continue
+
+            barcode = (row.get('barcode') or '').strip() or None
+            if barcode and barcode in existing_barcodes:
+                errors.append(f'Row {idx}: barcode "{barcode}" already exists')
+                continue
+
+            try:
+                cost_price = float(row.get('cost_price', 0) or 0)
+            except (ValueError, TypeError):
+                errors.append(f'Row {idx}: invalid cost_price "{row.get("cost_price")}"')
+                continue
+            try:
+                base_price = float(row.get('base_price', 0) or 0)
+            except (ValueError, TypeError):
+                errors.append(f'Row {idx}: invalid base_price "{row.get("base_price")}"')
+                continue
+            try:
+                low_stock = int(row.get('low_stock', 5) or 5)
+            except (ValueError, TypeError):
+                errors.append(f'Row {idx}: invalid low_stock "{row.get("low_stock")}"')
+                continue
+            try:
+                stock = int(row.get('stock', 0) or 0)
+            except (ValueError, TypeError):
+                errors.append(f'Row {idx}: invalid stock "{row.get("stock")}"')
+                continue
+
+            category = (row.get('category') or '').strip()
+            commission_class = (row.get('commission_class') or '').strip() or None
+
+            try:
+                cur = db.execute(
+                    'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class) VALUES (?,?,?,?,?,?,?,?)',
+                    (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class)
+                )
+                pid = cur.lastrowid
+                db.execute(
+                    'INSERT INTO variants (product_id, sku, stock) VALUES (?,?,?)',
+                    (pid, sku, stock)
+                )
+                existing_skus.add(sku)
+                if barcode:
+                    existing_barcodes.add(barcode)
+                created += 1
+            except Exception as e:
+                errors.append(f'Row {idx}: {str(e)}')
+
+    return jsonify({'ok': True, 'created': created, 'skipped': skipped, 'errors': errors})
 
 
 @prod_bp.route('/variants', methods=['POST'])

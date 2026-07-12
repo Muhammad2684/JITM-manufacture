@@ -14,6 +14,7 @@
             <h2>Inventory</h2>
             <div class="actions">
                 {% if role == 'manager' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ New Product</button>
+                <button class="btn btn-sm" onclick="showImport()">Import</button>
                 <button class="btn btn-sm" onclick="showRestock()">Restock Log</button>{% endif %}
                 <button class="btn btn-sm" onclick="showLow()">Low Stock</button> <button class="btn btn-sm"
                     onclick="showBarcodes()">Barcodes</button>
@@ -137,6 +138,19 @@
         <div class="mc" style="max-width:700px"><button class="mx" onclick="cl('rml')">&times;</button>
             <h2>Restock Log</h2>
             <div id="rl"></div>
+        </div>
+    </div>
+    <div class="modal" id="im">
+        <div class="mc" style="max-width:520px"><button class="mx" onclick="cl('im')">&times;</button>
+            <h2>Import Products</h2>
+            <p style="font-size:13px;color:#6b7280;margin:0 0 12px">Upload a CSV or Excel file with columns: <code>name</code>, <code>sku</code>, <code>barcode</code>, <code>cost_price</code>, <code>base_price</code>, <code>category</code>, <code>commission_class</code>, <code>low_stock</code>, <code>stock</code>. Only <code>name</code> and <code>sku</code> are required. Duplicate SKUs are skipped.</p>
+            <a href="/api/products/import-template" style="font-size:13px;color:#3b4fe2;text-decoration:underline;cursor:pointer">Download sample template</a>
+            <div style="margin-top:12px">
+                <label>Choose file (.csv or .xlsx)</label>
+                <input id="if" type="file" accept=".csv,.xlsx" style="margin-top:4px">
+            </div>
+            <button class="btn btn-p" onclick="doImport()" style="margin-top:12px">Upload & Import</button>
+            <div id="ir" style="margin-top:12px"></div>
         </div>
     </div>
     <script type="application/json" id="sv">{{role|tojson}}</script>
@@ -383,6 +397,30 @@
                 document.getElementById('rl').innerHTML = d.length ? '<table><tr><th>Date</th><th>Product</th><th>SKU</th><th>Added</th><th class="text-right">Cost</th><th>Staff</th><th>Note</th></tr>' +
                     d.map(r => '<tr><td>' + (r.created_at || '').slice(0, 10) + '</td><td>' + r.product_name + '</td><td>' + r.sku + '</td><td>' + r.qty_added + '</td><td class="text-right">Rs ' + (r.cost || 0).toFixed(2) + '</td><td>' + (r.staff_name || '') + '</td><td>' + (r.note || '') + '</td></tr>').join('') + '</table>' : '<div class="empty">No restock history</div>'; document.getElementById('rml').classList.add('show');
             });
+        }
+        function showImport() { document.getElementById('im').classList.add('show'); document.getElementById('ir').innerHTML = ''; document.getElementById('if').value = ''; }
+        function doImport() {
+            const fileInput = document.getElementById('if');
+            if (!fileInput.files.length) { alert('Please select a file'); return; }
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            const btn = document.querySelector('#im .btn-p');
+            btn.textContent = 'Importing...'; btn.disabled = true;
+            fetch('/api/products/import', { method: 'POST', body: formData })
+                .then(r => r.json()).then(d => {
+                    btn.textContent = 'Upload & Import'; btn.disabled = false;
+                    let html = '';
+                    if (d.error) {
+                        html = '<div class="bdg bdg-err" style="padding:8px;border-radius:6px">' + d.error + '</div>';
+                    } else {
+                        html = '<div style="padding:8px;border-radius:6px;background:#f0fdf4;color:#16a34a;font-size:13px;font-weight:600">Created: ' + d.created + ' &nbsp;|&nbsp; Skipped: ' + d.skipped + '</div>';
+                        if (d.errors && d.errors.length) {
+                            html += '<div style="margin-top:8px;padding:8px;border-radius:6px;background:#fef2f2;color:#dc2626;font-size:12px;max-height:200px;overflow-y:auto">' + d.errors.map(function(e){return '<div>'+e+'</div>'}).join('') + '</div>';
+                        }
+                        load();
+                    }
+                    document.getElementById('ir').innerHTML = html;
+                }).catch(function(){ btn.textContent = 'Upload & Import'; btn.disabled = false; alert('Upload failed'); });
         }
         function f(m, t) { const e = document.getElementById('flash'); e.innerHTML = '<div class="fl fl-' + t + '">' + m + '</div>'; setTimeout(() => { const f = e.querySelector('.fl'); if (f) { f.style.opacity = '0'; setTimeout(() => f.remove(), 300); } }, 3000); }
         function cl(id) { document.getElementById(id).classList.remove('show'); }

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JITM · Dashboard</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Dashboard</h2>
+            <div class="actions">
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="stats" id="stats"></div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Top Products (Month)</h3>
+                    </div>
+                    <div class="card-body" id="top"></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Recent Sales</h3>
+                    </div>
+                    <div class="card-body" id="recent"></div>
+                </div>
+            </div>
+            <div class="card mt-2">
+                <div class="card-header">
+                    <h3>Sales (Last 7 Days)</h3>
+                </div>
+                <div class="card-body" id="chart"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        fetch('/api/dashboard')
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('stats').innerHTML = `
+                    <div class="stat">
+                        <div class="val">Rs ${d.today.revenue.toFixed(2)}</div>
+                        <div class="lbl">Today's Revenue</div>
+                        <div class="sub">${d.today.sales} transactions</div>
+                    </div>
+                    <div class="stat">
+                        <div class="val">${d.today.sales}</div>
+                        <div class="lbl">Sales Today</div>
+                        <div class="sub">Rs ${d.today.returns.toFixed(2)} returns</div>
+                    </div>
+                    <div class="stat">
+                        <div class="val">Rs ${d.month.revenue.toFixed(2)}</div>
+                        <div class="lbl">This Month</div>
+                        <div class="sub">${d.month.sales} transactions</div>
+                    </div>
+                    <div class="stat">
+                        <div class="val">${d.low_stock}</div>
+                        <div class="lbl">Low Stock Items</div>
+                        <div class="sub">Need reorder</div>
+                    </div>
+                    <div class="stat">
+                        <div class="val">${d.customers}</div>
+                        <div class="lbl">Customers</div>
+                        <div class="sub">${d.products} products, ${d.staff} staff</div>
+                    </div>
+                `;
+                
+                document.getElementById('top').innerHTML = d.top_products.length
+                    ? '<table><tr><th>Product</th><th class="text-right">Qty</th><th class="text-right">Revenue</th></tr>' +
+                      d.top_products.map(p => '<tr><td>' + p.product_name + '</td><td class="text-right">' + p.qty + '</td><td class="text-right">Rs ' + p.revenue.toFixed(2) + '</td></tr>').join('') +
+                      '</table>'
+                    : '<div class="empty">No data</div>';
+                
+                document.getElementById('recent').innerHTML = d.recent_sales.length
+                    ? '<table><tr><th>Receipt</th><th class="text-right">Total</th><th>Staff</th><th>Status</th></tr>' +
+                      d.recent_sales.map(s => '<tr><td>' + s.receipt + '</td><td class="text-right">Rs ' + s.total.toFixed(2) + '</td><td>' + s.staff_name + '</td><td><span class="bdg bdg-' + (s.status === 'completed' ? 'ok' : s.status === 'returned' ? 'err' : 'warn') + '">' + s.status + '</span></td></tr>').join('') +
+                      '</table>'
+                    : '<div class="empty">No sales yet</div>';
+                
+                if (d.sales_by_day.length) {
+                    const max = Math.max(...d.sales_by_day.map(s => s.total));
+                    document.getElementById('chart').innerHTML = '<div style="display:flex;gap:8px;align-items:end;height:140px;padding:8px 0">' +
+                        d.sales_by_day.map(s => '<div style="flex:1;text-align:center"><div style="background:#4f46e5;height:' + Math.max(4, s.total / max * 120) + 'px;border-radius:4px 4px 0 0"></div><div style="font-size:10px;color:#9ca3af;margin-top:4px">' + (s.day || '').slice(5) + '</div><div style="font-size:10px;font-weight:600">Rs ' + s.total.toFixed(0) + '</div></div>').join('') +
+                        '</div>';
+                } else {
+                    document.getElementById('chart').innerHTML = '<div class="empty">No data</div>';
+                }
+            });
+    </script>
+</body>
+</html>

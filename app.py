@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 os.environ['TZ'] = 'Asia/Karachi'
 time.tzset()
@@ -58,7 +59,12 @@ from routes.transactions import txn_bp
 from routes.ledger import ledger_bp
 from routes.payroll import payroll_bp
 
-app = Flask(__name__)
+if getattr(sys, 'frozen', False):
+    base_dir = sys._MEIPASS
+    app = Flask(__name__, template_folder=os.path.join(base_dir, 'templates'),
+                static_folder=os.path.join(base_dir, 'static'))
+else:
+    app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-change-in-prod')
 
 @app.template_filter('format_month')
@@ -697,4 +703,5 @@ def ledger_page(entity_type, entity_id):
 
 if __name__ == '__main__':
     init_db()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    debug_mode = not getattr(sys, 'frozen', False)
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)

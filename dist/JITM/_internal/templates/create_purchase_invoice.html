@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html>
+<head><title>JITM · Create Purchase Invoice</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
+<style>
+.ci-wrap{max-width:960px;margin:0 auto}
+.ci-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
+.ci-meta label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600;display:block;margin-bottom:4px}
+.ci-meta input,.ci-meta select{width:100%;padding:7px 10px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
+.ci-meta input:focus,.ci-meta select:focus{outline:none;border-color:#3b4fe2}
+.ci-entity{background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
+.ci-entity label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600;display:block;margin-bottom:4px}
+.ci-entity select,.ci-entity input{width:100%;padding:8px 12px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
+.ci-entity select:focus,.ci-entity input:focus{outline:none;border-color:#3b4fe2}
+.ssheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;margin-bottom:16px}
+
+.ssheet table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ssheet th{background:#f3f4f6;padding:6px 8px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db;border-right:1px solid #e5e7eb}
+.ssheet th:last-child{border-right:none}
+.ssheet td{padding:0;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
+.ssheet td:last-child{border-right:none}
+.ssheet tr:last-child td{border-bottom:none}
+.ssheet .cell{width:100%;border:none;padding:6px 8px;font-size:13px;color:#1e293b;background:transparent;outline:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.ssheet .cell:focus{background:#eef2ff;box-shadow:inset 0 0 0 2px #3b4fe2;position:relative;z-index:1}
+.ssheet .cell.num{text-align:right}
+.ssheet .cell.ro{background:#f9fafb;color:#6b7280}
+.ssheet .total-cell{padding:6px 8px;font-weight:600;font-size:13px;color:#1e293b;text-align:right}
+.ssheet .del-cell{padding:2px 4px;text-align:center}
+.ssheet .del-cell button{background:none;border:none;color:#9ca3af;cursor:pointer;font-size:14px;padding:4px}
+.ssheet .del-cell button:hover{color:#dc2626}
+.ssheet-foot{display:flex;align-items:center;padding:8px 10px;gap:8px;border-top:1px solid #e5e7eb}
+.ci-footer{display:flex;gap:10px;align-items:center;padding-top:4px}
+.ci-footer .gt{margin-left:auto;font-size:16px;font-weight:700;color:#1e293b}
+.ssheet .item-wrap{position:relative}
+.ssheet .ac-list{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:4px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.ssheet .ac-list div{padding:6px 8px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6}
+.ssheet .ac-list div:hover{background:#eef2ff}
+.ssheet .ac-list div:last-child{border-bottom:none}
+.ssheet .ac-list div.ac-highlight{background:#dbeafe}
+#csv_preview_modal table th{background:#f3f4f6;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db}
+#csv_preview_modal table td{padding:5px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#1e293b}
+#csv_preview_modal table tr:last-child td{border-bottom:none}
+#csv_preview_modal table td.num{text-align:right;font-family:monospace}
+#csv_preview_modal .tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;margin-left:4px}
+#csv_preview_modal .tag-match{background:#dbeafe;color:#1e40af}
+#csv_preview_modal .tag-new{background:#fef3c7;color:#92400e}
+#csv_preview_modal tr.csv-excluded td{opacity:.4;text-decoration:line-through}
+</style></head>
+<body>
+{{sidebar|safe}}
+<style>.sidebar{display:none}.main{margin-left:0!important}</style>
+<div class="main">
+    <div class="topbar"><h2>Create Purchase Invoice</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
+    <div class="content">
+        <div class="ci-wrap">
+            <div class="ci-meta">
+                <div><label>Issue date</label><input type="date" id="issue_date"></div>
+                <div><label>Due date</label><input type="date" id="due_date"></div>
+                <div><label>Invoice No.</label><input type="text" id="invoice_no" placeholder="e.g. INV-001" required></div>
+            </div>
+            <div class="ci-entity">
+                <div style="margin-bottom:12px"><label>Supplier</label><select id="supplier_id"><option value="">-- Select Supplier --</option></select></div>
+                <div><label>Description</label><input type="text" id="description" placeholder="Invoice description (optional)"></div>
+            </div>
+            <div class="ssheet">
+                <table>
+                    <thead><tr><th style="width:38%">Item</th><th style="width:14%" class="text-right">Qty</th><th style="width:18%" class="text-right">Unit Price</th><th style="width:18%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
+                    <tbody id="items_tb"></tbody>
+                </table>
+                <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button></div>
+            </div>
+            <div class="ci-footer">
+                <button class="btn btn-p" onclick="submitInvoice()">Create</button>
+                <div class="gt">Total: <span id="grand_total">Rs 0.00</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="csv_file" accept=".csv" style="display:none" onchange="handleCSVFile(this.files[0])">
+
+<div class="modal" id="csv_preview_modal">
+    <div class="mc" style="max-width:700px">
+        <button class="mx" onclick="closeCSVPreview()">&times;</button>
+        <h2>CSV Preview</h2>
+        <p style="font-size:12px;color:#6b7280;margin-bottom:12px" id="csv_preview_info"></p>
+        <div style="overflow-x:auto;border:1px solid #e2e1de;border-radius:6px">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead id="csv_preview_thead"></thead>
+                <tbody id="csv_preview_tbody"></tbody>
+            </table>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn btn-p" onclick="applyCSVData()">Approve &amp; Add</button>
+            <button class="btn" onclick="closeCSVPreview()">Cancel</button>
+        </div>
+    </div>
+</div>
+<div class="modal" id="pm">
+    <div class="mc"><button class="mx" onclick="cl('pm')">&times;</button>
+        <h2 id="ft">New Product</h2>
+        <form onsubmit="saveProduct(event)">
+            <label>Name</label><input id="pn" required>
+            <label>Size</label>
+            <select id="psize" onchange="sizePicker()"></select>
+            <input id="psize_new" style="display:none" placeholder="New size name">
+            <div class="form-row">
+                <div>
+                    <label>SKU</label>
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <input id="ps" required style="flex:1">
+                        <label style="white-space:nowrap;font-size:11px;color:#6b7280;display:flex;align-items:center;gap:3px;font-weight:400;text-transform:none;cursor:pointer;margin:0">
+                            <input type="checkbox" id="pa" onchange="autoSku(this.checked)" checked> Auto
+                        </label>
+                    </div>
+                </div>
+                <div><label>Barcode</label><input id="pb"></div>
+            </div>
+            <div class="form-row">
+                <div><label>Cost (Rs)</label><input id="pc" type="number" step="0.01" value="0" oninput="autoPrice()"></div>
+                <div><label>Markup %</label><input id="pmu" type="number" step="0.01" value="35" oninput="autoPrice()"></div>
+            </div>
+            <div class="form-row">
+                <div><label>Price (Rs)</label><input id="pp" type="number" step="0.01" required></div>
+                <div><label>Low Stock Alert</label><input id="pl" type="number" value="5"></div>
+            </div>
+            <div class="form-row">
+                <div><label>Category</label><select id="pcat" onchange="categoryPicker()"></select><input id="pcat_new" style="display:none" placeholder="New category name"></div>
+                <div><label>Commission Class</label><select id="pcc" onchange="commissionPicker()"></select><input id="pcc_new" style="display:none" placeholder="New class name"></div>
+            </div>
+            <button class="btn btn-p" type="submit" style="margin-top:8px">Save</button>
+        </form>
+    </div>
+</div>
+<script>
+var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [], sizeList = [];
+
+function loadSuppliers() {
+    fetch('/api/suppliers').then(r=>r.json()).then(d=>{
+        suppliers = d.items || d;
+        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('');
+    });
+}
+function loadProducts() {
+    fetch('/api/products?per_page=10000').then(r=>r.json()).then(d=>{products=d.items||d;});
+}
+
+function isLastRow(el) {
+    var rows = document.querySelectorAll('#items_tb tr');
+    return rows.length > 0 && el.closest('tr') === rows[rows.length - 1];
+}
+
+function addRow(data) {
+    rowId++;
+    var name = data ? data.item : '';
+    var qty = data ? data.qty : 1;
+    var up = data ? data.unit_price : 0;
+    var total = data ? data.total : 0;
+    var pid = data ? (data.pid || null) : null;
+    var html = '<tr id="rr-'+rowId+'"' + (pid ? ' data-pid="'+pid+'"' : '') + '>';
+    html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
+    html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
+    html += '<td><input class="cell num up" value="'+up.toFixed(2)+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
+    html += '<td><div class="total-cell" id="rt-'+rowId+'">Rs '+total.toFixed(2)+'</div></td>';
+    html += '<td class="del-cell"><button onclick="delRow(this)">&times;</button></td>';
+    html += '</tr>';
+    document.getElementById('items_tb').insertAdjacentHTML('beforeend', html);
+    calcGrand();
+}
+
+function onItemInput(inp, rid) {
+    acShow(inp, rid);
+    if (!isLastRow(inp)) return;
+    if (inp.value.trim() !== '') {
+        var rows = document.querySelectorAll('#items_tb tr');
+        var lastRow = rows[rows.length - 1];
+        var lastInp = lastRow.querySelector('.item-wrap .cell');
+        if (lastInp === inp && lastInp.value.trim() !== '') {
+            addRow();
+        }
+    }
+}
+
+function acShow(inp, rid) {
+    var q = inp.value.toLowerCase();
+    var list = document.getElementById('ac-'+rid);
+    if (!q) { list.style.display = 'none'; return; }
+    var matches = products.filter(function(p){return (p.name||'').toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q);});
+    if (!matches.length) {
+        list.innerHTML = '<div data-action="create" data-name="'+inp.value.replace(/'/g,"\\'")+'" onmousedown="acCreate('+rid+',\''+inp.value.replace(/'/g,"\\'")+'\')"><span style="color:#3b4fe2;font-weight:600">+ Create</span> \''+inp.value+'\'</div>';
+        list.style.display = 'block'; acHighlightIdx = -1; return;
+    }
+    list.innerHTML = matches.map(function(p){
+        var sz = (p.variants && p.variants[0] && p.variants[0].size) || '';
+        var label = p.name + (sz ? ' ['+sz+']' : '');
+        return '<div onmousedown="acPick('+rid+','+p.id+',\''+label.replace(/'/g,"\\'")+'\','+(p.cost_price||0)+')" data-pid="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+(p.cost_price||0)+'">'+label+' <span style="color:#9ca3af;font-size:10px">'+p.sku+'</span></div>';
+    }).join('');
+    acHighlightIdx = -1;
+    list.style.display = 'block';
+}
+function acHide(rid) { document.getElementById('ac-'+rid).style.display = 'none'; acHighlightIdx = -1; }
+
+function acKeydown(e, inp, rid) {
+    var list = document.getElementById('ac-'+rid);
+    if (list.style.display === 'none') return;
+    var items = list.querySelectorAll('div');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        acHighlightIdx = acHighlightIdx < items.length - 1 ? acHighlightIdx + 1 : 0;
+        acHighlight(items, acHighlightIdx);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        acHighlightIdx = acHighlightIdx > 0 ? acHighlightIdx - 1 : items.length - 1;
+        acHighlight(items, acHighlightIdx);
+    } else if (e.key === 'Tab') {
+        e.preventDefault();
+        acSelect(rid);
+        var tr = document.getElementById('rr-'+rid);
+        var qty = tr.querySelector('.qty');
+        if (qty) qty.focus();
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        acSelect(rid);
+        var tr = document.getElementById('rr-'+rid);
+        var nextTr = tr.nextElementSibling;
+        if (!nextTr) {
+            addRow();
+            nextTr = tr.nextElementSibling;
+        }
+        if (nextTr) {
+            var nextInp = nextTr.querySelector('.item-wrap .cell');
+            if (nextInp) nextInp.focus();
+        }
+    }
+}
+
+function acHighlight(items, idx) {
+    for (var i = 0; i < items.length; i++) {
+        if (i === idx) items[i].classList.add('ac-highlight');
+        else items[i].classList.remove('ac-highlight');
+    }
+}
+
+function acSelect(rid) {
+    var list = document.getElementById('ac-'+rid);
+    var items = list.querySelectorAll('div');
+    if (!items.length) return;
+    var idx = acHighlightIdx >= 0 ? acHighlightIdx : 0;
+    var el = items[idx];
+    if (el.dataset.action === 'create') {
+        acCreate(rid, el.dataset.name);
+    } else {
+        acPick(rid, parseInt(el.dataset.pid), el.dataset.name, parseFloat(el.dataset.price));
+    }
+}
+
+function acCreate(rid, name) {
+    createTargetRid = rid;
+    document.getElementById('pn').value = name;
+    document.getElementById('pa').checked = true;
+    document.getElementById('ps').disabled = true;
+    document.getElementById('ps').value = '';
+    autoSku(true);
+    document.getElementById('pb').value = '';
+    var tr = document.getElementById('rr-'+rid);
+    var cost = parseFloat(tr.querySelector('.up').value) || 0;
+    document.getElementById('pc').value = cost;
+    document.getElementById('pmu').value = 35;
+    if (cost > 0) {
+        document.getElementById('pp').value = (cost * (1 + 35 / 100)).toFixed(2);
+    } else {
+        document.getElementById('pp').value = '';
+    }
+    document.getElementById('pcat').style.display = ''; document.getElementById('pcat_new').style.display = 'none';
+    document.getElementById('pcc').style.display = ''; document.getElementById('pcc_new').style.display = 'none';
+    populateCategories(); document.getElementById('pcat').value = '';
+    populateCommissionClasses(); document.getElementById('pcc').value = '';
+    document.getElementById('pl').value = 5;
+    document.getElementById('psize').style.display = ''; document.getElementById('psize_new').style.display = 'none';
+    populateSizes(); document.getElementById('psize').value = '';
+    document.getElementById('ft').textContent = 'New Product';
+    document.getElementById('ac-'+rid).style.display = 'none';
+    document.getElementById('pm').classList.add('show');
+}
+function autoSku(on) {
+    var inp = document.getElementById('ps');
+    if (on) {
+        inp.disabled = true;
+        var sku;
+        do {
+            sku = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+        } while (products.some(function(p){return p.sku === sku;}));
+        inp.value = sku;
+    } else {
+        inp.disabled = false;
+    }
+}
+function autoPrice() {
+    var cost = parseFloat(document.getElementById('pc').value) || 0;
+    var markup = parseFloat(document.getElementById('pmu').value) || 0;
+    if (cost > 0) {
+        document.getElementById('pp').value = (cost * (1 + markup / 100)).toFixed(2);
+    }
+}
+function populateCategories() {
+    var sel = document.getElementById('pcat');
+    sel.innerHTML = '<option value="">-- Select --</option>' + catList.map(function(c){return '<option value="' + c.name.replace(/"/g, '&quot;') + '">' + c.name + '</option>';}).join('') + '<option value="__new__">+ Create new category</option>';
+}
+function categoryPicker() {
+    var sel = document.getElementById('pcat');
+    if (sel.value === '__new__') {
+        sel.style.display = 'none';
+        document.getElementById('pcat_new').style.display = '';
+        document.getElementById('pcat_new').value = '';
+        document.getElementById('pcat_new').focus();
+    }
+}
+function populateCommissionClasses() {
+    var sel = document.getElementById('pcc');
+    sel.innerHTML = '<option value="">-- Select --</option>' + ccList.map(function(c){return '<option value="' + c.name.replace(/"/g, '&quot;') + '">' + c.name + '</option>';}).join('') + '<option value="__new__">+ Create new class</option>';
+}
+function commissionPicker() {
+    var sel = document.getElementById('pcc');
+    if (sel.value === '__new__') {
+        sel.style.display = 'none';
+        document.getElementById('pcc_new').style.display = '';
+        document.getElementById('pcc_new').value = '';
+        document.getElementById('pcc_new').focus();
+    }
+}
+function populateSizes() {
+    var sel = document.getElementById('psize');
+    sel.innerHTML = '<option value="">-- Select --</option>' + sizeList.map(function(s){return '<option value="' + s.name.replace(/"/g, '&quot;') + '">' + s.name + '</option>';}).join('') + '<option value="__new__">+ Create new size</option>';
+}
+function sizePicker() {
+    var sel = document.getElementById('psize');
+    if (sel.value === '__new__') {
+        sel.style.display = 'none';
+        document.getElementById('psize_new').style.display = '';
+        document.getElementById('psize_new').value = '';
+        document.getElementById('psize_new').focus();
+    }
+}
+function saveProduct(e) {
+    e.preventDefault();
+    var sel = document.getElementById('pcat');
+    var cat = sel.value === '__new__' ? document.getElementById('pcat_new').value : sel.value;
+    var csel = document.getElementById('pcc');
+    var commission_class = csel.value === '__new__' ? document.getElementById('pcc_new').value : csel.value;
+    var szSel = document.getElementById('psize');
+    var psize = szSel.value === '__new__' ? document.getElementById('psize_new').value : szSel.value;
+    var data = {
+        name: document.getElementById('pn').value, sku: document.getElementById('ps').value, barcode: document.getElementById('pb').value || null,
+        base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
+        commission_class: commission_class || null,
+        low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0,
+        size: psize || ''
+    };
+    if (cat && !catList.some(function(c){return c.name === cat;})) {
+        fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: cat}) });
+    }
+    if (psize && !sizeList.some(function(s){return s.name === psize;})) {
+        fetch('/api/sizes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: psize}) });
+    }
+    if (commission_class && !ccList.some(function(c){return c.name === commission_class;})) {
+        fetch('/api/commission-classes', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: commission_class}) });
+    }
+    fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if (d.error) { alert(d.error); return; }
+            var tr = document.getElementById('rr-'+createTargetRid);
+            if (tr) {
+                tr.dataset.pid = d.id;
+                tr.querySelector('.up').value = parseFloat(data.cost_price).toFixed(2);
+                var inp = tr.querySelector('.item-wrap .cell');
+                inp.value = data.name + (data.size ? ' ['+data.size+']' : '');
+                calcRow(tr.querySelector('.qty'));
+                if (isLastRow(inp)) { addRow(); }
+                var nextTr = tr.nextElementSibling;
+                if (nextTr) {
+                    var nextInp = nextTr.querySelector('.item-wrap .cell');
+                    if (nextInp) nextInp.focus();
+                }
+            }
+            products.push({id: d.id, name: data.name, sku: data.sku, cost_price: parseFloat(data.cost_price) || 0});
+            document.getElementById('pm').classList.remove('show');
+        });
+}
+function cl(id) { document.getElementById(id).classList.remove('show'); }
+
+function acPick(rid, pid, name, price) {
+    document.getElementById('in-'+rid).value = name;
+    document.getElementById('ac-'+rid).style.display = 'none';
+    acHighlightIdx = -1;
+    var tr = document.getElementById('rr-'+rid);
+    tr.querySelector('.up').value = price.toFixed(2);
+    tr.querySelector('.qty').value = 1;
+    tr.dataset.pid = pid;
+    calcRow(tr.querySelector('.qty'));
+    if (isLastRow(tr.querySelector('.item-wrap .cell'))) {
+        addRow();
+    }
+}
+function calcRow(el) {
+    var tr = el.closest('tr');
+    var qty = parseFloat(tr.querySelector('.qty').value) || 0;
+    var up = parseFloat(tr.querySelector('.up').value) || 0;
+    tr.querySelector('.total-cell').textContent = 'Rs '+(qty*up).toFixed(2);
+    calcGrand();
+}
+function delRow(btn) {
+    var rows = document.querySelectorAll('#items_tb tr');
+    if (rows.length <= 1) return;
+    btn.closest('tr').remove();
+    calcGrand();
+}
+function calcGrand() {
+    var rows = document.querySelectorAll('#items_tb tr');
+    var gt = 0;
+    rows.forEach(function(r){
+        var qty = parseFloat(r.querySelector('.qty').value) || 0;
+        var up = parseFloat(r.querySelector('.up').value) || 0;
+        gt += qty * up;
+    });
+    document.getElementById('grand_total').textContent = 'Rs '+gt.toFixed(2);
+}
+var csvData = null;
+
+function triggerCSVUpload() {
+    document.getElementById('csv_file').value = '';
+    document.getElementById('csv_file').click();
+}
+
+function handleCSVFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var rows = parseCSV(e.target.result);
+        if (rows.length < 1) { alert('CSV is empty or invalid.'); return; }
+        csvData = rows;
+        showCSVPreview(rows);
+    };
+    reader.readAsText(file);
+}
+
+function parseCSV(text) {
+    var lines = [], row = [], field = '', inQ = false;
+    for (var i = 0; i < text.length; i++) {
+        var c = text[i];
+        if (inQ) {
+            if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+            else if (c === '"') { inQ = false; }
+            else { field += c; }
+        } else if (c === '"') { inQ = true; }
+        else if (c === ',') { row.push(field.trim()); field = ''; }
+        else if (c === '\n' || (c === '\r' && text[i+1] === '\n')) {
+            row.push(field.trim()); field = '';
+            if (row.length > 1 || row[0] !== '') lines.push(row);
+            row = [];
+            if (c === '\r') i++;
+        } else if (c === '\r') {
+            row.push(field.trim()); field = '';
+            if (row.length > 1 || row[0] !== '') lines.push(row);
+            row = [];
+        } else { field += c; }
+    }
+    row.push(field.trim());
+    if (row.length > 1 || row[0] !== '') lines.push(row);
+    if (lines.length < 1) return [];
+    var headerKeywords = ['item','name','product','sku','qty','quantity','price','unit','cost','total'];
+    var firstCell = (lines[0][0]||'').toLowerCase();
+    var isHeader = headerKeywords.some(function(k){return firstCell.indexOf(k) !== -1;});
+    if (isHeader) lines.shift();
+    return lines.map(function(r){return {item:r[0]||'',qty:parseFloat(r[1])||1,up:parseFloat(r[2])||0};});
+}
+
+function showCSVPreview(rows) {
+    var matched = 0, excluded = 0;
+    var thead = document.getElementById('csv_preview_thead');
+    var tbody = document.getElementById('csv_preview_tbody');
+    thead.innerHTML = '<tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Total</th><th>Match</th></tr>';
+    var html = '';
+    rows.forEach(function(r) {
+        var total = r.qty * r.up;
+        var match = findProductMatch(r.item);
+        if (match) { matched++; } else { excluded++; }
+        var tag = match ? '<span class="tag tag-match">Matched</span>' : '<span class="tag tag-new">Excluded</span>';
+        var cls = match ? '' : ' class="csv-excluded"';
+        html += '<tr'+cls+'><td>'+(r.item||'')+'</td><td class="num">'+r.qty+'</td><td class="num">'+r.up.toFixed(2)+'</td><td class="num">'+total.toFixed(2)+'</td><td>'+tag+'</td></tr>';
+    });
+    tbody.innerHTML = html;
+    document.getElementById('csv_preview_info').textContent = matched + ' row(s) will be added' + (excluded ? ', ' + excluded + ' new product(s) excluded' : '');
+    document.getElementById('csv_preview_modal').classList.add('show');
+}
+
+function closeCSVPreview() {
+    document.getElementById('csv_preview_modal').classList.remove('show');
+    document.getElementById('csv_file').value = '';
+}
+
+function findProductMatch(name) {
+    var q = (name||'').toLowerCase().trim();
+    if (!q) return null;
+    for (var i = 0; i < products.length; i++) {
+        if ((products[i].name||'').toLowerCase() === q || (products[i].sku||'').toLowerCase() === q) return products[i];
+    }
+    for (var i = 0; i < products.length; i++) {
+        if ((products[i].name||'').toLowerCase().indexOf(q) !== -1 || (products[i].sku||'').toLowerCase().indexOf(q) !== -1) return products[i];
+    }
+    return null;
+}
+
+function applyCSVData() {
+    if (!csvData || !csvData.length) return;
+    closeCSVPreview();
+    document.getElementById('items_tb').innerHTML = '';
+    rowId = 0;
+    csvData.forEach(function(r) {
+        var match = findProductMatch(r.item);
+        if (!match) return;
+        var price = (r.up > 0) ? r.up : (match.cost_price || 0);
+        addRow({
+            item: match.name,
+            qty: r.qty,
+            unit_price: price,
+            total: price * r.qty,
+            pid: match.id
+        });
+    });
+    if (!document.querySelectorAll('#items_tb tr').length) addRow();
+    csvData = null;
+    calcGrand();
+}
+
+function loadInvoice(id) {
+    fetch('/api/purchase-invoices/' + id).then(r=>r.json()).then(function(inv){
+        editId = id;
+        document.getElementById('invoice_no').value = inv.invoice_no;
+        document.getElementById('issue_date').value = inv.issue_date || '';
+        document.getElementById('due_date').value = inv.due_date || '';
+        document.getElementById('description').value = inv.description || '';
+        document.querySelector('.btn-p').textContent = 'Update';
+        var sel = document.getElementById('supplier_id');
+        if (inv.supplier_id) {
+            var opts = sel.options;
+            for (var i = 0; i < opts.length; i++) {
+                if (parseInt(opts[i].value) === inv.supplier_id) { sel.value = inv.supplier_id; break; }
+            }
+        }
+        document.getElementById('items_tb').innerHTML = '';
+        rowId = 0;
+        (inv.items || []).forEach(function(item) {
+            addRow({
+                item: item.item,
+                qty: item.qty,
+                unit_price: item.unit_price,
+                total: item.total,
+                pid: item.product_id
+            });
+        });
+        if (!inv.items || !inv.items.length) addRow();
+        calcGrand();
+    });
+}
+
+function submitInvoice() {
+    var invoice_no = document.getElementById('invoice_no').value.trim();
+    if (!invoice_no) { alert('Enter invoice number.'); return; }
+    var supplier_id = document.getElementById('supplier_id').value || null;
+    if (!supplier_id) { alert('Select a supplier.'); return; }
+    var rows = document.querySelectorAll('#items_tb tr');
+    if (!rows.length) { alert('Add at least one item row.'); return; }
+    var items = [], total = 0;
+    rows.forEach(function(r, i){
+        var name = r.querySelector('.item-wrap .cell').value.trim();
+        var qty = parseFloat(r.querySelector('.qty').value) || 0;
+        var up = parseFloat(r.querySelector('.up').value) || 0;
+        var t = qty * up;
+        total += t;
+        items.push({
+            line_number: i+1,
+            item: name || 'Item '+(i+1),
+            product_id: r.dataset.pid || null,
+            qty: qty,
+            unit_price: up,
+            total: t
+        });
+    });
+    var url = editId ? '/api/purchase-invoices/' + editId : '/api/purchase-invoices';
+    var method = editId ? 'PUT' : 'POST';
+    fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            invoice_no: invoice_no,
+            issue_date: document.getElementById('issue_date').value,
+            due_date: document.getElementById('due_date').value,
+            supplier_id: supplier_id,
+            description: document.getElementById('description').value,
+            invoice_amount: total,
+            balance_due: total,
+            status: 'Unpaid',
+            items: items
+        })
+    }).then(function(r){return r.json();}).then(function(d){
+        if (d.error) { alert(d.error); return; }
+        window.location.href = '/purchase-invoices';
+    });
+}
+window.onclick=function(e){document.querySelectorAll('.modal').forEach(function(m){if(e.target===m)m.classList.remove('show');});};
+document.getElementById('issue_date').value=new Date().toISOString().slice(0,10);
+loadSuppliers();
+loadProducts();
+fetch('/api/categories').then(r=>r.json()).then(function(d){catList=d;});
+fetch('/api/commission-classes').then(r=>r.json()).then(function(d){ccList=d;});
+fetch('/api/sizes').then(r=>r.json()).then(function(d){sizeList=d;});
+var params = new URLSearchParams(window.location.search);
+var editIdParam = params.get('id');
+if (editIdParam) {
+    loadInvoice(parseInt(editIdParam));
+} else {
+    addRow();
+}
+</script>
+</body>
+</html>

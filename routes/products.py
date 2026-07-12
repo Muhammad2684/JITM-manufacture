@@ -25,7 +25,9 @@ def list_products():
             ).fetchone()
             total = count_row['cnt']
             rows = db.execute(
-                'SELECT DISTINCT p.* FROM products p LEFT JOIN variants v ON v.product_id=p.id '
+                'SELECT DISTINCT p.id, p.name, p.category, p.base_price, p.cost_price, p.sku, p.barcode, p.has_variants, p.low_stock, p.created_at, p.commission_class, p.supplier_id, s.name as supplier_name FROM products p '
+                'LEFT JOIN suppliers s ON s.id=p.supplier_id '
+                'LEFT JOIN variants v ON v.product_id=p.id '
                 'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? OR p.category LIKE ? '
                 'ORDER BY p.name LIMIT ? OFFSET ?',
                 (f'%{q}%', f'%{q}%', f'%{q}%', q, q, f'%{q}%', per_page, offset)
@@ -33,7 +35,12 @@ def list_products():
         else:
             count_row = db.execute('SELECT COUNT(*) as cnt FROM products').fetchone()
             total = count_row['cnt']
-            rows = db.execute('SELECT * FROM products ORDER BY name LIMIT ? OFFSET ?', (per_page, offset)).fetchall()
+            rows = db.execute(
+                'SELECT p.*, s.name as supplier_name FROM products p '
+                'LEFT JOIN suppliers s ON s.id=p.supplier_id '
+                'ORDER BY p.name LIMIT ? OFFSET ?',
+                (per_page, offset)
+            ).fetchall()
         
         products = []
         for p in rows:
@@ -63,14 +70,19 @@ def list_products():
 @login_required
 def search_products():
     q = request.args.get('q', '')
+    supplier_id = request.args.get('supplier_id', type=int)
     with get_db() as db:
-        rows = db.execute(
-            'SELECT p.*, v.id as vid, v.size, v.color, v.sku as v_sku, v.barcode as v_barcode, v.price as v_price, v.stock '
-            'FROM products p JOIN variants v ON v.product_id=p.id '
-            'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? '
-            'ORDER BY p.name, v.size, v.color',
-            (f'%{q}%', f'%{q}%', f'%{q}%', q, q)
-        ).fetchall()
+        query = ('SELECT p.*, s.name as supplier_name, v.id as vid, v.size, v.color, v.sku as v_sku, '
+                 'v.barcode as v_barcode, v.price as v_price, v.stock '
+                 'FROM products p JOIN variants v ON v.product_id=p.id '
+                 'LEFT JOIN suppliers s ON s.id=p.supplier_id '
+                 'WHERE (p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=?)')
+        params = [f'%{q}%', f'%{q}%', f'%{q}%', q, q]
+        if supplier_id:
+            query += ' AND p.supplier_id=?'
+            params.append(supplier_id)
+        query += ' ORDER BY p.name, v.size, v.color'
+        rows = db.execute(query, params).fetchall()
     results = []
     seen = set()
     for r in rows:
@@ -91,6 +103,8 @@ def search_products():
             'base_price': r['base_price'],
             'stock': r['stock'],
             'low_stock': r['low_stock'],
+            'supplier_id': r['supplier_id'],
+            'supplier_name': r['supplier_name'],
         })
     return jsonify(results)
 
@@ -102,11 +116,14 @@ def add_product():
     d = request.get_json()
     with get_db() as db:
         try:
+            supplier_id = d.get('supplier_id')
+            if supplier_id:
+                supplier_id = int(supplier_id)
             cur = db.execute(
-                'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, has_variants, low_stock, commission_class) VALUES (?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, has_variants, low_stock, commission_class, supplier_id) VALUES (?,?,?,?,?,?,?,?,?,?)',
                 (d['name'], d.get('category', ''), float(d.get('base_price', 0)), float(d.get('cost_price', 0)),
                  d['sku'], d.get('barcode'), int(d.get('has_variants', 0)), int(d.get('low_stock', 5)),
-                 d.get('commission_class') or None)
+                 d.get('commission_class') or None, supplier_id)
             )
             pid = cur.lastrowid
             if not d.get('has_variants'):
@@ -123,10 +140,13 @@ def add_product():
 def update_product(pid):
     d = request.get_json()
     with get_db() as db:
+        supplier_id = d.get('supplier_id')
+        if supplier_id:
+            supplier_id = int(supplier_id)
         db.execute(
-            'UPDATE products SET name=?, category=?, base_price=?, cost_price=?, sku=?, barcode=?, low_stock=?, commission_class=? WHERE id=?',
+            'UPDATE products SET name=?, category=?, base_price=?, cost_price=?, sku=?, barcode=?, low_stock=?, commission_class=?, supplier_id=? WHERE id=?',
             (d['name'], d.get('category', ''), float(d['base_price']), float(d.get('cost_price', 0)),
-             d['sku'], d.get('barcode'), int(d.get('low_stock', 5)), d.get('commission_class') or None, pid)
+             d['sku'], d.get('barcode'), int(d.get('low_stock', 5)), d.get('commission_class') or None, supplier_id, pid)
         )
         if not d.get('has_variants'):
             db.execute('UPDATE variants SET size=? WHERE product_id=?',
@@ -138,8 +158,8 @@ def update_product(pid):
 @login_required
 def import_template():
     """Return a sample CSV template for bulk product import."""
-    header = 'name,sku,barcode,cost_price,base_price,category,commission_class,low_stock,stock'
-    sample = 'Sample Product,SMP001,,150,250,Apparel,Standard,5,20'
+    header = 'name,sku,barcode,cost_price,base_price,category,commission_class,low_stock,stock,supplier_id'
+    sample = 'Sample Product,SMP001,,150,250,Apparel,Standard,5,20,1'
     output = io.StringIO()
     output.write(header + '\n' + sample + '\n')
     return output.getvalue(), 200, {'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=product_import_template.csv'}
@@ -249,11 +269,18 @@ def import_products():
 
             category = (row.get('category') or '').strip()
             commission_class = (row.get('commission_class') or '').strip() or None
+            supplier_id = row.get('supplier_id', '').strip() or None
+            if supplier_id:
+                try:
+                    supplier_id = int(supplier_id)
+                except (ValueError, TypeError):
+                    errors.append(f'Row {idx}: invalid supplier_id "{row.get("supplier_id")}"')
+                    continue
 
             try:
                 cur = db.execute(
-                    'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class) VALUES (?,?,?,?,?,?,?,?)',
-                    (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class)
+                    'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, supplier_id) VALUES (?,?,?,?,?,?,?,?,?)',
+                    (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, supplier_id)
                 )
                 pid = cur.lastrowid
                 db.execute(

@@ -37,6 +37,7 @@
                             <th onclick="sortCol(7)" class="text-right" style="cursor:pointer;user-select:none">Avg Cost <span id="si7"></span></th>
                             <th onclick="sortCol(8)" class="text-right" style="cursor:pointer;user-select:none">Last P.Cost <span id="si8"></span></th>
                             <th onclick="sortCol(9)" class="text-right" style="cursor:pointer;user-select:none">Total Cost <span id="si9"></span></th>
+                            <th onclick="sortCol(10)" style="cursor:pointer;user-select:none">Supplier <span id="si10"></span></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -88,6 +89,10 @@
                 <div class="form-row">
                     <div><label>Category</label><select id="pcat" onchange="categoryPicker()"></select><input id="pcat_new" style="display:none" placeholder="New category name"></div>
                     <div><label>Commission Class</label><select id="pcc" onchange="commissionPicker()"></select><input id="pcc_new" style="display:none" placeholder="New class name"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>Supplier</label><select id="psup"></select></div>
+                    <div></div>
                 </div>
                 <button class="btn btn-p" type="submit" style="margin-top:8px">Save</button>
             </form>
@@ -143,7 +148,7 @@
     <div class="modal" id="im">
         <div class="mc" style="max-width:520px"><button class="mx" onclick="cl('im')">&times;</button>
             <h2>Import Products</h2>
-            <p style="font-size:13px;color:#6b7280;margin:0 0 12px">Upload a CSV or Excel file with columns: <code>name</code>, <code>sku</code>, <code>barcode</code>, <code>cost_price</code>, <code>base_price</code>, <code>category</code>, <code>commission_class</code>, <code>low_stock</code>, <code>stock</code>. Only <code>name</code> and <code>sku</code> are required. Duplicate SKUs are skipped.</p>
+            <p style="font-size:13px;color:#6b7280;margin:0 0 12px">Upload a CSV or Excel file with columns: <code>name</code>, <code>sku</code>, <code>barcode</code>, <code>cost_price</code>, <code>base_price</code>, <code>category</code>, <code>commission_class</code>, <code>low_stock</code>, <code>stock</code>, <code>supplier_id</code>. Only <code>name</code> and <code>sku</code> are required. Duplicate SKUs are skipped.</p>
             <a href="/api/products/import-template" style="font-size:13px;color:#3b4fe2;text-decoration:underline;cursor:pointer">Download sample template</a>
             <div style="margin-top:12px">
                 <label>Choose file (.csv or .xlsx)</label>
@@ -156,7 +161,7 @@
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
-        var editing = null, avId = null, svId = null, all = [], sortIdx = -1, sortDir = 1, catList = [], ccList = [], sizeList = [], currentPage = 1, totalPages = 1;
+        var editing = null, avId = null, svId = null, all = [], sortIdx = -1, sortDir = 1, catList = [], ccList = [], sizeList = [], supList = [], currentPage = 1, totalPages = 1;
         load();
         function load(page) {
             const q = document.getElementById('s').value;
@@ -170,6 +175,7 @@
             fetch('/api/categories').then(r => r.json()).then(d => { catList = d; });
             fetch('/api/commission-classes').then(r => r.json()).then(d => { ccList = d; });
             fetch('/api/sizes').then(r => r.json()).then(d => { sizeList = d; });
+            fetch('/api/suppliers?per_page=1000').then(r => r.json()).then(d => { supList = d.items || d; });
         }
         function renderPagination() {
             var html = '';
@@ -182,7 +188,7 @@
         }
         function sortCol(i){
             if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
-            for (let j = 0; j < 10; j++) document.getElementById('si' + j).textContent = '';
+            for (let j = 0; j < 11; j++) document.getElementById('si' + j).textContent = '';
             document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
             const vals = [
                 () => 0,
@@ -195,6 +201,7 @@
                 p => p.cost_price || 0,
                 p => p.last_purchased_cost != null ? p.last_purchased_cost : -Infinity,
                 p => (p.cost_price || 0) * (p.total_stock || 0),
+                p => (p.supplier_name || '').toLowerCase(),
             ];
             all.sort((a, b) => { const va = vals[i](a), vb = vals[i](b); return va < vb ? -sortDir : va > vb ? sortDir : 0; });
             render(all);
@@ -202,7 +209,7 @@
         function render(l) {
             document.getElementById('tb').innerHTML = l.map((p, idx) => {
                 let vh = ''; if (p.variants && p.variants.length) {
-                    const vc = p.cost_price || 0; vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="11" style="padding:6px 14px 8px;background:#f8f7f4">' +
+                    const vc = p.cost_price || 0; vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="12" style="padding:6px 14px 8px;background:#f8f7f4">' +
                         p.variants.map(v => '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px"><span style="width:95px">' + (v.size || '-') + ' / ' + (v.color || '-') + '</span><span style="width:80px;color:#6b7280">' + v.sku + '</span><span style="width:45px;text-align:right" class="' + (v.stock <= p.low_stock ? 'bdg bdg-err' : '') + '">' + v.stock + '</span><span style="width:70px">' + (v.barcode ? '<code>' + v.barcode + '</code>' : '-') + '</span><span style="width:65px;font-weight:600;text-align:right">Rs ' + (v.price || p.base_price).toFixed(2) + '</span><span style="width:60px;text-align:right">Rs ' + vc.toFixed(2) + '</span><span style="width:65px;text-align:right;color:#6b7280">' + (p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '- -') + '</span><span style="width:65px;text-align:right;color:#374151">Rs ' + (vc * v.stock).toFixed(2) + '</span>' +
                             (ROLE == 'manager' ? '<button class="btn btn-xs" onclick="editStock(' + v.id + ')">Stock</button>' : '') + '</div>').join('') + '</td></tr>';
                 }
@@ -210,11 +217,11 @@
         const tc = p.cost_price * p.total_stock;
         const lc = p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>';
         const psize = (p.variants && p.variants[0] && p.variants[0].size) || '-';
-        return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + idx + 1) + '</td><td style="font-weight:600">' + arrow + '<a href="/ledger/product/'+p.id+'" style="text-decoration:none;color:inherit">'+p.name+'</a></td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td>' +
+        return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + idx + 1) + '</td><td style="font-weight:600">' + arrow + '<a href="/ledger/product/'+p.id+'" style="text-decoration:none;color:inherit">'+p.name+'</a></td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (p.supplier_name || '-') + '</td>' +
             '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button>' : '') + '</td></tr>' + vh;}).join('');
     var totStock=0,totCost=0;
     l.forEach(function(p){totStock+=p.total_stock||0;totCost+=(p.cost_price||0)*(p.total_stock||0);});
-    document.getElementById('tf').innerHTML='<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td></tr>';}
+    document.getElementById('tf').innerHTML='<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td><td></td></tr>';}
         function toggleV(id) { const e = document.getElementById('v-' + id); const a = document.getElementById('a-' + id); if (e.style.display === 'none') { e.style.display = ''; a.innerHTML = '&#9660;'; } else { e.style.display = 'none'; a.innerHTML = '&#9654;'; } }
         function autoSku(on) {
             const inp = document.getElementById('ps');
@@ -285,7 +292,12 @@
             document.getElementById('pcc').style.display = ''; document.getElementById('pcc_new').style.display = 'none';
             populateCategories(); document.getElementById('pcat').value = '';
             populateCommissionClasses(); document.getElementById('pcc').value = '';
+            populateSuppliers(); document.getElementById('psup').value = '';
             document.getElementById('pm').classList.add('show');
+        }
+        function populateSuppliers() {
+            const sel = document.getElementById('psup');
+            sel.innerHTML = '<option value="">-- No Supplier --</option>' + supList.map(s => '<option value="' + s.id + '">' + s.name.replace(/"/g, '&quot;') + '</option>').join('');
         }
         function edit(id) {
             const p = all.find(x => x.id === id); if (!p) return; editing = id; document.getElementById('ft').textContent = 'Edit ' + p.name;
@@ -321,6 +333,7 @@
                 csel.value = '';
             }
             document.getElementById('pl').value = p.low_stock; document.getElementById('pa').checked = false; document.getElementById('ps').disabled = true;
+            populateSuppliers(); document.getElementById('psup').value = p.supplier_id || '';
             var psizeVal = (p.variants && p.variants[0] && p.variants[0].size) || '';
             populateSizes();
             var szSel = document.getElementById('psize');
@@ -345,12 +358,13 @@
             const commission_class = csel.value === '__new__' ? document.getElementById('pcc_new').value : csel.value;
             const szSel = document.getElementById('psize');
             const psize = szSel.value === '__new__' ? document.getElementById('psize_new').value : szSel.value;
+            const supplier_id = document.getElementById('psup').value || null;
             const data = {
                 name: document.getElementById('pn').value, sku: document.getElementById('ps').value, barcode: document.getElementById('pb').value || null,
                 base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
                 commission_class: commission_class || null,
                 low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: document.getElementById('pos').value || 0,
-                size: psize || ''
+                size: psize || '', supplier_id: supplier_id
             };
             if (cat && !catList.some(c => c.name === cat)) {
                 fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: cat}) }).then(r => r.json()).then(() => { catList.push({name: cat}); });

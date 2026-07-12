@@ -140,9 +140,14 @@ function loadSuppliers() {
         document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('');
     });
 }
-function loadProducts() {
-    fetch('/api/products?per_page=10000').then(r=>r.json()).then(d=>{products=d.items||d;});
+function loadProducts(supplierId) {
+    var url = '/api/products?per_page=10000';
+    if (supplierId) url += '&supplier_id=' + supplierId;
+    fetch(url).then(r=>r.json()).then(d=>{products=d.items||d;});
 }
+document.getElementById('supplier_id').addEventListener('change', function() {
+    loadProducts(this.value || null);
+});
 
 function isLastRow(el) {
     var rows = document.querySelectorAll('#items_tb tr');
@@ -349,12 +354,13 @@ function saveProduct(e) {
     var commission_class = csel.value === '__new__' ? document.getElementById('pcc_new').value : csel.value;
     var szSel = document.getElementById('psize');
     var psize = szSel.value === '__new__' ? document.getElementById('psize_new').value : szSel.value;
+    var supplier_id = document.getElementById('supplier_id').value || null;
     var data = {
         name: document.getElementById('pn').value, sku: document.getElementById('ps').value, barcode: document.getElementById('pb').value || null,
         base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
         commission_class: commission_class || null,
         low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: 0,
-        size: psize || ''
+        size: psize || '', supplier_id: supplier_id
     };
     if (cat && !catList.some(function(c){return c.name === cat;})) {
         fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: cat}) });
@@ -383,7 +389,7 @@ function saveProduct(e) {
                     if (nextInp) nextInp.focus();
                 }
             }
-            products.push({id: d.id, name: data.name, sku: data.sku, cost_price: parseFloat(data.cost_price) || 0});
+            products.push({id: d.id, name: data.name, sku: data.sku, cost_price: parseFloat(data.cost_price) || 0, supplier_id: data.supplier_id});
             document.getElementById('pm').classList.remove('show');
         });
 }

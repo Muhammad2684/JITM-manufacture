@@ -426,6 +426,11 @@ def init_db():
             pass
 
         try:
+            db.execute('ALTER TABLE products ADD COLUMN supplier_id INTEGER DEFAULT NULL REFERENCES suppliers(id)')
+        except Exception:
+            pass
+
+        try:
             db.execute('ALTER TABLE transactions ADD COLUMN party_type TEXT DEFAULT \'other\'')
         except Exception:
             pass

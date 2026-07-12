@@ -1,8 +1,18 @@
-import os
-import sys
-import time
+import os, sys, time, traceback
 os.environ['TZ'] = 'Asia/Karachi'
 time.tzset()
+
+if getattr(sys, 'frozen', False):
+    import atexit
+    log_file = os.path.join(os.path.dirname(sys.executable), 'error.log')
+    fh = open(log_file, 'w', buffering=1)
+    sys.stderr = fh
+    atexit.register(lambda: fh.close() if not fh.closed else None)
+
+    def excepthook(tp, val, tb):
+        fh.write(''.join(traceback.format_exception(tp, val, tb)))
+        fh.flush()
+    sys.excepthook = excepthook
 
 from flask import Flask, render_template, redirect, session, request
 from markupsafe import escape

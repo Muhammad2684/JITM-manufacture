@@ -7,4 +7,5 @@ __pycache__/
 dist/
 build/
 *.spec
+!JITM.spec
 *.tar.gz

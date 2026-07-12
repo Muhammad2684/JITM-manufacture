@@ -26,7 +26,7 @@
                             <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Supplier <span id="si1"></span></th>
                             <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Phone <span id="si2"></span></th>
                             <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Balance <span id="si3"></span></th>
-                            <th onclick="sortCol(4)" style="cursor:pointer;user-select:none">Products <span id="si4"></span></th>
+                            <th onclick="sortCol(4)" style="cursor:pointer;user-select:none">Stock Cost <span id="si4"></span></th>
                         </tr>
                     </thead>
                     <tbody id="tb"></tbody>
@@ -59,16 +59,16 @@
                     '<td style="font-weight:600"><a href="/ledger/supplier/' + item.id + '" style="text-decoration:none;color:inherit">' + item.name + '</a></td>' +
                     '<td>' + (item.phone || '-') + '</td>' +
                     '<td>Rs ' + item.balance.toFixed(2) + '</td>' +
-                    '<td>' + item.product_count + '</td>' +
+                    '<td>Rs ' + item.stock_cost.toFixed(2) + '</td>' +
                     '</tr>';
             }).join('');
-            var bal = 0, prod = 0;
-            l.forEach(function(item) { bal += item.balance || 0; prod += item.product_count || 0; });
+            var bal = 0, cost = 0;
+            l.forEach(function(item) { bal += item.balance || 0; cost += item.stock_cost || 0; });
             document.getElementById('tf').innerHTML =
                 '<tr>' +
                 '<td colspan="3" class="text-right" style="padding:6px 8px">Total</td>' +
                 '<td style="padding:6px 8px;font-weight:700">Rs ' + bal.toFixed(2) + '</td>' +
-                '<td style="padding:6px 8px;font-weight:700">' + prod + '</td>' +
+                '<td style="padding:6px 8px;font-weight:700">Rs ' + cost.toFixed(2) + '</td>' +
                 '</tr>';
         }
         function sortCol(i) {
@@ -80,7 +80,7 @@
                 s => (s.name || '').toLowerCase(),
                 s => (s.phone || '').toLowerCase(),
                 s => s.balance || 0,
-                s => s.product_count || 0
+                s => s.stock_cost || 0
             ];
             list.sort(function(a, b) {
                 var va = vals[i](a), vb = vals[i](b);

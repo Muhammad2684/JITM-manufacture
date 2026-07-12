@@ -11,8 +11,8 @@ def supplier_balances():
     with get_db() as db:
         rows = db.execute('''
             SELECT s.id, s.name, s.phone, s.balance,
-                   COALESCE((SELECT COUNT(*) FROM products WHERE supplier_id = s.id), 0) as product_count
+                   COALESCE((SELECT SUM(v.stock * p.cost_price) FROM products p JOIN variants v ON v.product_id = p.id WHERE p.supplier_id = s.id), 0) as stock_cost
             FROM suppliers s
-            ORDER BY s.balance DESC, product_count ASC
+            ORDER BY s.balance DESC, stock_cost ASC
         ''').fetchall()
         return jsonify([dict(r) for r in rows])

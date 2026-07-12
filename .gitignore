@@ -4,3 +4,7 @@ __pycache__/
 *.db-shm
 *.db-wal
 .env
+dist/
+build/
+*.spec
+*.tar.gz

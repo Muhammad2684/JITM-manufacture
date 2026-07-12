@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=JITM POS
-Comment=Point of Sale and Inventory Management System
-Exec=start-jitm.sh
-Path=%k
-Icon=network-server
-Terminal=true
-Type=Application
-Categories=Office;Finance;

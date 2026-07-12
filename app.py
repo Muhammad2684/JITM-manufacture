@@ -58,6 +58,7 @@ from routes.accounts import acc_bp
 from routes.transactions import txn_bp
 from routes.ledger import ledger_bp
 from routes.payroll import payroll_bp
+from routes.reports import reports_bp
 
 if getattr(sys, 'frozen', False):
     base_dir = sys._MEIPASS
@@ -93,6 +94,7 @@ app.register_blueprint(acc_bp)
 app.register_blueprint(txn_bp)
 app.register_blueprint(ledger_bp)
 app.register_blueprint(payroll_bp)
+app.register_blueprint(reports_bp)
 
 
 def render_sidebar(active_page):
@@ -144,6 +146,7 @@ def render_sidebar(active_page):
         ]},
         {'url': '/staff', 'label': 'User Accounts', 'permission': 'staff'},
         {'url': '/payroll', 'label': 'Payroll', 'permission': 'payroll'},
+        {'url': '/reports', 'label': 'Reports', 'permission': 'summary'},
         {'url': '/summary', 'label': 'Summary', 'permission': 'summary'},
     ]
     
@@ -603,6 +606,14 @@ def view_purchase_invoice(invoice_id):
             paid_info=paid_info,
             back_url='/purchase-invoices',
         )
+
+
+@app.route('/reports', strict_slashes=False)
+@login_required
+@permission_required('summary')
+def reports():
+    """Display the reports page."""
+    return render_page('reports.html', '/reports')
 
 
 @app.route('/summary', strict_slashes=False)

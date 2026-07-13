@@ -209,10 +209,13 @@ def update_purchase_invoice(invoice_id):
                     if old_qty != new_qty or old_cost != new_cost:
                         variant = find_default_variant(db, product_id)
                         if variant:
-                            db.execute(
-                                'UPDATE restock_log SET qty_added=?, cost=? WHERE variant_id=? AND note=? AND qty_added>0 ORDER BY id DESC LIMIT 1',
-                                (new_qty, new_cost, variant['id'], reference)
-                            )
+                            row = db.execute(
+                                'SELECT id FROM restock_log WHERE variant_id=? AND note=? AND qty_added>0 ORDER BY id DESC LIMIT 1',
+                                (variant['id'], reference)
+                            ).fetchone()
+                            if row:
+                                db.execute('UPDATE restock_log SET qty_added=?, cost=? WHERE id=?',
+                                           (new_qty, new_cost, row['id']))
                             delta = new_qty - old_qty
                             if delta != 0:
                                 db.execute('UPDATE variants SET stock=stock+? WHERE id=?', (delta, variant['id']))

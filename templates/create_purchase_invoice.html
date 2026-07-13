@@ -132,7 +132,7 @@
     </div>
 </div>
 <script>
-var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [], sizeList = [];
+var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [], sizeList = [], oldInvoiceAmount = 0, oldBalanceDue = 0;
 
 function loadSuppliers() {
     fetch('/api/suppliers').then(r=>r.json()).then(d=>{
@@ -568,6 +568,8 @@ function loadInvoice(id) {
             });
         });
         if (!inv.items || !inv.items.length) addRow();
+        oldInvoiceAmount = inv.invoice_amount || 0;
+        oldBalanceDue = inv.balance_due || 0;
         calcGrand();
     });
 }
@@ -597,6 +599,13 @@ function submitInvoice() {
     });
     var url = editId ? '/api/purchase-invoices/' + editId : '/api/purchase-invoices';
     var method = editId ? 'PUT' : 'POST';
+    var paid = oldInvoiceAmount - oldBalanceDue;
+    var newBalanceDue = editId ? Math.max(0, total - paid) : total;
+    var newStatus = 'Unpaid';
+    if (editId) {
+        if (paid >= total) newStatus = paid > total ? 'Overpaid' : 'Paid';
+        else if (paid > 0) newStatus = 'Partial';
+    }
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
@@ -607,8 +616,8 @@ function submitInvoice() {
             supplier_id: supplier_id,
             description: document.getElementById('description').value,
             invoice_amount: total,
-            balance_due: total,
-            status: 'Unpaid',
+            balance_due: newBalanceDue,
+            status: newStatus,
             items: items
         })
     }).then(function(r){return r.json();}).then(function(d){

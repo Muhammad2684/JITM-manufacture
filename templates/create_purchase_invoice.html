@@ -138,6 +138,13 @@ function loadSuppliers() {
     fetch('/api/suppliers').then(r=>r.json()).then(d=>{
         suppliers = d.items || d;
         document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('');
+        var params = new URLSearchParams(window.location.search);
+        var editIdParam = params.get('id');
+        if (editIdParam) {
+            loadInvoice(parseInt(editIdParam));
+        } else {
+            addRow();
+        }
     });
 }
 function loadProducts(supplierId) {
@@ -627,18 +634,11 @@ function submitInvoice() {
 }
 window.onclick=function(e){document.querySelectorAll('.modal').forEach(function(m){if(e.target===m)m.classList.remove('show');});};
 document.getElementById('issue_date').value=new Date().toISOString().slice(0,10);
-loadSuppliers();
 loadProducts();
 fetch('/api/categories').then(r=>r.json()).then(function(d){catList=d;});
 fetch('/api/commission-classes').then(r=>r.json()).then(function(d){ccList=d;});
 fetch('/api/sizes').then(r=>r.json()).then(function(d){sizeList=d;});
-var params = new URLSearchParams(window.location.search);
-var editIdParam = params.get('id');
-if (editIdParam) {
-    loadInvoice(parseInt(editIdParam));
-} else {
-    addRow();
-}
+loadSuppliers();
 </script>
 </body>
 </html>

@@ -15,7 +15,7 @@ for pkg in ['flask', 'flask_login', 'openpyxl', 'et_xmlfile', 'werkzeug', 'jinja
 hiddenimports += [
     'routes.auth', 'routes.products', 'routes.pos', 'routes.customers',
     'routes.dashboard', 'routes.suppliers', 'routes.settings', 'routes.summary',
-    'routes.categories', 'routes.sizes', 'routes.purchase_invoices',
+    'routes.categories', 'routes.sizes', 'routes.purchase_invoices', 'routes.purchase_returns',
     'routes.accounts', 'routes.transactions', 'routes.ledger', 'routes.payroll',
     'routes.reports',
 ]

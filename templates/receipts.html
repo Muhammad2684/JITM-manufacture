@@ -411,7 +411,7 @@
             sel.onchange = type === 'customer' ? loadInvoicesE : loadInvoicesE;
         }
         
-        function loadInvoicesE() {
+        function loadInvoicesE(selInv) {
             var v = document.getElementById('ept').value;
             var partyEl = document.getElementById('eparty');
             var pv = partyEl.value;
@@ -434,6 +434,7 @@
                         var amt = inv.outstanding || inv.balance_due;
                         return '<option value="' + (pi.type === 'customer' ? 's_' : 'p_') + inv.id + '">' + label + ' (Rs ' + amt.toFixed(2) + ')</option>';
                     }).join('');
+                    if (selInv) sel.value = selInv;
                 });
         }
         
@@ -512,10 +513,7 @@
             if (x.party_type !== 'other') {
                 var sel = document.getElementById('eparty');
                 sel.value = (x.party_type === 'customer' ? 'c_' : 's_') + x.party_id;
-                loadInvoicesE();
-                if (x.reference_type && x.reference_id) {
-                    document.getElementById('einv').value = (x.reference_type === 'sale' ? 's_' : 'p_') + x.reference_id;
-                }
+                loadInvoicesE(x.reference_type && x.reference_id ? (x.reference_type === 'sale' ? 's_' : 'p_') + x.reference_id : undefined);
             }
             
             document.getElementById('em').classList.add('show');

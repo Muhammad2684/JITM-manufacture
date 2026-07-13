@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JITM · Purchase Returns</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Purchase Returns</h2>
+            <div class="actions">
+                {% if role == 'manager' %}<button class="btn btn-p btn-sm" onclick="window.open('/purchase-returns/create','_blank')">+ New Return</button>{% endif %}
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="search"><input id="s" placeholder="Search by return no or supplier..." oninput="load()"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Return No <span id="si1"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Date <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Supplier <span id="si3"></span></th>
+                            <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Total Amount <span id="si4"></span></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tb"></tbody>
+                    <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+            <div style="margin-top:12px;text-align:right"><button class="btn btn-sm btn-print" onclick="printTable()">Print</button></div>
+        </div>
+    </div>
+    <div class="modal" id="dm">
+        <div class="mc" style="max-width:400px"><button class="mx" onclick="cl('dm')">&times;</button>
+            <h3>Delete Purchase Return</h3>
+            <p style="font-size:14px;color:#374151">Are you sure you want to delete return <strong id="dno"></strong>?</p>
+            <div id="dmsg" style="display:none;padding:8px;border-radius:6px;margin-bottom:10px;font-size:13px"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn" onclick="cl('dm')">Cancel</button>
+                <button class="btn btn-p" id="dbtn" onclick="doDelete()" style="background:#dc2626">Delete</button>
+            </div>
+        </div>
+    </div>
+    <script type="application/json" id="sv">{{role|tojson}}</script>
+    <script>
+        var ROLE = JSON.parse(document.getElementById('sv').textContent);
+        var all = [], sortIdx = -1, sortDir = 1, deleteId = null, currentPage = 1, totalPages = 1;
+        load();
+        function load(page) {
+            const q = document.getElementById('s').value;
+            currentPage = page || 1;
+            fetch('/api/purchase-returns?page=' + currentPage + '&per_page=50').then(r => r.json()).then(d => {
+                all = d.items || [];
+                totalPages = d.total_pages || 1;
+                render(all);
+                renderPagination();
+            });
+        }
+        function renderPagination() {
+            var html = '';
+            if (totalPages > 1) {
+                html += '<button class="btn btn-sm" onclick="load(' + (currentPage - 1) + ')"' + (currentPage <= 1 ? ' disabled' : '') + '>← Prev</button>';
+                html += '<span style="margin:0 12px;color:#6b7280;font-size:13px">Page ' + currentPage + ' of ' + totalPages + '</span>';
+                html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
+            }
+            document.getElementById('pagination').innerHTML = html;
+        }
+        function sortCol(i) {
+            if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
+            for (let j = 0; j < 6; j++) document.getElementById('si' + j).textContent = '';
+            document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
+            const vals = [
+                function() { return 0; },
+                function(p) { return (p.return_no || '').toLowerCase(); },
+                function(p) { return (p.return_date || ''); },
+                function(p) { return (p.supplier_name || '').toLowerCase(); },
+                function(p) { return p.total_amount || 0; },
+            ];
+            all.sort(function(a, b) { var va = vals[i](a), vb = vals[i](b); return va < vb ? -sortDir : va > vb ? sortDir : 0; });
+            render(all);
+        }
+        function render(l) {
+            var q = (document.getElementById('s').value || '').toLowerCase();
+            var filtered = l.filter(function(p) {
+                return !q || (p.return_no || '').toLowerCase().includes(q) || (p.supplier_name || '').toLowerCase().includes(q);
+            });
+            document.getElementById('tb').innerHTML = filtered.map(function(p, idx) {
+                return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + idx + 1) + '</td><td><a href="/purchase-returns/' + p.id + '" style="text-decoration:none;color:inherit;font-weight:600">' + p.return_no + '</a></td><td>' + (p.return_date || '') + '</td><td>' + (p.supplier_name || '-') + '</td><td class="text-right">Rs ' + (p.total_amount || 0).toFixed(2) + '</td>' +
+                    '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.return_no.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>';
+            }).join('');
+            var tot = 0;
+            filtered.forEach(function(p) { tot += p.total_amount || 0; });
+            document.getElementById('tf').innerHTML = '<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px;font-weight:700">Rs ' + tot.toFixed(2) + '</td><td></td></tr>';
+        }
+        function confirmDelete(id, no) {
+            deleteId = id;
+            document.getElementById('dno').textContent = no;
+            document.getElementById('dmsg').style.display = 'none';
+            document.getElementById('dbtn').disabled = false;
+            document.getElementById('dbtn').textContent = 'Delete';
+            document.getElementById('dm').classList.add('show');
+        }
+        function doDelete() {
+            var btn = document.getElementById('dbtn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
+            fetch('/api/purchase-returns/' + deleteId, { method: 'DELETE' })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.error) {
+                        var msg = document.getElementById('dmsg');
+                        msg.textContent = d.error;
+                        msg.style.display = '';
+                        msg.style.background = '#fef2f2';
+                        msg.style.color = '#dc2626';
+                        btn.disabled = false;
+                        btn.textContent = 'Delete';
+                        return;
+                    }
+                    cl('dm');
+                    load();
+                });
+        }
+        function cl(id) { document.getElementById(id).classList.remove('show'); }
+        window.onclick = function(e) { document.querySelectorAll('.modal').forEach(function(m) { if (e.target === m) m.classList.remove('show'); }); };
+        function printTable() { document.body.classList.add('printing'); window.print(); }
+        window.addEventListener('afterprint', function() { document.body.classList.remove('printing'); });
+    </script>
+</body>
+</html>

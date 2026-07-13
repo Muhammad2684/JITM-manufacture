@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
-<head><title>JITM · Create Purchase Invoice</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
+<head><title>JITM · Create Purchase Return</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
 <style>
 .ci-wrap{max-width:960px;margin:0 auto}
-.ci-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
+.ci-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
 .ci-meta label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600;display:block;margin-bottom:4px}
 .ci-meta input,.ci-meta select{width:100%;padding:7px 10px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
 .ci-meta input:focus,.ci-meta select:focus{outline:none;border-color:#3b4fe2}
@@ -12,7 +12,6 @@
 .ci-entity select,.ci-entity input{width:100%;padding:8px 12px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
 .ci-entity select:focus,.ci-entity input:focus{outline:none;border-color:#3b4fe2}
 .ssheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;margin-bottom:16px}
-
 .ssheet table{width:100%;border-collapse:collapse;table-layout:fixed}
 .ssheet th{background:#f3f4f6;padding:6px 8px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db;border-right:1px solid #e5e7eb}
 .ssheet th:last-child{border-right:none}
@@ -49,17 +48,16 @@
 {{sidebar|safe}}
 <style>.sidebar{display:none}.main{margin-left:0!important}</style>
 <div class="main">
-    <div class="topbar"><h2>Create Purchase Invoice</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
+    <div class="topbar"><h2>Create Purchase Return</h2><div class="actions"><span class="text-muted">{{name}}</span></div></div>
     <div class="content">
         <div class="ci-wrap">
             <div class="ci-meta">
-                <div><label>Issue date</label><input type="date" id="issue_date"></div>
-                <div><label>Due date</label><input type="date" id="due_date"></div>
-                <div><label>Invoice No.</label><input type="text" id="invoice_no" placeholder="e.g. INV-001" required></div>
+                <div><label>Return date</label><input type="date" id="return_date"></div>
+                <div><label>Return No.</label><input type="text" id="return_no" placeholder="e.g. RET-001" required></div>
             </div>
             <div class="ci-entity">
                 <div style="margin-bottom:12px"><label>Supplier</label><select id="supplier_id"><option value="">-- Select Supplier --</option></select></div>
-                <div><label>Description</label><input type="text" id="description" placeholder="Invoice description (optional)"></div>
+                <div><label>Reason / Description</label><input type="text" id="description" placeholder="Reason for return (optional)"></div>
             </div>
             <div class="ssheet">
                 <table>
@@ -69,7 +67,7 @@
                 <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button></div>
             </div>
             <div class="ci-footer">
-                <button class="btn btn-p" onclick="submitInvoice()">Create</button>
+                <button class="btn btn-p" onclick="submitReturn()">Create</button>
                 <div class="gt">Total: <span id="grand_total">Rs 0.00</span></div>
             </div>
         </div>
@@ -132,22 +130,17 @@
     </div>
 </div>
 <script>
-var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [], sizeList = [];
+var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, createTargetRid = null, catList = [], ccList = [], sizeList = [];
 
 function loadSuppliers() {
-    fetch('/api/suppliers').then(r=>r.json()).then(d=>{
+    fetch('/api/suppliers').then(function(r){return r.json();}).then(function(d){
         suppliers = d.items || d;
-        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('');
+        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(function(s){return '<option value="'+s.id+'">'+s.name+'</option>';}).join('');
     });
 }
-function loadProducts(supplierId) {
-    var url = '/api/products?per_page=10000';
-    if (supplierId) url += '&supplier_id=' + supplierId;
-    fetch(url).then(r=>r.json()).then(d=>{products=d.items||d;});
+function loadProducts() {
+    fetch('/api/products?per_page=10000').then(function(r){return r.json();}).then(function(d){products=d.items||d;});
 }
-document.getElementById('supplier_id').addEventListener('change', function() {
-    loadProducts(this.value || null);
-});
 
 function isLastRow(el) {
     var rows = document.querySelectorAll('#items_tb tr');
@@ -194,11 +187,12 @@ function acShow(inp, rid) {
         list.innerHTML = '<div data-action="create" data-name="'+inp.value.replace(/'/g,"\\'")+'" onmousedown="acCreate('+rid+',\''+inp.value.replace(/'/g,"\\'")+'\')"><span style="color:#3b4fe2;font-weight:600">+ Create</span> \''+inp.value+'\'</div>';
         list.style.display = 'block'; acHighlightIdx = -1; return;
     }
+    var unitPrice = function(p) { return p.last_purchased_cost != null ? p.last_purchased_cost : (p.cost_price || 0); };
     list.innerHTML = matches.map(function(p){
         var sz = (p.variants && p.variants[0] && p.variants[0].size) || '';
         var label = p.name + (sz ? ' ['+sz+']' : '');
-        var unitPrice = p.last_purchased_cost != null ? p.last_purchased_cost : (p.cost_price || 0);
-        return '<div onmousedown="acPick('+rid+','+p.id+',\''+label.replace(/'/g,"\\'")+'\','+unitPrice+')" data-pid="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+unitPrice+'">'+label+' <span style="color:#9ca3af;font-size:10px">'+p.sku+'</span></div>';
+        var up = unitPrice(p);
+        return '<div onmousedown="acPick('+rid+','+p.id+',\''+label.replace(/'/g,"\\'")+'\','+up+')" data-pid="'+p.id+'" data-name="'+p.name.replace(/"/g,'&quot;')+'" data-price="'+up+'">'+label+' <span style="color:#9ca3af;font-size:10px">'+p.sku+'</span></div>';
     }).join('');
     acHighlightIdx = -1;
     list.style.display = 'block';
@@ -526,8 +520,8 @@ function applyCSVData() {
     csvData.forEach(function(r) {
         var match = findProductMatch(r.item);
         if (!match) return;
-        var unitPrice = match.last_purchased_cost != null ? match.last_purchased_cost : (match.cost_price || 0);
-        var price = (r.up > 0) ? r.up : unitPrice;
+        var up = match.last_purchased_cost != null ? match.last_purchased_cost : (match.cost_price || 0);
+        var price = (r.up > 0) ? r.up : up;
         addRow({
             item: match.name,
             qty: r.qty,
@@ -541,40 +535,9 @@ function applyCSVData() {
     calcGrand();
 }
 
-function loadInvoice(id) {
-    fetch('/api/purchase-invoices/' + id).then(r=>r.json()).then(function(inv){
-        editId = id;
-        document.getElementById('invoice_no').value = inv.invoice_no;
-        document.getElementById('issue_date').value = inv.issue_date || '';
-        document.getElementById('due_date').value = inv.due_date || '';
-        document.getElementById('description').value = inv.description || '';
-        document.querySelector('.btn-p').textContent = 'Update';
-        var sel = document.getElementById('supplier_id');
-        if (inv.supplier_id) {
-            var opts = sel.options;
-            for (var i = 0; i < opts.length; i++) {
-                if (parseInt(opts[i].value) === inv.supplier_id) { sel.value = inv.supplier_id; break; }
-            }
-        }
-        document.getElementById('items_tb').innerHTML = '';
-        rowId = 0;
-        (inv.items || []).forEach(function(item) {
-            addRow({
-                item: item.item,
-                qty: item.qty,
-                unit_price: item.unit_price,
-                total: item.total,
-                pid: item.product_id
-            });
-        });
-        if (!inv.items || !inv.items.length) addRow();
-        calcGrand();
-    });
-}
-
-function submitInvoice() {
-    var invoice_no = document.getElementById('invoice_no').value.trim();
-    if (!invoice_no) { alert('Enter invoice number.'); return; }
+function submitReturn() {
+    var return_no = document.getElementById('return_no').value.trim();
+    if (!return_no) { alert('Enter return number.'); return; }
     var supplier_id = document.getElementById('supplier_id').value || null;
     if (!supplier_id) { alert('Select a supplier.'); return; }
     var rows = document.querySelectorAll('#items_tb tr');
@@ -595,41 +558,30 @@ function submitInvoice() {
             total: t
         });
     });
-    var url = editId ? '/api/purchase-invoices/' + editId : '/api/purchase-invoices';
-    var method = editId ? 'PUT' : 'POST';
-    fetch(url, {
-        method: method,
+    fetch('/api/purchase-returns', {
+        method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            invoice_no: invoice_no,
-            issue_date: document.getElementById('issue_date').value,
-            due_date: document.getElementById('due_date').value,
+            return_no: return_no,
+            return_date: document.getElementById('return_date').value,
             supplier_id: supplier_id,
             description: document.getElementById('description').value,
-            invoice_amount: total,
-            balance_due: total,
-            status: 'Unpaid',
+            total_amount: total,
             items: items
         })
     }).then(function(r){return r.json();}).then(function(d){
         if (d.error) { alert(d.error); return; }
-        window.location.href = '/purchase-invoices';
+        window.location.href = '/purchase-returns';
     });
 }
 window.onclick=function(e){document.querySelectorAll('.modal').forEach(function(m){if(e.target===m)m.classList.remove('show');});};
-document.getElementById('issue_date').value=new Date().toISOString().slice(0,10);
+document.getElementById('return_date').value=new Date().toISOString().slice(0,10);
 loadSuppliers();
 loadProducts();
 fetch('/api/categories').then(r=>r.json()).then(function(d){catList=d;});
 fetch('/api/commission-classes').then(r=>r.json()).then(function(d){ccList=d;});
 fetch('/api/sizes').then(r=>r.json()).then(function(d){sizeList=d;});
-var params = new URLSearchParams(window.location.search);
-var editIdParam = params.get('id');
-if (editIdParam) {
-    loadInvoice(parseInt(editIdParam));
-} else {
-    addRow();
-}
+addRow();
 </script>
 </body>
 </html>

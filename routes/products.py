@@ -127,8 +127,15 @@ def add_product():
             )
             pid = cur.lastrowid
             if not d.get('has_variants'):
+                stock = int(d.get('stock', 0))
                 db.execute('INSERT INTO variants (product_id, sku, stock, size) VALUES (?,?,?,?)',
-                           (pid, d['sku'], int(d.get('stock', 0)), d.get('size', '')))
+                           (pid, d['sku'], stock, d.get('size', '')))
+                if stock > 0:
+                    vid = db.execute('SELECT id FROM variants WHERE product_id=?', (pid,)).fetchone()['id']
+                    db.execute(
+                        'INSERT INTO restock_log (variant_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?)',
+                        (vid, 0, stock, stock, float(d.get('cost_price', 0)), 'Opening stock', session.get('name', ''))
+                    )
             return jsonify({'ok': True, 'id': pid})
         except Exception as e:
             return jsonify({'error': str(e)}), 400
@@ -151,6 +158,34 @@ def update_product(pid):
         if not d.get('has_variants'):
             db.execute('UPDATE variants SET size=? WHERE product_id=?',
                        (d.get('size', ''), pid))
+        return jsonify({'ok': True})
+
+
+@prod_bp.route('/products/<int:pid>', methods=['DELETE'])
+@login_required
+@manager_required
+def delete_product(pid):
+    """Delete a product if it has no sale or purchase invoice references."""
+    with get_db() as db:
+        sale_count = db.execute(
+            'SELECT COUNT(DISTINCT s.id) as cnt FROM sales s '
+            'JOIN sale_items si ON si.sale_id = s.id WHERE si.product_id=?',
+            (pid,)
+        ).fetchone()['cnt']
+        purchase_count = db.execute(
+            'SELECT COUNT(DISTINCT pi.id) as cnt FROM purchase_invoices pi '
+            'JOIN purchase_invoice_items pii ON pii.invoice_id = pi.id WHERE pii.product_id=?',
+            (pid,)
+        ).fetchone()['cnt']
+
+        if sale_count > 0 and purchase_count > 0:
+            return jsonify({'error': f'Cannot delete: product appears in {sale_count} sale(s) and {purchase_count} purchase invoice(s)'}), 400
+        if sale_count > 0:
+            return jsonify({'error': f'Cannot delete: product appears in {sale_count} sale(s)'}), 400
+        if purchase_count > 0:
+            return jsonify({'error': f'Cannot delete: product appears in {purchase_count} purchase invoice(s)'}), 400
+
+        db.execute('DELETE FROM products WHERE id=?', (pid,))
         return jsonify({'ok': True})
 
 
@@ -283,10 +318,15 @@ def import_products():
                     (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, supplier_id)
                 )
                 pid = cur.lastrowid
-                db.execute(
+                cur2 = db.execute(
                     'INSERT INTO variants (product_id, sku, stock) VALUES (?,?,?)',
                     (pid, sku, stock)
                 )
+                if stock > 0:
+                    db.execute(
+                        'INSERT INTO restock_log (variant_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?)',
+                        (cur2.lastrowid, 0, stock, stock, cost_price, 'Opening stock', session.get('name', ''))
+                    )
                 existing_skus.add(sku)
                 if barcode:
                     existing_barcodes.add(barcode)

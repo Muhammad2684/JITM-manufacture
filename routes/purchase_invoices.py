@@ -167,7 +167,7 @@ def create_purchase_invoice():
 @login_required
 @manager_required
 def update_purchase_invoice(invoice_id):
-    """Update a purchase invoice: reverse old stock, apply new items, adjust supplier balance."""
+    """Update a purchase invoice: apply stock deltas per item, adjust supplier balance."""
     request_data = request.get_json()
     with get_db() as db:
         try:
@@ -183,11 +183,46 @@ def update_purchase_invoice(invoice_id):
             ).fetchall()
             
             staff_member = session.get('name', '')
-            reference = 'PI #' + old_invoice['invoice_no']
+            reference = 'PI #' + (request_data.get('invoice_no') or old_invoice['invoice_no'])
+            
+            old_by_pid = {}
+            for item in old_items:
+                if item['product_id']:
+                    old_by_pid[item['product_id']] = dict(item)
+            
+            matched_pids = set()
+            
+            for item in request_data.get('items', []):
+                product_id = auto_link_product(db, item)
+                if not product_id:
+                    continue
+                
+                new_qty = int(float(item.get('qty', 1)))
+                new_cost = float(item.get('unit_price', 0))
+                
+                if product_id in old_by_pid:
+                    matched_pids.add(product_id)
+                    old_item = old_by_pid[product_id]
+                    old_qty = int(old_item['qty'])
+                    old_cost = float(old_item['unit_price'] or 0)
+                    
+                    if old_qty != new_qty or old_cost != new_cost:
+                        variant = find_default_variant(db, product_id)
+                        if variant:
+                            db.execute(
+                                'UPDATE restock_log SET qty_added=?, cost=? WHERE variant_id=? AND note=? AND qty_added>0 ORDER BY id DESC LIMIT 1',
+                                (new_qty, new_cost, variant['id'], reference)
+                            )
+                            delta = new_qty - old_qty
+                            if delta != 0:
+                                db.execute('UPDATE variants SET stock=stock+? WHERE id=?', (delta, variant['id']))
+                            update_weighted_avg_cost(db, product_id)
+                else:
+                    apply_stock_change(db, product_id, new_qty, new_cost, reference, staff_member)
             
             for old_item in old_items:
-                if old_item['product_id']:
-                    apply_stock_change(db, old_item['product_id'], -int(old_item['qty']), float(old_item['unit_price'] or 0), reference, staff_member)
+                if old_item['product_id'] and old_item['product_id'] not in matched_pids:
+                    apply_stock_change(db, old_item['product_id'], -int(old_item['qty']), float(old_item['unit_price'] or 0), reference + ' (removed)', staff_member)
             
             db.execute(
                 'UPDATE purchase_invoices SET invoice_no=?, issue_date=?, due_date=?, supplier_id=?, description=?, invoice_amount=?, balance_due=?, status=? WHERE id=?',
@@ -199,7 +234,6 @@ def update_purchase_invoice(invoice_id):
             
             db.execute('DELETE FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,))
             
-            new_reference = 'PI #' + request_data['invoice_no']
             for item in request_data.get('items', []):
                 product_id = auto_link_product(db, item)
                 db.execute(
@@ -208,8 +242,6 @@ def update_purchase_invoice(invoice_id):
                      product_id, float(item.get('qty', 1)),
                      float(item.get('unit_price', 0)), float(item.get('total', 0)))
                 )
-                if product_id:
-                    apply_stock_change(db, product_id, int(float(item.get('qty', 1))), float(item.get('unit_price', 0)), new_reference, staff_member)
             
             if old_invoice['supplier_id']:
                 old_balance = float(old_invoice['balance_due'] or 0)

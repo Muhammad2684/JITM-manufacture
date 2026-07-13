@@ -412,8 +412,9 @@ def get_product_entries(db, product_id, entity):
     ).fetchall()
     for r in restocks:
         r = dict(r)
-        total_cost = r['qty_added'] * r['cost']
-        desc = 'Restock'
+        total_cost = abs(r['qty_added']) * r['cost']
+        is_return = r['qty_added'] < 0
+        desc = 'Purchase Return' if is_return else 'Restock'
         if r['note']:
             desc += ' - ' + r['note']
         entries.append({
@@ -421,9 +422,9 @@ def get_product_entries(db, product_id, entity):
             'description': desc,
             'reference': r['sku'] or '',
             'qty': abs(r['qty_added']),
-            'debit': total_cost,
-            'credit': 0,
-            'type': 'restock'
+            'debit': total_cost if not is_return else 0,
+            'credit': total_cost if is_return else 0,
+            'type': 'purchase_return' if is_return else 'restock'
         })
 
     entries.sort(key=lambda e: e['date'])

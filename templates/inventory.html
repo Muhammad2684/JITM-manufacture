@@ -158,6 +158,17 @@
             <div id="ir" style="margin-top:12px"></div>
         </div>
     </div>
+    <div class="modal" id="dm">
+        <div class="mc" style="max-width:400px"><button class="mx" onclick="cl('dm')">&times;</button>
+            <h3>Delete Product</h3>
+            <p style="font-size:14px;color:#374151">Are you sure you want to delete <strong id="dname"></strong>?</p>
+            <div id="dmsg" style="display:none;padding:8px;border-radius:6px;margin-bottom:10px;font-size:13px"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn" onclick="cl('dm')">Cancel</button>
+                <button class="btn btn-p" id="dbtn" onclick="doDelete()" style="background:#dc2626">Delete</button>
+            </div>
+        </div>
+    </div>
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
@@ -218,7 +229,7 @@
         const lc = p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>';
         const psize = (p.variants && p.variants[0] && p.variants[0].size) || '-';
         return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + idx + 1) + '</td><td style="font-weight:600">' + arrow + '<a href="/ledger/product/'+p.id+'" style="text-decoration:none;color:inherit">'+p.name+'</a></td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (p.supplier_name || '-') + '</td>' +
-            '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button>' : '') + '</td></tr>' + vh;}).join('');
+            '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>' + vh;}).join('');
     var totStock=0,totCost=0;
     l.forEach(function(p){totStock+=p.total_stock||0;totCost+=(p.cost_price||0)*(p.total_stock||0);});
     document.getElementById('tf').innerHTML='<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td><td></td></tr>';}
@@ -435,6 +446,37 @@
                     }
                     document.getElementById('ir').innerHTML = html;
                 }).catch(function(){ btn.textContent = 'Upload & Import'; btn.disabled = false; alert('Upload failed'); });
+        }
+        var deleteId = null;
+        function confirmDelete(id, name) {
+            deleteId = id;
+            document.getElementById('dname').textContent = name;
+            document.getElementById('dmsg').style.display = 'none';
+            document.getElementById('dbtn').disabled = false;
+            document.getElementById('dbtn').textContent = 'Delete';
+            document.getElementById('dm').classList.add('show');
+        }
+        function doDelete() {
+            var btn = document.getElementById('dbtn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
+            fetch('/api/products/' + deleteId, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.error) {
+                        var msg = document.getElementById('dmsg');
+                        msg.textContent = d.error;
+                        msg.style.display = '';
+                        msg.style.background = '#fef2f2';
+                        msg.style.color = '#dc2626';
+                        btn.disabled = false;
+                        btn.textContent = 'Delete';
+                        return;
+                    }
+                    cl('dm');
+                    load();
+                    f('Product deleted', 'ok');
+                });
         }
         function f(m, t) { const e = document.getElementById('flash'); e.innerHTML = '<div class="fl fl-' + t + '">' + m + '</div>'; setTimeout(() => { const f = e.querySelector('.fl'); if (f) { f.style.opacity = '0'; setTimeout(() => f.remove(), 300); } }, 3000); }
         function cl(id) { document.getElementById(id).classList.remove('show'); }

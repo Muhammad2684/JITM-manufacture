@@ -479,6 +479,33 @@ def init_db():
         except Exception:
             pass
 
+        try:
+            db.execute('''CREATE TABLE IF NOT EXISTS purchase_returns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                return_no TEXT NOT NULL,
+                return_date TEXT NOT NULL,
+                supplier_id INTEGER REFERENCES suppliers(id),
+                description TEXT DEFAULT '',
+                total_amount REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            )''')
+        except Exception:
+            pass
+
+        try:
+            db.execute('''CREATE TABLE IF NOT EXISTS purchase_return_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                return_id INTEGER NOT NULL REFERENCES purchase_returns(id) ON DELETE CASCADE,
+                line_number INTEGER NOT NULL DEFAULT 0,
+                item TEXT DEFAULT '',
+                product_id INTEGER,
+                qty REAL NOT NULL DEFAULT 1,
+                unit_price REAL NOT NULL DEFAULT 0,
+                total REAL NOT NULL DEFAULT 0
+            )''')
+        except Exception:
+            pass
+
         hashed_admin = generate_password_hash('admin123')
         hashed_staff = generate_password_hash('staff123')
         db.execute(
@@ -517,6 +544,32 @@ def init_db():
                 'INSERT OR IGNORE INTO customers (id, name, phone, credit) VALUES (?,?,?,?)',
                 (i, name, f'0300-000000{i}', 0)
             )
+
+        # Clean up old reversal pairs in restock_log (legacy cleanup)
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            # Delete reversal entries (negative qty from old update code)
+            db.execute('DELETE FROM restock_log WHERE qty_added < 0 AND note LIKE \'PI #%\'')
+            # For duplicate positive entries with same variant and note, keep first and update its cost
+            dupes = db.execute(
+                'SELECT variant_id, note FROM restock_log WHERE qty_added > 0 AND note LIKE \'PI #%\' '
+                'GROUP BY variant_id, note HAVING COUNT(*) > 1'
+            ).fetchall()
+            for d in dupes:
+                rows = db.execute(
+                    'SELECT id, cost FROM restock_log WHERE variant_id=? AND note=? AND qty_added > 0 ORDER BY id',
+                    (d['variant_id'], d['note'])
+                ).fetchall()
+                if len(rows) > 1:
+                    first_id = rows[0]['id']
+                    last_cost = rows[-1]['cost']
+                    db.execute('UPDATE restock_log SET cost=? WHERE id=?', (last_cost, first_id))
+                    ids_to_delete = [r['id'] for r in rows[1:]]
+                    placeholders = ','.join('?' * len(ids_to_delete))
+                    db.execute(f'DELETE FROM restock_log WHERE id IN ({placeholders})', ids_to_delete)
+            db.execute('COMMIT')
+        except Exception:
+            pass
 
         seed_suppliers = ['New Born Fashions', 'Kids Wear House', 'Baby Garments Co', 'Tiny Tots Suppliers']
         for i, name in enumerate(seed_suppliers, 1):

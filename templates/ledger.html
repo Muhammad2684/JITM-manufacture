@@ -28,6 +28,7 @@
         .bdg-payment { background: #fff3cd; color: #856404; }
         .bdg-purchase { background: #fff3cd; color: #856404; }
         .bdg-restock { background: #d4edda; color: #155724; }
+        .bdg-purchase_return { background: #fce4ec; color: #880e4f; }
         .bdg-transfer_in { background: #d4edda; color: #155724; }
         .bdg-transfer_out { background: #f8d7da; color: #721c24; }
         .bdg-opening { background: #e2e3e5; color: #383d41; }
@@ -43,6 +44,22 @@
         }
         .entity-header .name { font-size: 18px; font-weight: 700; }
         .entity-header .current-bal { font-size: 15px; margin-left: auto; }
+        .printing .sidebar,
+        .printing .topbar,
+        .printing .search,
+        .printing .pagination,
+        .printing .btn-print,
+        .printing .main .actions { display: none !important; }
+        .printing .main { margin-left: 0 !important; padding: 0 !important; }
+        .printing .entity-header { border: none; background: none; padding: 0 0 8px; margin-bottom: 8px; }
+        .printing .entity-header .name { font-size: 20px; }
+        .printing .table-wrap table { font-size: 11px; }
+        .printing .table-wrap th { padding: 4px 6px; font-size: 9px; }
+        .printing .table-wrap td { padding: 3px 6px; }
+        @media print {
+            @page { margin: 12mm; size: A4 portrait; }
+            body { background: #fff; }
+        }
     </style>
 </head>
 <body>

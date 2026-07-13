@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JITM · Purchase Return {{return_no}}</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .inv-wrap{max-width:720px;margin:0 auto}
+        .inv-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+        .inv-head h2{margin:0}
+        .inv-meta{background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .inv-meta .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600}
+        .inv-meta .val{font-size:14px;color:#1e293b}
+        .inv-table{width:100%;border-collapse:collapse;margin-bottom:16px}
+        .inv-table th{background:#f3f4f6;padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db}
+        .inv-table td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#1e293b}
+        .inv-table td.num{text-align:right;font-family:monospace}
+        .inv-table tfoot td{font-weight:700;font-size:14px;border-top:2px solid #d1d5db;padding:8px 10px}
+        .printing .back-link,.printing .btn-print{display:none!important}
+        @media print{@page{margin:12mm;size:A4 portrait}body{background:#fff}.sidebar,.topbar,.back-link,.btn-print{display:none!important}.main{margin-left:0!important;padding:0!important}}
+    </style>
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Purchase Return</h2>
+            <div class="actions">
+                <button class="btn btn-sm btn-print" onclick="window.print()">Print</button>
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="inv-wrap">
+                <div class="inv-head">
+                    <h2>Return #{{return_no}}</h2>
+                    <a href="/purchase-returns" class="back-link" style="font-size:13px;color:#3b4fe2;text-decoration:none">&larr; Back to Returns</a>
+                </div>
+                <div class="inv-meta">
+                    <div><div class="lbl">Return Date</div><div class="val">{{return_date}}</div></div>
+                    <div><div class="lbl">Supplier</div><div class="val">{{supplier_name}}</div></div>
+                    {% if description %}
+                    <div style="grid-column:1/-1"><div class="lbl">Description</div><div class="val">{{description}}</div></div>
+                    {% endif %}
+                </div>
+                <table class="inv-table">
+                    <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Unit Price</th><th class="num">Total</th></tr></thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr><td>{{item.item}}</td><td class="num">{{item.qty}}</td><td class="num">Rs {{'%0.2f'|format(item.unit_price)}}</td><td class="num">Rs {{'%0.2f'|format(item.total)}}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot><tr><td colspan="3" class="num">Total Amount</td><td class="num">Rs {{'%0.2f'|format(total_amount)}}</td></tr></tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

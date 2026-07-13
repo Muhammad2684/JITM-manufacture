@@ -35,6 +35,7 @@ from routes.summary import summary_bp
 from routes.categories import cat_bp
 from routes.sizes import sizes_bp
 from routes.purchase_invoices import pi_bp
+from routes.purchase_returns import pr_bp
 
 ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
         'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
@@ -107,6 +108,7 @@ app.register_blueprint(summary_bp)
 app.register_blueprint(cat_bp)
 app.register_blueprint(sizes_bp)
 app.register_blueprint(pi_bp)
+app.register_blueprint(pr_bp)
 app.register_blueprint(acc_bp)
 app.register_blueprint(txn_bp)
 app.register_blueprint(ledger_bp)
@@ -143,6 +145,8 @@ def render_sidebar(active_page):
             {'url': '/suppliers', 'label': 'Suppliers'},
             {'url': '/purchase-invoices', 'label': 'Purchase Invoices'},
             {'url': '/purchase-invoices/create', 'label': 'Create Invoice'},
+            {'url': '/purchase-returns', 'label': 'Purchase Returns'},
+            {'url': '/purchase-returns/create', 'label': 'Create Return'},
         ]},
         {'label': 'Sales', 'permission': 'sales', 'subs': [
             {'url': '/customers', 'label': 'Customers'},
@@ -222,6 +226,53 @@ def purchase_invoices():
 def create_purchase_invoice():
     """Display the create purchase invoice form."""
     return render_page('create_purchase_invoice.html', '/purchase-invoices/create')
+
+
+@app.route('/purchase-returns', strict_slashes=False)
+@login_required
+@permission_required('purchase')
+def purchase_returns():
+    """Display the purchase returns list."""
+    return render_page('purchase_returns.html', '/purchase-returns')
+
+
+@app.route('/purchase-returns/create', strict_slashes=False)
+@login_required
+@permission_required('purchase')
+def create_purchase_return():
+    """Display the create purchase return form."""
+    return render_page('create_purchase_return.html', '/purchase-returns/create')
+
+
+@app.route('/purchase-returns/<int:return_id>', strict_slashes=False)
+@login_required
+@permission_required('purchase')
+def view_purchase_return(return_id):
+    """Display a detailed view of a purchase return."""
+    from database import get_db
+    from markupsafe import escape
+    with get_db() as db:
+        purchase_return = db.execute(
+            'SELECT pr.*, s.name as supplier_name FROM purchase_returns pr '
+            'LEFT JOIN suppliers s ON s.id=pr.supplier_id WHERE pr.id=?', (return_id,)
+        ).fetchone()
+        if not purchase_return:
+            return 'Not found', 404
+        purchase_return = dict(purchase_return)
+
+        items = db.execute(
+            'SELECT * FROM purchase_return_items WHERE return_id=? ORDER BY line_number', (return_id,)
+        ).fetchall()
+
+        return render_template('view_purchase_return.html',
+            role=session.get('role'), name=session.get('name'), sidebar=render_sidebar('/purchase-returns'),
+            return_no=escape(purchase_return['return_no']),
+            return_date=purchase_return.get('return_date', ''),
+            supplier_name=escape(purchase_return.get('supplier_name') or '-'),
+            description=escape(purchase_return.get('description', '')),
+            total_amount=purchase_return['total_amount'],
+            items=[dict(item) for item in items],
+        )
 
 
 @app.route('/inventory', strict_slashes=False)
@@ -668,7 +719,7 @@ def inventory_barcode():
         from database import get_db
         with get_db() as db:
             items = db.execute(
-                'SELECT pii.qty, v.id as vid, v.sku, p.name, v.price '
+                'SELECT pii.qty, v.id as vid, v.sku, p.name, v.price, p.base_price '
                 'FROM purchase_invoice_items pii '
                 'JOIN products p ON p.id = pii.product_id '
                 'JOIN variants v ON v.product_id = p.id AND v.id = ('
@@ -678,12 +729,13 @@ def inventory_barcode():
                 (invoice_id,)
             ).fetchall()
             for row in items:
+                price = float(row['price']) if row['price'] is not None else (float(row['base_price']) if row['base_price'] else 0)
                 queue_data.append({
                     'vid': row['vid'],
                     'sku': row['sku'],
                     'name': row['name'],
                     'copies': row['qty'],
-                    'price': float(row['price']) if row['price'] is not None else 0
+                    'price': price
                 })
     return render_page('barcode.html', '/inventory/barcode', queue_data=queue_data)
 

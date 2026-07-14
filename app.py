@@ -77,6 +77,7 @@ from routes.transactions import txn_bp
 from routes.ledger import ledger_bp
 from routes.payroll import payroll_bp
 from routes.reports import reports_bp
+from routes.data_management import data_bp
 
 if getattr(sys, 'frozen', False):
     base_dir = sys._MEIPASS
@@ -114,6 +115,7 @@ app.register_blueprint(txn_bp)
 app.register_blueprint(ledger_bp)
 app.register_blueprint(payroll_bp)
 app.register_blueprint(reports_bp)
+app.register_blueprint(data_bp)
 
 
 def render_sidebar(active_page):
@@ -126,7 +128,7 @@ def render_sidebar(active_page):
     user_permissions = []
     if user_role == 'manager':
         # Managers have all permissions
-        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary', 'payroll']
+        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary', 'payroll', 'reports', 'settings']
     elif user_id:
         from database import get_db
         import json
@@ -167,8 +169,11 @@ def render_sidebar(active_page):
         ]},
         {'url': '/staff', 'label': 'User Accounts', 'permission': 'staff'},
         {'url': '/payroll', 'label': 'Payroll', 'permission': 'payroll'},
-        {'url': '/reports', 'label': 'Reports', 'permission': 'summary'},
+        {'url': '/reports', 'label': 'Reports', 'permission': 'reports'},
         {'url': '/summary', 'label': 'Summary', 'permission': 'summary'},
+        {'label': 'Settings', 'permission': 'settings', 'subs': [
+            {'url': '/data-management', 'label': 'Data Management'},
+        ]},
     ]
     
     # Filter menu items based on permissions
@@ -690,6 +695,14 @@ def reports():
 def summary():
     """Display the business summary page."""
     return render_page('summary.html', '/summary')
+
+
+@app.route('/data-management', strict_slashes=False)
+@login_required
+@permission_required('settings')
+def data_management():
+    """Display the data management page."""
+    return render_page('data_management.html', '/data-management')
 
 
 @app.route('/inventory/categories', strict_slashes=False)

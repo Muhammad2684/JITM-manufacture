@@ -39,10 +39,13 @@ def add_supplier():
     with get_db() as db:
         try:
             cursor = db.execute(
-                'INSERT INTO suppliers (name, phone, email, address, contact_person, notes, company_phone, balance) VALUES (?,?,?,?,?,?,?,?)',
+                'INSERT INTO suppliers (name, phone, email, address, contact_person, notes, company_phone, balance, supplier_code, type, area, city, country, telephone, fax, account_no, due_days) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 (request_data['name'], request_data.get('phone', ''), request_data.get('email', ''), request_data.get('address', ''),
                  request_data.get('contact_person', ''), request_data.get('notes', ''), request_data.get('company_phone', ''),
-                 float(request_data.get('balance', 0)))
+                 float(request_data.get('balance', 0)),
+                 request_data.get('supplier_code', ''), request_data.get('type', ''), request_data.get('area', ''),
+                 request_data.get('city', ''), request_data.get('country', ''), request_data.get('telephone', ''),
+                 request_data.get('fax', ''), request_data.get('account_no', ''), int(request_data.get('due_days', 0) or 0))
             )
             return jsonify({'ok': True, 'id': cursor.lastrowid})
         except Exception as error:
@@ -57,9 +60,12 @@ def update_supplier(supplier_id):
     request_data = request.get_json()
     with get_db() as db:
         db.execute(
-            'UPDATE suppliers SET name=?, phone=?, email=?, address=?, contact_person=?, notes=?, company_phone=? WHERE id=?',
+            'UPDATE suppliers SET name=?, phone=?, email=?, address=?, contact_person=?, notes=?, company_phone=?, supplier_code=?, type=?, area=?, city=?, country=?, telephone=?, fax=?, account_no=?, due_days=? WHERE id=?',
             (request_data['name'], request_data.get('phone', ''), request_data.get('email', ''), request_data.get('address', ''),
-             request_data.get('contact_person', ''), request_data.get('notes', ''), request_data.get('company_phone', ''), supplier_id)
+             request_data.get('contact_person', ''), request_data.get('notes', ''), request_data.get('company_phone', ''),
+             request_data.get('supplier_code', ''), request_data.get('type', ''), request_data.get('area', ''),
+             request_data.get('city', ''), request_data.get('country', ''), request_data.get('telephone', ''),
+             request_data.get('fax', ''), request_data.get('account_no', ''), int(request_data.get('due_days', 0) or 0), supplier_id)
         )
         return jsonify({'ok': True})
 
@@ -90,8 +96,8 @@ def supplier_invoices(supplier_id):
 @login_required
 def supplier_import_template():
     """Return a sample CSV template for bulk supplier import."""
-    header = 'name,phone,email,address,contact_person,notes,balance,company_phone'
-    sample = 'ABC Supplies,021-1234567,info@abc.com,123 Industrial Area,Ali Khan,Net 30,0,021-7654321'
+    header = 'name,phone,email,address,contact_person,notes,balance,company_phone,supplier_code,type,area,city,country,telephone,fax,account_no,due_days'
+    sample = 'ABC Supplies,021-1234567,info@abc.com,123 Industrial Area,Ali Khan,Net 30,0,021-7654321,SUP001,Wholesale,Industrial Zone,Karachi,Pakistan,021-111222,021-111333,ACC-001,30'
     output = io.StringIO()
     output.write(header + '\n' + sample + '\n')
     return output.getvalue(), 200, {'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=supplier_import_template.csv'}
@@ -170,9 +176,12 @@ def supplier_import():
 
             try:
                 db.execute(
-                    'INSERT INTO suppliers (name, phone, email, address, contact_person, notes, balance, company_phone) VALUES (?,?,?,?,?,?,?,?)',
+                    'INSERT INTO suppliers (name, phone, email, address, contact_person, notes, balance, company_phone, supplier_code, type, area, city, country, telephone, fax, account_no, due_days) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                     (name, row.get('phone', ''), row.get('email', ''), row.get('address', ''),
-                     row.get('contact_person', ''), row.get('notes', ''), balance, row.get('company_phone', ''))
+                     row.get('contact_person', ''), row.get('notes', ''), balance, row.get('company_phone', ''),
+                     row.get('supplier_code', ''), row.get('type', ''), row.get('area', ''),
+                     row.get('city', ''), row.get('country', ''), row.get('telephone', ''),
+                     row.get('fax', ''), row.get('account_no', ''), int(row.get('due_days', 0) or 0))
                 )
                 existing_names.add(name)
                 created += 1

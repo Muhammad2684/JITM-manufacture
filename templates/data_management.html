@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JITM · Data Management</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Data Management</h2>
+            <div class="actions">
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">Import / Export Data</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:32px"><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
+                                <th>Entity</th>
+                                <th>Records</th>
+                                <th>Template</th>
+                                <th>Import</th>
+                                <th>Export</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tb"></tbody>
+                    </table>
+                </div>
+                <div style="padding:10px 14px;border-top:1px solid #e2e1de;display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-sm btn-p" onclick="exportSelected()">Export Selected</button>
+                    <span id="status" style="font-size:12px;color:#6b7280"></span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Database Location</div>
+                <div style="padding:14px">
+                    <div style="margin-bottom:10px">
+                        <label style="font-size:12px;color:#6b7280">Current Path</label>
+                        <div id="curPath" style="font-family:monospace;font-size:13px;padding:8px 10px;background:#f3f2ef;border-radius:6px;word-break:break-all;margin-top:2px"></div>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-sm btn-p" onclick="showChangePath()">Change Location</button>
+                        <button class="btn btn-sm btn-ghost" onclick="loadDbPath()">Refresh</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="modal" id="pathModal">
+        <div class="mc">
+            <button class="mx" onclick="cl('pathModal')">&times;</button>
+            <h2>Change Database Location</h2>
+            <p style="font-size:13px;color:#6b7280;margin:6px 0 12px">Enter a new directory path. The database file will be moved there.</p>
+            <form onsubmit="savePath(event)">
+                <label>New Directory Path</label>
+                <input id="newPath" required placeholder="/home/user/.local/share/JITM" style="font-family:monospace">
+                <div style="font-size:11px;color:#9ca3af;margin:4px 0 10px">
+                    Linux: ~/.local/share/JITM &nbsp;|&nbsp; Windows: %APPDATA%/JITM &nbsp;|&nbsp; macOS: ~/Library/Application Support/JITM
+                </div>
+                <button class="btn btn-p" type="submit">Move Database</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="importModal">
+        <div class="mc" style="max-width:500px">
+            <button class="mx" onclick="cl('importModal')">&times;</button>
+            <h2 id="importTitle">Import Data</h2>
+            <div id="importBody">
+                <form onsubmit="uploadImport(event)">
+                    <input type="file" id="importFile" accept=".csv,.xlsx" required style="margin:8px 0">
+                    <button class="btn btn-p" type="submit" id="importBtn">Upload & Import</button>
+                </form>
+            </div>
+            <div id="importResult" style="display:none"></div>
+        </div>
+    </div>
+
+    <script>
+        var entities = [];
+        var importEntity = null;
+
+        function load() {
+            fetch('/api/data/entities')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    entities = d;
+                    render(d);
+                });
+            loadDbPath();
+        }
+
+        function render(l) {
+            var h = '';
+            for (var i = 0; i < l.length; i++) {
+                var e = l[i];
+                h += '<tr>' +
+                    '<td><input type="checkbox" class="entity-cb" value="' + e.id + '"></td>' +
+                    '<td><strong>' + e.label + '</strong></td>' +
+                    '<td style="color:#6b7280">' + e.count + '</td>' +
+                    '<td><button class="btn btn-xs btn-ghost" onclick="downloadTemplate(\'' + e.id + '\')">CSV</button></td>' +
+                    '<td><button class="btn btn-xs btn-p" onclick="showImport(\'' + e.id + '\')">Import</button></td>' +
+                    '<td><button class="btn btn-xs btn-ghost" onclick="downloadExport(\'' + e.id + '\')">CSV</button></td>' +
+                    '</tr>';
+            }
+            document.getElementById('tb').innerHTML = h;
+        }
+
+        function toggleAll() {
+            var checked = document.getElementById('selectAll').checked;
+            var cbs = document.querySelectorAll('.entity-cb');
+            for (var i = 0; i < cbs.length; i++) {
+                cbs[i].checked = checked;
+            }
+        }
+
+        function getSelected() {
+            var ids = [];
+            var cbs = document.querySelectorAll('.entity-cb:checked');
+            for (var i = 0; i < cbs.length; i++) {
+                ids.push(cbs[i].value);
+            }
+            return ids;
+        }
+
+        function downloadTemplate(eid) {
+            window.location.href = '/api/data/template/' + eid;
+        }
+
+        function downloadExport(eid) {
+            window.location.href = '/api/data/export/' + eid;
+        }
+
+        function exportSelected() {
+            var ids = getSelected();
+            if (ids.length === 0) {
+                setStatus('Select at least one entity to export');
+                return;
+            }
+            setStatus('Preparing export...');
+            fetch('/api/data/export-batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entities: ids })
+            })
+            .then(function(r) {
+                if (!r.ok) { throw new Error('Export failed'); }
+                return r.blob();
+            })
+            .then(function(blob) {
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'jitm_export.xlsx';
+                a.click();
+                URL.revokeObjectURL(url);
+                setStatus('Downloaded jitm_export.xlsx (' + ids.length + ' sheets)');
+            })
+            .catch(function(err) {
+                setStatus('Error: ' + err.message);
+            });
+        }
+
+        function setStatus(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+
+        function showImport(eid) {
+            importEntity = eid;
+            var label = '';
+            for (var i = 0; i < entities.length; i++) {
+                if (entities[i].id === eid) { label = entities[i].label; break; }
+            }
+            document.getElementById('importTitle').textContent = 'Import ' + label;
+            document.getElementById('importBody').style.display = '';
+            document.getElementById('importResult').style.display = 'none';
+            document.getElementById('importFile').value = '';
+            document.getElementById('importBtn').textContent = 'Upload & Import';
+            document.getElementById('importBtn').disabled = false;
+            document.getElementById('importModal').classList.add('show');
+        }
+
+        function uploadImport(e) {
+            e.preventDefault();
+            var file = document.getElementById('importFile').files[0];
+            if (!file) return;
+            var fd = new FormData();
+            fd.append('file', file);
+            document.getElementById('importBtn').textContent = 'Importing...';
+            document.getElementById('importBtn').disabled = true;
+            fetch('/api/data/import/' + importEntity, {
+                method: 'POST',
+                body: fd
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                document.getElementById('importBody').style.display = 'none';
+                if (d.error) {
+                    document.getElementById('importResult').innerHTML = '<div class="alert alert-error">' + d.error + '</div>';
+                } else {
+                    var html = '<div class="alert alert-success">Import complete</div>' +
+                        '<p style="font-size:13px">Created: <strong>' + d.created + '</strong></p>' +
+                        '<p style="font-size:13px">Updated: <strong>' + (d.updated || 0) + '</strong></p>' +
+                        '<p style="font-size:13px">Skipped (no changes): <strong>' + (d.skipped || 0) + '</strong></p>';
+                    if (d.changes && d.changes.length) {
+                        html += '<p style="font-size:13px;color:#2563eb">Changes:</p><ul style="font-size:12px;color:#2563eb">';
+                        for (var i = 0; i < d.changes.length; i++) {
+                            html += '<li>' + d.changes[i] + '</li>';
+                        }
+                        html += '</ul>';
+                    }
+                    if (d.errors && d.errors.length) {
+                        html += '<p style="font-size:13px;color:#dc2626">Errors:</p><ul style="font-size:12px;color:#dc2626">';
+                        for (var i = 0; i < d.errors.length; i++) {
+                            html += '<li>' + d.errors[i] + '</li>';
+                        }
+                        html += '</ul>';
+                    }
+                    html += '<button class="btn btn-sm btn-p" onclick="cl(\'importModal\');load()">Done</button>';
+                    document.getElementById('importResult').innerHTML = html;
+                }
+                document.getElementById('importResult').style.display = '';
+            })
+            .catch(function(err) {
+                document.getElementById('importBody').style.display = 'none';
+                document.getElementById('importResult').innerHTML = '<div class="alert alert-error">Error: ' + err.message + '</div>';
+                document.getElementById('importResult').style.display = '';
+            });
+        }
+
+        function loadDbPath() {
+            fetch('/api/data/db-path')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var sizeLabel = 'N/A';
+                    if (d.exists) {
+                        sizeLabel = (d.size / 1024).toFixed(1) + ' KB';
+                    }
+                    document.getElementById('curPath').innerHTML = d.current_path + ' <span style="color:#6b7280;font-size:11px">(' + sizeLabel + ')</span>';
+                });
+        }
+
+        function showChangePath() {
+            document.getElementById('newPath').value = '';
+            document.getElementById('pathModal').classList.add('show');
+        }
+
+        function savePath(e) {
+            e.preventDefault();
+            var path = document.getElementById('newPath').value.trim();
+            if (!path) return;
+            if (!confirm('This will move the database file to the new location and update the config. The app will need to be restarted. Continue?')) return;
+            fetch('/api/data/db-path', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) { alert(d.error); return; }
+                cl('pathModal');
+                alert(d.message);
+                loadDbPath();
+            });
+        }
+
+        function cl(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        window.onclick = function(e) {
+            document.querySelectorAll('.modal').forEach(function(m) {
+                if (e.target === m) m.classList.remove('show');
+            });
+        };
+
+        load();
+    </script>
+</body>
+</html>

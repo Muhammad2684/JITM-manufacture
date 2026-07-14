@@ -210,13 +210,14 @@
             </div>
         </div>
     </div>
+
     <div class="modal" id="rm">
-        <div class="mc" style="max-width:320px"><button class="mx" onclick="cl('rm')">&times;</button>
+        <div class="mc" style="max-width:380px"><button class="mx" onclick="cl('rm')">&times;</button>
             <div id="rp">
                 <div class="rec" id="rc"></div>
             </div>
-            <div class="ra"><button class="btn btn-p btn-sm" onclick="printReceipt()">Print</button><button
-                    class="btn btn-sm" onclick="cl('rm')">Done</button></div>
+<div class="ra"><button class="btn btn-p btn-sm" onclick="printReceiptModal()">Print</button> <button
+                     class="btn btn-sm" onclick="cl('rm')">Done</button></div>
         </div>
     </div>
     <div class="modal" id="em">
@@ -423,51 +424,17 @@
                 .catch(() => { f('Sale failed'); btn.disabled = false; });
         }
         function fmt(n) { return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-        function showR(d) {
-            var totQty = d.items.reduce(function (s, i) { return s + Math.abs(i.quantity); }, 0);
-            var crAmt = 0; d.payments.forEach(function (p) { if (p.method === 'credit') crAmt = p.amount; });
-            var netCash = d.cash_tendered - d.change_given;
-            var h = '<div style="text-align:center;margin-bottom:4px"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAA8ADwDASIAAhEBAxEB/8QAGgAAAwEBAQEAAAAAAAAAAAAAAAQGBQIHA//EAC8QAAEDAwIFAgYBBQAAAAAAAAECAwQABRESMQYhQVFhE4EUFSIycZFCB2Kh0fD/xAAZAQACAwEAAAAAAAAAAAAAAAACAwABBAX/xAAhEQADAAMAAQQDAAAAAAAAAAAAAQIDESEEEhMxQXGx8P/aAAwDAQACEQMRAD8A9loooqECiijaoQXlTo0JIVIdCM7Dcn2rmJcok4kMOhShukjBqOmylzJbjyznJ5eB0FcxXlx5TTrZwpKhTvb4P9rhe0UUUkQFYkviH0Jamm2AtKDgkqxk9cVt1M3SzSRKW9HbLjbh1YG6TRwpb6ZfJrJMp4ygiSm5kdL7ROlXQ7g9q+1TtqutstrBjybgwl5SySkKyE+CRyrWm3ONCt5mqV6jeBoDf1FwnYJxvmqctMZhyLJK70l7la34UlYDalNE5QtIyMUxZrQ9IkoeebKGUHV9QxqPYUlOmcaT8ux4bsRn+KG9IVjznnWVE4uvlslFEp1T4ScLZfTg/vcGnpU1zR0VNudJrZ6dRSttuDF0gNTI5OhwbHdJ6g01Wb4MjWgqZ44nvRLW2wyop+IWUrUN9IHMe9U1Y/E1pTdrSpoLSh1tWptSjgZ2xnznFHDSpNmbypusFTHzoxLNwtEcRpkNJdWlILqlk4SSM6UgEbDqa2IMNFnLkaIl1xLhCmWXAcIV1IV228/ukeHbsoumLIQW5iAEPMq5KVpGAsd+W496qCoBOokADmSaK6remJ8PHhUKoXV/dEPljroK5E58unb0laEp/A/3UZxm0FxIUtzBk63GFrAx6gSeR/7vV0/IQYheQ+htnBKnieSR3Fed3F13iq9MwbY2fh2RobJ6DP1LV+avFvezrYNuvV9IpP6fBwWF0qzoMhWj9DP+aqaVtsBq2W9mGz9jScZ7nqfc01S6e6bF3XqpsK4daQ80pp1AWhYwpJHIiu6KEAlLxanY2FuxnLhEb+x1pWJMceD/ADA886W+e2dqKl6Vc5V0WOTcZadJB/uGxPk5q0pdNvhpkmSmIyH1buBA1H3pivnQfbxOvVU9/f5I9yDxBxa4kyk/LreDlLZHM+25P5wKqbTZ4dmjehEbxn71nmpZ7k0/RVVba19Datta+gooooAD/9k=" style="width:60px;height:auto" alt="Nomolood"></div>';
-            h += '<div style="border-bottom:1px dashed #000;padding-bottom:4px;margin-bottom:4px">';
-            h += '<div class="rl"><span>Receipt No:</span><span>' + d.receipt + '</span></div>';
-            h += '<div class="rl"><span>Customer:</span><span>' + (d.customer_name || 'Walk In') + '</span></div>';
-            h += '<div class="rl"><span>Phone:</span><span>' + (d.customer_phone || '-') + '</span></div>';
-            var dt = d.created_at ? d.created_at.split(' ') : ['', ''];
-            h += '<div class="rl"><span>Date & Time:</span><span>' + dt[0] + ' ' + (dt[1] && dt[2] ? dt[1] + ' ' + dt[2] : dt[1] || '') + '</span></div></div>';
-            h += '<div style="display:grid;grid-template-columns:25px 1fr 75px 75px;column-gap:2px;font-size:9px;border-bottom:1px dashed #000;padding-bottom:3px;margin-bottom:2px">';
-            h += '<span style="text-align:center;background:#000;color:#fff;font-weight:700;padding:1px 2px 6px 2px">Qty</span><span style="background:#000;color:#fff;font-weight:700;padding:1px 2px 6px 2px">Description</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:1px 2px 6px 2px">Price</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:1px 2px 6px 2px">Total</span></div>';
-            h += '<div style="display:grid;grid-template-columns:25px 1fr 75px 75px;column-gap:2px;font-size:9px;padding-block:6px;row-gap:10px">';
-            d.items.forEach(function (i) {
-                var itemLabel = i.is_return ? ' [RETURN]' : '';
-                h += '<span style="text-align:center">' + Math.abs(i.quantity) + '</span>';
-                h += '<span style="font-size:8px">' + i.product_name + (i.variant_label ? ' (' + i.variant_label + ')' : '') + itemLabel + '<br><span style="font-size:7px;color:#000">' + (i.sku || '') + '</span></span>';
-                h += '<span style="text-align:right">' + fmt(i.price) + '</span>';
-                h += '<span style="text-align:right">' + fmt(Math.abs(i.total)) + '</span>';
-            });
-            h += '</div>';
-            h += '<div class="rl"><span>Items: ' + d.items.length + '</span><span>Qty: ' + totQty + '</span></div>';
-            h += '<div class="rl" style="margin-bottom:4px"><span>Status:</span><span style="font-weight:600">' + (d.is_return ? 'Return' : d.status) + '</span></div>';
-            h += '<div style="border-top:1px dashed #000;padding-top:4px">';
-            h += '<div class="rl"><span>Sub Total:</span><span>Rs ' + fmt(d.subtotal) + '</span></div>';
-            h += '<div class="rl"><span>Addons:</span><span>Rs ' + fmt(d.discount) + '</span></div>';
-            h += '<div class="rl" style="font-weight:700;font-size:12px"><span>Total:</span><span>Rs ' + fmt(d.total) + '</span></div>';
-            h += '<div class="rl"><span>Credit:</span><span>Rs ' + fmt(crAmt) + '</span></div>';
-            h += '<div class="rl"><span>Cash:</span><span>Rs ' + fmt(netCash) + '</span></div>';
-            h += '<div class="rl"><span>Change:</span><span>Rs ' + fmt(d.change_given) + '</span></div></div>';
-            h += '<div style="margin-top:6px;padding-top:4px;border-top:1px dashed #000;text-align:center;font-size:9px;color:#000;line-height:1.4">';
-            h += '<div style="font-size:10px;font-weight:600">Thanks for Shopping</div>';
-            h += 'Check items & cash before leaving.<br>';
-            h += 'Exchange within 10 days with receipt.<br>';
-            h += 'Toys, personal care, undergarments & sale items non-exchangeable.<br>';
-            h += 'Imported items: no guarantee.<br>';
-            h += '<strong>NO CASH Refund</strong><br>';
-            h += '<img src="https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(d.receipt) + '&code=Code128&translate-esc=true&dpi=96&imagetype=png" style="width:140px;height:30px;margin:4px 0" alt="' + d.receipt + '"><br>';
 
-            document.getElementById('rc').innerHTML = h; document.getElementById('rm').classList.add('show');
+        function findCust() {
+            var ph = document.getElementById('cPhone').value.trim(); if (ph.length < 3) { selC = null; document.getElementById('sc').innerHTML = ''; return; }
+            fetch('/api/customers?q=' + encodeURIComponent(ph)).then(r => r.json()).then(function (response) { var list = response.items || response; var match = list.find(function (c) { return c.phone === ph; }); if (match) { selC = { id: match.id, name: match.name, phone: match.phone }; document.getElementById('cName').value = match.name; document.getElementById('cName').readOnly = true; document.getElementById('sc').innerHTML = 'Customer: ' + match.name + ' | Credit: Rs ' + match.credit.toFixed(2); } else { selC = null; document.getElementById('cName').readOnly = false; document.getElementById('sc').innerHTML = '<span style=\"color:#6b7280\">New customer</span>'; } });
         }
-        function printReceipt() {
+        function toggleWalkIn() { walkIn = document.getElementById('walkIn').checked; document.getElementById('cPhone').disabled = walkIn; document.getElementById('cName').disabled = walkIn; if (walkIn) { document.getElementById('cName').value = ''; document.getElementById('sc').innerHTML = 'Walk In Customer'; selC = null; } else { document.getElementById('sc').innerHTML = ''; } }
+        function f(m) { document.getElementById('em-msg').textContent = m; document.getElementById('em').classList.add('show'); }
+        function cl(id) { document.getElementById(id).classList.remove('show'); }
+        function showR(d) { var totQty = d.items.reduce(function (s, i) { return s + Math.abs(i.quantity); }, 0); var crAmt = 0; d.payments.forEach(function (p) { if (p.method === 'credit') crAmt = p.amount; }); var netCash = (d.cash_tendered || 0) - (d.change_given || 0); var h = '<div style="text-align:center;margin-bottom:6px"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAA8ADwDASIAAhEBAxEB/8QAGgAAAwEBAQEAAAAAAAAAAAAAAAQGBQIHA//EAC8QAAEDAwIFAgYBBQAAAAAAAAECAwQABRESMQYhQVFhE4EUFSIycZFCB2Kh0fD/xAAZAQACAwEAAAAAAAAAAAAAAAACAwABBAX/xAAhEQADAAMAAQQDAAAAAAAAAAAAAQIDESEEEhMxQXGx8P/aAAwDAQACEQMRAD8A9loooqECiijaoQXlTo0JIVIdCM7Dcn2rmJcok4kMOhShukjBqOmylzJbjyznJ5eB0FcxXlx5TTrZwpKhTvb4P9rhe0UUUkQFYkviH0Jamm2AtKDgkqxk9cVt1M3SzSRKW9HbLjbh1YG6TRwpb6ZfJrJMp4ygiSm5kdL7ROlXQ7g9q+1TtqutstrBjybgwl5SySkKyE+CRyrWm3ONCt5mqV6jeBoDf1FwnYJxvmqctMZhyLJK70l7la34UlYDalNE5QtIyMUxZrQ9IkoeebKGUHV9QxqPYUlOmcaT8ux4bsRn+KG9IVjznnWVE4uvlslFEp1T4ScLZfTg/vcGnpU1zR0VNudJrZ6dRSttuDF0gNTI5OhwbHdJ6g01Wb4MjWgqZ44nvRLW2wyop+IWUrUN9IHMe9U1Y/E1pTdrSpoLSh1tWptSjgZ2xnznFHDSpNmbypusFTHzoxLNwtEcRpkNJdWlILqlk4SSM6UgEbDqa2IMNFnLkaIl1xLhCmWXAcIV1IV228/ukeHbsoumLIQW5iAEPMq5KVpGAsd+W496qCoBOokADmSaK6remJ8PHhUKoXV/dEPljroK5E58unb0laEp/A/3UZxm0FxIUtzBk63GFrAx6gSeR/7vV0/IQYheQ+htnBKnieSR3Fed3F13iq9MwbY2fh2RobJ6DP1LV+avFvezrYNuvV9IpP6fBwWF0qzoMhWj9DP+aqaVtsBq2W9mGz9jScZ7nqfc01S6e6bF3XqpsK4daQ80pp1AWhYwpJHIiu6KEAlLxanY2FuxnLhEb+x1pWJMceD/ADA886W+e2dqKl6Vc5V0WOTcZadJB/uGxPk5q0pdNvhpkmSmIyH1buBA1H3pivnQfbxOvVU9/f5I9yDxBxa4kyk/LreDlLZHM+25P5wKqbTZ4dmjehEbxn71nmpZ7k0/RVVba19Datta+gooooAD/9k=" style="width:80px;height:auto" alt="Logo"></div>'; h += '<div style="border-bottom:1px dashed #e2e1de;padding-bottom:6px;margin-bottom:6px">'; h += '<div class="rl"><span>Invoice/Receipt No:</span><span>' + d.receipt + '</span></div>'; h += '<div class="rl"><span>Customer Name:</span><span>' + (d.customer_name || 'Walk In') + '</span></div>'; h += '<div class="rl"><span>Mobile/Phone No:</span><span>' + (d.customer_phone || '-') + '</span></div>'; var dt = d.created_at ? d.created_at.split(' ') : ['', '']; h += '<div class="rl"><span>Date & Time:</span><span>' + dt[0] + ' ' + (dt[1] && dt[2] ? dt[1] + ' ' + dt[2] : dt[1] || '') + '</span></div></div>'; h += '<div style="display:grid;grid-template-columns:25px 1fr 75px 75px;column-gap:0px;font-size:13px;border-bottom:1px dashed #e2e1de;padding-bottom:4px;margin-bottom:-3px">'; h += '<span style="text-align:center;background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Qty</span><span style="background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Description</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:2px 4px">Unit Price</span><span style="text-align:right;background:#000;color:#fff;font-weight:700;padding:2px 4px 10px 4px">Total</span></div>'; h += '<div style="display:grid;grid-template-columns:25px 1fr 75px 75px;column-gap:0px;font-size:13px;padding-block:10px;row-gap:15px">'; d.items.forEach(function (i) { h += '<span style="text-align:center">' + Math.abs(i.quantity) + '</span>'; h += '<span>' + i.product_name + (i.variant_label ? ' (' + i.variant_label + ')' : '') + '<br><span style="font-size:11px;color:#000">' + (i.sku || '') + '</span></span>'; h += '<span style="text-align:right">' + fmt(i.price) + '</span>'; h += '<span style="text-align:right">' + fmt(i.total) + '</span>'; }); h += '</div>'; h += '<div class="rl"><span>Items: ' + d.items.length + '</span><span>Qty: ' + totQty + '</span></div>'; h += '<div class="rl" style="margin-bottom:6px"><span>Status/Tag:</span><span style="font-weight:600">' + (d.is_return ? 'Return' : d.status) + '</span></div>'; h += '<div style="border-top:1px dashed #e2e1de;padding-top:6px">'; h += '<div class="rl"><span>Sub Total:</span><span>Rs ' + fmt(d.subtotal) + '</span></div>'; h += '<div class="rl"><span>Addons:</span><span>Rs ' + fmt(d.discount) + '</span></div>'; h += '<div class="rl" style="font-weight:700;font-size:17px"><span>Total:</span><span>Rs ' + fmt(d.total) + '</span></div>'; h += '<div class="rl"><span>Credit:</span><span>Rs ' + fmt(crAmt) + '</span></div>'; h += '<div class="rl"><span>Cash:</span><span>Rs ' + fmt(netCash) + '</span></div>'; h += '<div class="rl"><span>Change:</span><span>Rs ' + fmt(d.change_given || 0) + '</span></div></div>'; h += '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e1de;text-align:center;font-size:13px;color:#000;line-height:1.6">'; h += '<div style="font-size:15px;font-weight:600">Thanks for Shopping</div>'; h += 'Please check items, cash, and receipt before leaving the counter.<br>'; h += 'Items can be exchanged within 10 days with receipt and barcode tag.<br>'; h += 'Toys, personal care, undergarments, and sale items are non-exchangeable.<br>'; h += 'Imported items carry no guarantee.<br>'; h += '<strong>NO CASH Refund Allowed</strong><br>'; h += '<img src="https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(d.receipt) + '&code=Code128&translate-esc=true&dpi=96&imagetype=png" style="width:180px;height:40px;margin:6px 0" alt="' + d.receipt + '"><br>'; document.getElementById('rc').innerHTML = h; document.getElementById('rm').classList.add('show'); }
+        function printReceiptModal() {
             const receiptContent = document.getElementById('rc').innerHTML;
-            
             let printIframe = document.getElementById('receipt-print-iframe');
             if (!printIframe) {
                 printIframe = document.createElement('iframe');
@@ -478,7 +445,6 @@
                 printIframe.style.border = 'none';
                 document.body.appendChild(printIframe);
             }
-            
             const iframeDoc = printIframe.contentWindow.document;
             iframeDoc.open();
             iframeDoc.write(`
@@ -501,13 +467,13 @@
                             margin: 0 auto; 
                             padding: 2mm;
                             box-sizing: border-box;
-                            font-size: 10px;
+                            font-size: 13px;
                             color: #000;
                         }
                         .rec .rh { text-align: center; margin-bottom: 8px; }
-                        .rec .rh h3 { font-size: 13px; margin: 0; }
+                        .rec .rh h3 { font-size: 16px; margin: 0; }
                         .rec .ri { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin: 6px 0; }
-                        .rec .rl { display: flex; justify-content: space-between; padding: 1px 0; font-size: 10px; }
+                        .rec .rl { display: flex; justify-content: space-between; padding: 1px 0; font-size: 13px; }
                     </style>
                 </head>
                 <body>
@@ -525,13 +491,6 @@
             `);
             iframeDoc.close();
         }
-        function findCust() {
-            var ph = document.getElementById('cPhone').value.trim(); if (ph.length < 3) { selC = null; document.getElementById('sc').innerHTML = ''; return; }
-            fetch('/api/customers?q=' + encodeURIComponent(ph)).then(r => r.json()).then(function (response) { var list = response.items || response; var match = list.find(function (c) { return c.phone === ph; }); if (match) { selC = { id: match.id, name: match.name, phone: match.phone }; document.getElementById('cName').value = match.name; document.getElementById('cName').readOnly = true; document.getElementById('sc').innerHTML = 'Customer: ' + match.name + ' | Credit: Rs ' + match.credit.toFixed(2); } else { selC = null; document.getElementById('cName').readOnly = false; document.getElementById('sc').innerHTML = '<span style=\"color:#6b7280\">New customer</span>'; } });
-        }
-        function toggleWalkIn() { walkIn = document.getElementById('walkIn').checked; document.getElementById('cPhone').disabled = walkIn; document.getElementById('cName').disabled = walkIn; if (walkIn) { document.getElementById('cName').value = ''; document.getElementById('sc').innerHTML = 'Walk In Customer'; selC = null; } else { document.getElementById('sc').innerHTML = ''; } }
-        function f(m) { document.getElementById('em-msg').textContent = m; document.getElementById('em').classList.add('show'); }
-        function cl(id) { document.getElementById(id).classList.remove('show'); }
         window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
         document.getElementById('s').focus();
         document.addEventListener('keydown', function (e) { var t = (e.target || {}).tagName; if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return; if (document.querySelector('.modal.show')) return; document.getElementById('s').focus(); });

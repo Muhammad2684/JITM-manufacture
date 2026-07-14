@@ -23,6 +23,7 @@ Tables:
 - settings: System configuration key-value pairs
 """
 
+import json
 import sqlite3
 import os
 import sys
@@ -32,7 +33,36 @@ if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB = os.path.join(BASE_DIR, 'jitm.db')
+
+CONFIG_DIR = os.path.join(BASE_DIR, 'instance')
+os.makedirs(CONFIG_DIR, exist_ok=True)
+CONFIG_FILE = os.path.join(CONFIG_DIR, 'db_config.json')
+
+
+def _get_db_path():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE) as f:
+                cfg = json.load(f)
+                path = cfg.get('db_path', '')
+                if path and os.path.exists(os.path.dirname(path)):
+                    return path
+        except Exception:
+            pass
+    return os.path.join(BASE_DIR, 'jitm.db')
+
+
+def set_db_path(new_path):
+    abs_path = os.path.abspath(new_path)
+    dirname = os.path.dirname(abs_path)
+    os.makedirs(dirname, exist_ok=True)
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump({'db_path': abs_path}, f)
+    global DB
+    DB = abs_path
+
+
+DB = _get_db_path()
 
 
 def get_db():
@@ -301,6 +331,51 @@ def init_db():
             pass
 
         try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN supplier_code TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN type TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN area TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN city TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN country TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN telephone TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN fax TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN account_no TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE suppliers ADD COLUMN due_days INTEGER DEFAULT 0')
+        except Exception:
+            pass
+
+        try:
             db.execute('ALTER TABLE purchase_invoices ADD COLUMN due_date TEXT DEFAULT \'\'')
         except Exception:
             pass
@@ -427,6 +502,21 @@ def init_db():
 
         try:
             db.execute('ALTER TABLE products ADD COLUMN supplier_id INTEGER DEFAULT NULL REFERENCES suppliers(id)')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE products ADD COLUMN brand TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE products ADD COLUMN make TEXT DEFAULT \'\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE products ADD COLUMN color TEXT DEFAULT \'\'')
         except Exception:
             pass
 
@@ -578,7 +668,7 @@ def init_db():
                 (i, name, f'0301-000000{i}', 0)
             )
 
-        seed_accounts = [('Cash in Hand', 'cash'), ('Bank Account (HBL)', 'bank')]
+        seed_accounts = [('POS Petty Cash', 'cash'), ('Bilal', 'bank'), ('Jamal', 'bank'), ('Zahid', 'bank')]
         for i, (name, typ) in enumerate(seed_accounts, 1):
             db.execute(
                 'INSERT OR IGNORE INTO accounts (id, name, type, balance) VALUES (?,?,?,?)',

@@ -64,6 +64,21 @@
                 <input id="sad">
                 <label>Opening Balance (Rs)</label>
                 <input id="sob" type="number" step="0.01" value="0">
+                <div style="text-align:center;margin-top:4px"><button type="button" class="btn btn-sm btn-ghost" onclick="toggleExtrasA()" id="extBtnA">+ Extras</button></div>
+                <div id="extrasA" style="display:none">
+                    <label>Supplier ID</label><input id="sasc">
+                    <label>Type</label><input id="sat">
+                    <label>Area</label><input id="saa">
+                    <div class="form-row">
+                        <div><label>City</label><input id="saci"></div>
+                        <div><label>Country</label><input id="saco"></div>
+                    </div>
+                    <label>Telephone No.</label><input id="sate">
+                    <label>Fax No.</label><input id="saf">
+                    <label>E-Mail</label><input id="sae" type="email">
+                    <label>Account #</label><input id="saan">
+                    <label>Supplier Due Days</label><input id="sadd" type="number" value="0">
+                </div>
                 <button class="btn btn-p" type="submit">Save</button>
             </form>
         </div>
@@ -84,6 +99,21 @@
                 <input id="escph" type="tel">
                 <label>Address</label>
                 <input id="esad">
+                <div style="text-align:center;margin-top:4px"><button type="button" class="btn btn-sm btn-ghost" onclick="toggleExtrasE()" id="extBtnE">+ Extras</button></div>
+                <div id="extrasE" style="display:none">
+                    <label>Supplier ID</label><input id="esasc">
+                    <label>Type</label><input id="esat">
+                    <label>Area</label><input id="esaa">
+                    <div class="form-row">
+                        <div><label>City</label><input id="esaci"></div>
+                        <div><label>Country</label><input id="esaco"></div>
+                    </div>
+                    <label>Telephone No.</label><input id="esate">
+                    <label>Fax No.</label><input id="esaf">
+                    <label>E-Mail</label><input id="esae" type="email">
+                    <label>Account #</label><input id="esaan">
+                    <label>Supplier Due Days</label><input id="esadd" type="number" value="0">
+                </div>
                 <button class="btn btn-p" type="submit">Update</button>
             </form>
         </div>
@@ -211,6 +241,25 @@
             document.getElementById('scph').value = '';
             document.getElementById('sad').value = '';
             document.getElementById('sob').value = '0';
+            document.getElementById('sasc').value = ''; document.getElementById('sat').value = '';
+            document.getElementById('saa').value = ''; document.getElementById('saci').value = '';
+            document.getElementById('saco').value = ''; document.getElementById('sate').value = '';
+            document.getElementById('saf').value = '';
+            document.getElementById('sae').value = ''; document.getElementById('saan').value = '';
+            document.getElementById('sadd').value = '0';
+            document.getElementById('extrasA').style.display = 'none'; document.getElementById('extBtnA').textContent = '+ Extras';
+        }
+        
+        function toggleExtrasA() {
+            var el = document.getElementById('extrasA');
+            el.style.display = el.style.display === 'none' ? '' : 'none';
+            document.getElementById('extBtnA').textContent = el.style.display === 'none' ? '+ Extras' : '- Extras';
+        }
+        
+        function toggleExtrasE() {
+            var el = document.getElementById('extrasE');
+            el.style.display = el.style.display === 'none' ? '' : 'none';
+            document.getElementById('extBtnE').textContent = el.style.display === 'none' ? '+ Extras' : '- Extras';
         }
         
         function saveS(e) {
@@ -227,7 +276,17 @@
                     phone: document.getElementById('sph').value,
                     company_phone: document.getElementById('scph').value,
                     address: document.getElementById('sad').value,
-                    balance: document.getElementById('sob').value
+                    balance: document.getElementById('sob').value,
+                    supplier_code: document.getElementById('sasc').value,
+                    type: document.getElementById('sat').value,
+                    area: document.getElementById('saa').value,
+                    city: document.getElementById('saci').value,
+                    country: document.getElementById('saco').value,
+                    telephone: document.getElementById('sate').value,
+                    fax: document.getElementById('saf').value,
+                    email: document.getElementById('sae').value,
+                    account_no: document.getElementById('saan').value,
+                    due_days: document.getElementById('sadd').value
                 })
             })
             .then(r => r.json())
@@ -247,6 +306,17 @@
             document.getElementById('esph').value = s.phone || '';
             document.getElementById('escph').value = s.company_phone || '';
             document.getElementById('esad').value = s.address || '';
+            document.getElementById('esasc').value = s.supplier_code || '';
+            document.getElementById('esat').value = s.type || '';
+            document.getElementById('esaa').value = s.area || '';
+            document.getElementById('esaci').value = s.city || '';
+            document.getElementById('esaco').value = s.country || '';
+            document.getElementById('esate').value = s.telephone || '';
+            document.getElementById('esaf').value = s.fax || '';
+            document.getElementById('esae').value = s.email || '';
+            document.getElementById('esaan').value = s.account_no || '';
+            document.getElementById('esadd').value = s.due_days || 0;
+            document.getElementById('extrasE').style.display = 'none'; document.getElementById('extBtnE').textContent = '+ Extras';
             document.getElementById('em').classList.add('show');
         }
         
@@ -263,7 +333,17 @@
                     contact_person: document.getElementById('escp').value,
                     phone: document.getElementById('esph').value,
                     company_phone: document.getElementById('escph').value,
-                    address: document.getElementById('esad').value
+                    address: document.getElementById('esad').value,
+                    supplier_code: document.getElementById('esasc').value,
+                    type: document.getElementById('esat').value,
+                    area: document.getElementById('esaa').value,
+                    city: document.getElementById('esaci').value,
+                    country: document.getElementById('esaco').value,
+                    telephone: document.getElementById('esate').value,
+                    fax: document.getElementById('esaf').value,
+                    email: document.getElementById('esae').value,
+                    account_no: document.getElementById('esaan').value,
+                    due_days: document.getElementById('esadd').value
                 })
             })
             .then(r => r.json())

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>JITM · Accounts</title>
+    <title>JITM · Staff</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -9,7 +9,7 @@
     {{sidebar|safe}}
     <div class="main">
         <div class="topbar">
-            <h2>Accounts</h2>
+            <h2>Staff</h2>
             <div class="actions">
                 {% if role == 'manager' %}
                     <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Account</button>
@@ -59,13 +59,22 @@
                         <input type="checkbox" value="inventory" class="perm-cb"> Inventory
                     </label>
                     <label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px">
-                        <input type="checkbox" value="accounts" class="perm-cb"> Cash and Bank Accounts
+                        <input type="checkbox" value="accounts" class="perm-cb"> Cash & Bank
                     </label>
                     <label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px">
-                        <input type="checkbox" value="staff" class="perm-cb"> Accounts
+                        <input type="checkbox" value="staff" class="perm-cb"> Staff
                     </label>
                     <label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px">
                         <input type="checkbox" value="summary" class="perm-cb"> Summary
+                    </label>
+                    <label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" value="payroll" class="perm-cb"> Payroll
+                    </label>
+                    <label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" value="reports" class="perm-cb"> Reports
+                    </label>
+                    <label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px">
+                        <input type="checkbox" value="settings" class="perm-cb"> Settings
                     </label>
                 </div>
                 <label>

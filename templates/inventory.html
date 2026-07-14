@@ -94,6 +94,17 @@
                     <div><label>Supplier</label><select id="psup"></select></div>
                     <div></div>
                 </div>
+                <div style="text-align:center;margin-top:4px"><button type="button" class="btn btn-sm btn-ghost" onclick="toggleExtras()" id="extBtn">+ Extras</button></div>
+                <div id="extras" style="display:none">
+                    <div class="form-row">
+                        <div><label>Brand</label><input id="pbrand"></div>
+                        <div><label>Make</label><input id="pmake"></div>
+                    </div>
+                    <div class="form-row">
+                        <div><label>Colour</label><input id="pcolor"></div>
+                        <div></div>
+                    </div>
+                </div>
                 <button class="btn btn-p" type="submit" style="margin-top:8px">Save</button>
             </form>
         </div>
@@ -286,6 +297,12 @@
                 document.getElementById('pcc_new').focus();
             }
         }
+        function toggleExtras() {
+            const el = document.getElementById('extras');
+            const btn = document.getElementById('extBtn');
+            el.style.display = el.style.display === 'none' ? '' : 'none';
+            btn.textContent = el.style.display === 'none' ? '+ Extras' : '- Extras';
+        }
         function autoPrice() {
             var cost = parseFloat(document.getElementById('pc').value) || 0;
             var markup = parseFloat(document.getElementById('pmu').value) || 0;
@@ -304,6 +321,8 @@
             populateCategories(); document.getElementById('pcat').value = '';
             populateCommissionClasses(); document.getElementById('pcc').value = '';
             populateSuppliers(); document.getElementById('psup').value = '';
+            document.getElementById('pbrand').value = ''; document.getElementById('pmake').value = ''; document.getElementById('pcolor').value = '';
+            document.getElementById('extras').style.display = 'none'; document.getElementById('extBtn').textContent = '+ Extras';
             document.getElementById('pm').classList.add('show');
         }
         function populateSuppliers() {
@@ -359,6 +378,9 @@
             } else {
                 szSel.value = '';
             }
+            document.getElementById('pbrand').value = p.brand || '';
+            document.getElementById('pmake').value = p.make || '';
+            document.getElementById('pcolor').value = p.color || '';
             document.getElementById('pm').classList.add('show');
         }
         function save(e) {
@@ -375,7 +397,8 @@
                 base_price: document.getElementById('pp').value, cost_price: document.getElementById('pc').value || 0, category: cat,
                 commission_class: commission_class || null,
                 low_stock: document.getElementById('pl').value || 5, has_variants: 0, stock: document.getElementById('pos').value || 0,
-                size: psize || '', supplier_id: supplier_id
+                size: psize || '', supplier_id: supplier_id,
+                brand: document.getElementById('pbrand').value, make: document.getElementById('pmake').value, color: document.getElementById('pcolor').value
             };
             if (cat && !catList.some(c => c.name === cat)) {
                 fetch('/api/categories', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: cat}) }).then(r => r.json()).then(() => { catList.push({name: cat}); });

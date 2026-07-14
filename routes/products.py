@@ -120,10 +120,11 @@ def add_product():
             if supplier_id:
                 supplier_id = int(supplier_id)
             cur = db.execute(
-                'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, has_variants, low_stock, commission_class, supplier_id) VALUES (?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, has_variants, low_stock, commission_class, supplier_id, brand, make, color) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 (d['name'], d.get('category', ''), float(d.get('base_price', 0)), float(d.get('cost_price', 0)),
                  d['sku'], d.get('barcode'), int(d.get('has_variants', 0)), int(d.get('low_stock', 5)),
-                 d.get('commission_class') or None, supplier_id)
+                 d.get('commission_class') or None, supplier_id,
+                 d.get('brand', ''), d.get('make', ''), d.get('color', ''))
             )
             pid = cur.lastrowid
             if not d.get('has_variants'):
@@ -151,9 +152,10 @@ def update_product(pid):
         if supplier_id:
             supplier_id = int(supplier_id)
         db.execute(
-            'UPDATE products SET name=?, category=?, base_price=?, cost_price=?, sku=?, barcode=?, low_stock=?, commission_class=?, supplier_id=? WHERE id=?',
+            'UPDATE products SET name=?, category=?, base_price=?, cost_price=?, sku=?, barcode=?, low_stock=?, commission_class=?, supplier_id=?, brand=?, make=?, color=? WHERE id=?',
             (d['name'], d.get('category', ''), float(d['base_price']), float(d.get('cost_price', 0)),
-             d['sku'], d.get('barcode'), int(d.get('low_stock', 5)), d.get('commission_class') or None, supplier_id, pid)
+             d['sku'], d.get('barcode'), int(d.get('low_stock', 5)), d.get('commission_class') or None, supplier_id,
+             d.get('brand', ''), d.get('make', ''), d.get('color', ''), pid)
         )
         if not d.get('has_variants'):
             db.execute('UPDATE variants SET size=? WHERE product_id=?',

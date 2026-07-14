@@ -1,23 +1,50 @@
 @echo off
-REM JITM POS - Windows Build Script
-REM Run this on Windows with Python and NSIS installed
+REM JITM POS - Onefile Windows Build Script
+REM Run this on Windows with Python installed
 
 echo === Installing dependencies ===
-pip install pyinstaller openpyxl flask flask-login
+pip install pyinstaller openpyxl flask flask-login pystray pillow
 
-echo === Building with PyInstaller ===
-pyinstaller JITM.spec
-if %errorlevel% neq 0 exit /b %errorlevel%
+echo === Cleaning old builds ===
+if exist "dist\JITM.exe" del "dist\JITM.exe"
+if exist "dist\JITM\" rmdir /s /q "dist\JITM\"
+if exist "build\" rmdir /s /q "build\"
 
-echo === Building NSIS installer ===
-makensis installer.nsi
+echo === Building single executable ===
+pyinstaller --onefile --noconsole ^
+    --add-data "templates;templates" ^
+    --add-data "static;static" ^
+    --hidden-import "routes.auth" ^
+    --hidden-import "routes.products" ^
+    --hidden-import "routes.pos" ^
+    --hidden-import "routes.customers" ^
+    --hidden-import "routes.dashboard" ^
+    --hidden-import "routes.suppliers" ^
+    --hidden-import "routes.settings" ^
+    --hidden-import "routes.summary" ^
+    --hidden-import "routes.categories" ^
+    --hidden-import "routes.sizes" ^
+    --hidden-import "routes.purchase_invoices" ^
+    --hidden-import "routes.purchase_returns" ^
+    --hidden-import "routes.accounts" ^
+    --hidden-import "routes.transactions" ^
+    --hidden-import "routes.ledger" ^
+    --hidden-import "routes.payroll" ^
+    --hidden-import "routes.reports" ^
+    --hidden-import "routes.data_management" ^
+    --hidden-import "database" ^
+    --name "JITM" ^
+    --icon "static\icon.ico" ^
+    app.py
+
 if %errorlevel% neq 0 (
-    echo NSIS not found. Install NSIS from https://nsis.sourceforge.io/
-    echo The PyInstaller build is ready at dist\JITM\
+    echo PyInstaller build failed!
     pause
-    exit /b 1
+    exit /b %errorlevel%
 )
 
-echo === Done ===
-echo Installer: JITM POS Setup.exe
+echo === Build complete ===
+echo Executable: dist\JITM.exe
+echo.
+echo To create an installer, run: makensis installer.nsi
 pause

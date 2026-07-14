@@ -20,13 +20,38 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
-          pip install pyinstaller openpyxl flask flask-login
+          pip install pyinstaller openpyxl flask flask-login pystray pillow
 
-      - name: Build with PyInstaller
+      - name: Build single executable
+        shell: cmd
         run: |
-          pyinstaller JITM.spec
+          pyinstaller --onefile --noconsole ^
+            --add-data "templates;templates" ^
+            --add-data "static;static" ^
+            --hidden-import "routes.auth" ^
+            --hidden-import "routes.products" ^
+            --hidden-import "routes.pos" ^
+            --hidden-import "routes.customers" ^
+            --hidden-import "routes.dashboard" ^
+            --hidden-import "routes.suppliers" ^
+            --hidden-import "routes.settings" ^
+            --hidden-import "routes.summary" ^
+            --hidden-import "routes.categories" ^
+            --hidden-import "routes.sizes" ^
+            --hidden-import "routes.purchase_invoices" ^
+            --hidden-import "routes.purchase_returns" ^
+            --hidden-import "routes.accounts" ^
+            --hidden-import "routes.transactions" ^
+            --hidden-import "routes.ledger" ^
+            --hidden-import "routes.payroll" ^
+            --hidden-import "routes.reports" ^
+            --hidden-import "routes.data_management" ^
+            --hidden-import "database" ^
+            --name "JITM" ^
+            --icon "static\icon.ico" ^
+            app.py
 
       - name: Install NSIS
         run: |

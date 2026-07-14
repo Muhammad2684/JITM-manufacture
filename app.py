@@ -1,4 +1,4 @@
-import os, sys, time, traceback
+import os, sys, time, traceback, threading
 os.environ['TZ'] = 'Asia/Karachi'
 if hasattr(time, 'tzset'):
     time.tzset()
@@ -797,7 +797,27 @@ def ledger_page(entity_type, entity_id):
 if __name__ == '__main__':
     init_db()
     debug_mode = not getattr(sys, 'frozen', False)
+
     if getattr(sys, 'frozen', False):
         import webbrowser
         webbrowser.open('http://localhost:5000')
+
+        def run_tray():
+            try:
+                import pystray
+                from PIL import Image
+                icon_path = os.path.join(os.path.dirname(sys.executable), 'icon2.ico') if getattr(sys, 'frozen', False) else 'icon2.ico'
+                if not os.path.exists(icon_path):
+                    icon_path = os.path.join(os.path.dirname(sys.executable), 'static', 'icon.ico') if getattr(sys, 'frozen', False) else 'static/icon.ico'
+                image = Image.open(icon_path) if os.path.exists(icon_path) else Image.new('RGB', (64, 64), '#3b4fe2')
+                menu = pystray.Menu(
+                    pystray.MenuItem('Open', lambda: webbrowser.open('http://localhost:5000')),
+                    pystray.MenuItem('Quit', lambda: os._exit(0))
+                )
+                icon = pystray.Icon('JITM', image, 'JITM POS', menu)
+                icon.run()
+            except Exception:
+                pass  # Tray not critical
+
+        threading.Thread(target=run_tray, daemon=True).start()
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)

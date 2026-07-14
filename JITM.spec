@@ -17,7 +17,7 @@ hiddenimports += [
     'routes.dashboard', 'routes.suppliers', 'routes.settings', 'routes.summary',
     'routes.categories', 'routes.sizes', 'routes.purchase_invoices', 'routes.purchase_returns',
     'routes.accounts', 'routes.transactions', 'routes.ledger', 'routes.payroll',
-    'routes.reports',
+    'routes.reports', 'routes.data_management',
 ]
 
 # Database module

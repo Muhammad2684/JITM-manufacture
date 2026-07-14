@@ -1,38 +1,51 @@
-name: Build Windows Executable
+name: Build Windows Installer
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
 
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller openpyxl flask flask-login
 
       - name: Build with PyInstaller
         run: |
           pyinstaller JITM.spec
 
-      - name: Copy extras to dist
+      - name: Download NSIS
         run: |
-          copy run.bat dist\JITM\
-          copy install.bat dist\JITM\
-          copy static\icon.ico dist\JITM\
+          Invoke-WebRequest -Uri "https://nsis.sourceforge.io/Download" -OutFile "$env:TEMP\nsis.zip"
+          # Use pre-installed NSIS on GitHub Actions
+          echo "NSIS is pre-installed on windows-latest"
 
-      - name: Upload artifact
+      - name: Build installer
+        run: |
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: JITM-Windows-x86_64
-          path: dist/JITM/
+          name: JITM-POS-Installer
+          path: "*.exe"
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.exe"

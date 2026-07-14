@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install pyinstaller openpyxl flask flask-login
 
@@ -28,15 +28,14 @@ jobs:
         run: |
           pyinstaller JITM.spec
 
-      - name: Download NSIS
+      - name: Install NSIS
         run: |
-          Invoke-WebRequest -Uri "https://nsis.sourceforge.io/Download" -OutFile "$env:TEMP\nsis.zip"
-          # Use pre-installed NSIS on GitHub Actions
-          echo "NSIS is pre-installed on windows-latest"
+          choco install nsis -y
 
       - name: Build installer
+        shell: cmd
         run: |
-          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+          "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

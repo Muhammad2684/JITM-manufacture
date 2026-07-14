@@ -384,20 +384,22 @@
 
     <div class="print-area" id="printArea"></div>
 
+    <script type="application/json" id="queueDataJson">{{ queue_data | tojson if queue_data else 'null' }}</script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
         var queue = [], queueId = 0, hlIdx = -1;
-        {% if queue_data %}
-        queue = {{ queue_data | tojson }};
-        queue.forEach(function(q) {
-            q.id = queueId++;
-            q.variant = q.variant || '';
-        });
-        document.addEventListener('DOMContentLoaded', function() {
-            renderQueue();
-            renderPreview();
-        });
-        {% endif %}
+        var _initialQueue = JSON.parse(document.getElementById('queueDataJson').textContent);
+        if (_initialQueue) {
+            queue = _initialQueue;
+            queue.forEach(function(q) {
+                q.id = queueId++;
+                q.variant = q.variant || '';
+            });
+            document.addEventListener('DOMContentLoaded', function() {
+                renderQueue();
+                renderPreview();
+            });
+        }
 
         // ─── 5×6 sheet preset: 21.5×15.5cm page, margins T/B 1.2cm, R/L 0.8cm,
         // 30 labels (5 cols × 6 rows), 0 gap. Cell size is derived so the grid

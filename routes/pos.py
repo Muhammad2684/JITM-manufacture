@@ -1,7 +1,6 @@
 import json
 import random
 import time
-from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from database import get_db
 from routes.auth import login_required, manager_required
@@ -207,6 +206,13 @@ def complete_sale():
         if errors:
             return jsonify({'error': '; '.join(errors)}), 400
         
+        for sale_item in sale_items:
+            if sale_item.get('staff_id'):
+                emp = db.execute('SELECT nickname FROM employees WHERE id=?', (sale_item['staff_id'],)).fetchone()
+                sale_item['employee_nickname'] = emp['nickname'] if emp else ''
+            else:
+                sale_item['employee_nickname'] = ''
+        
         discount_amount = round(abs(subtotal) * discount_pct / 100 + discount_amt, 2)
         if subtotal < 0:
             total = round(subtotal + discount_amount, 2)
@@ -305,11 +311,11 @@ def complete_sale():
             'customer_name': customer_name,
             'customer_phone': customer_phone,
             'staff_name': session['name'],
+            'staff_nickname': session.get('nick_name', session['name']),
             'is_return': is_return,
             'status': status,
             'cash_tendered': cash_tendered,
             'change_given': change_given,
-            'created_at': datetime.now().strftime('%d/%m/%Y %I:%M %p'),
         })
 
 
@@ -437,6 +443,9 @@ def create_sales_invoice():
             if payment_method == 'credit':
                 db.execute('UPDATE customers SET credit=credit+? WHERE id=?', (total, customer_id))
         
+        for sale_item in sale_items:
+            sale_item['employee_nickname'] = ''
+        
         return jsonify({
             'ok': True,
             'sale_id': sale_id,
@@ -447,6 +456,7 @@ def create_sales_invoice():
             'payment': payment_method,
             'customer_name': customer_name,
             'staff_name': session.get('name', ''),
+            'staff_nickname': session.get('nick_name', session.get('name', '')),
         })
 
 
@@ -597,6 +607,9 @@ def update_sales_invoice(sale_id):
                 )
                 db.execute('UPDATE accounts SET balance=balance+? WHERE id=?', (total, account_id))
         
+        for sale_item in sale_items:
+            sale_item['employee_nickname'] = ''
+        
         return jsonify({
             'ok': True,
             'sale_id': sale_id,
@@ -607,6 +620,7 @@ def update_sales_invoice(sale_id):
             'payment': payment_method,
             'customer_name': customer_name,
             'staff_name': session.get('name', ''),
+            'staff_nickname': session.get('nick_name', session.get('name', '')),
         })
 
 
@@ -714,6 +728,13 @@ def sale_detail(sale_id):
         # Compute status dynamically
         sale['status'] = compute_sale_status(sale['paid'], sale['total'])
         sale['items'] = [dict(item) for item in db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale_id,)).fetchall()]
+        for item in sale['items']:
+            if item.get('staff_id'):
+                emp = db.execute('SELECT nickname FROM employees WHERE id=?', (item['staff_id'],)).fetchone()
+                item['employee_nickname'] = emp['nickname'] if emp else ''
+            else:
+                item['employee_nickname'] = ''
+        
         sale['payments'] = [dict(payment) for payment in db.execute('SELECT * FROM payments WHERE sale_id=?', (sale_id,)).fetchall()]
         
         if sale.get('customer_id'):

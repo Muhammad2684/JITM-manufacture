@@ -77,6 +77,7 @@ def login():
             session['username'] = user['username']
             session['role'] = user['role']
             session['name'] = user['name']
+            session['nick_name'] = user['nick_name'] or user['name']
             return redirect('/')
         return '<h2>Invalid credentials</h2><a href="/login">Try again</a>'
     return render_template('login.html')

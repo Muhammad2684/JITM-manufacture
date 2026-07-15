@@ -701,7 +701,7 @@ def init_db():
                 (i, name, f'0301-000000{i}', 0)
             )
 
-        seed_accounts = [('POS Petty Cash', 'cash'), ('Bilal', 'bank'), ('Jamal', 'bank'), ('Zahid', 'bank')]
+        seed_accounts = [('POS Petty Cash', 'cash'), ('Jibraan', 'bank'), ('Ahmed', 'bank'), ('Zahid', 'bank')]
         for i, (name, typ) in enumerate(seed_accounts, 1):
             db.execute(
                 'INSERT OR IGNORE INTO accounts (id, name, type, balance) VALUES (?,?,?,?)',

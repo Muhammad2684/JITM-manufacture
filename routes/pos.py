@@ -123,8 +123,8 @@ def record_payments(db, sale_id, payments, is_return, customer_id, receipt_numbe
     """
     account_map = {
         'cash': ('POS Petty Cash', 'cash'),
-        'bl': ('Bilal', 'bank'),
-        'jl': ('Jamal', 'bank'),
+        'jb': ('Jibraan', 'bank'),
+        'ahd': ('Ahmed', 'bank'),
         'z': ('Zahid', 'bank')
     }
     
@@ -283,7 +283,7 @@ def complete_sale():
         # Verify: sum of account transactions must equal sum of non-credit payment legs
         expected_recorded = sum(
             payment['amount'] for payment in payment_list
-            if payment['method'] in ('cash', 'bl', 'jl', 'z')
+            if payment['method'] in ('cash', 'jb', 'ahd', 'z')
         )
         if abs(recorded_amount - expected_recorded) > 0.01:
             return jsonify({'error': f'Payment recording mismatch: expected Rs {expected_recorded:.2f}, recorded Rs {recorded_amount:.2f}'}), 500

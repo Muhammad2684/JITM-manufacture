@@ -178,11 +178,11 @@
                             <span>Cash</span>
                             <input id="am-cash" type="number" step="0.01" min="0" oninput="calcSplit()"
                                 style="width:100%;padding:5px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:12px">
-                            <span>BL</span>
-                            <input id="am-bl" type="number" step="0.01" min="0" oninput="calcSplit()"
+                            <span>JB</span>
+                            <input id="am-jb" type="number" step="0.01" min="0" oninput="calcSplit()"
                                 style="width:100%;padding:5px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:12px">
-                            <span>JL</span>
-                            <input id="am-jl" type="number" step="0.01" min="0" oninput="calcSplit()"
+                            <span>AHD</span>
+                            <input id="am-ahd" type="number" step="0.01" min="0" oninput="calcSplit()"
                                 style="width:100%;padding:5px 8px;border:1px solid #e2e1de;border-radius:4px;font-size:12px">
                             <span>Z</span>
                             <input id="am-z" type="number" step="0.01" min="0" oninput="calcSplit()"
@@ -200,8 +200,9 @@
                         </div>
                     </div>
                 </div>
-                <button class="btn btn-s btn-lg" id="chg" onclick="pay()" style="justify-content:center">Charge Rs
+                <button class="btn btn-s btn-lg" id="chg" onclick="pay(true)" style="justify-content:center">Charge Rs
                     0.00</button>
+                <button class="btn btn-lg" onclick="pay()" style="justify-content:center;margin-top:-6px">Complete</button>
                 <div style="display:flex;gap:6px">
                     <button class="btn btn-ghost btn-sm" onclick="cycleMode()" id="modeBtn">Sale</button>
                     <button class="btn btn-ghost btn-sm" onclick="clearCart()">Clear</button>
@@ -286,7 +287,7 @@
             h += '<table class="ct"><thead><tr><th></th><th>SKU</th><th>Staff</th><th>ㅤ</th><th>Product</th><th>Price</th><th>Qty</th><th>Net Total</th><th></th></tr></thead><tbody>';
             cart.forEach(function (c, i) {
                 n += Math.abs(c.qty); var net = c.qty * c.price * (1 - (c.disc || 0) / 100);
-                var sopts = staffList.map(function (s) { return '<option value="' + s.id + '"' + (s.id == c.staff ? ' selected' : '') + '>' + s.name + '</option>'; }).join('');
+                var sopts = staffList.map(function (s) { return '<option value="' + s.id + '"' + (s.id == c.staff ? ' selected' : '') + '>' + (s.nickname || s.name) + '</option>'; }).join('');
                 var isReturnItem = c.isReturn === true;
                 var rowStyle = isReturnItem ? 'background:#fef2f2;' : '';
                 var qtyLabel = isReturnItem ? ' (Return)' : '';
@@ -309,7 +310,7 @@
         function clearCart() {
             if (!cart.length) return; if (!confirm('Clear?')) return; cart = []; isR = false; selC = null; walkIn = false;
             document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false; document.getElementById('notes').value = '';
-            document.getElementById('discPct').value = ''; document.getElementById('discAmt').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-bl').value = ''; document.getElementById('am-jl').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
+            document.getElementById('discPct').value = ''; document.getElementById('discAmt').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-jb').value = ''; document.getElementById('am-ahd').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
             updateModeButton(); renderC(); search();
         }
         function cycleMode() {
@@ -344,11 +345,11 @@
         var splitTimer; function calcSplit(tot) {
             if (tot === undefined) tot = parseFloat(document.getElementById('tot').textContent.replace('Rs ', '')) || 0;
             var cashAmt = parseFloat(document.getElementById('am-cash').value) || 0;
-            var blAmt = parseFloat(document.getElementById('am-bl').value) || 0;
-            var jlAmt = parseFloat(document.getElementById('am-jl').value) || 0;
+            var jbAmt = parseFloat(document.getElementById('am-jb').value) || 0;
+            var ahdAmt = parseFloat(document.getElementById('am-ahd').value) || 0;
             var zAmt = parseFloat(document.getElementById('am-z').value) || 0;
             var crAmt = parseFloat(document.getElementById('am-credit').value) || 0;
-            var otherTotal = blAmt + jlAmt + zAmt + crAmt;
+            var otherTotal = jbAmt + ahdAmt + zAmt + crAmt;
             var applied = cashAmt + otherTotal;
             document.getElementById('appliedTotal').textContent = applied.toFixed(2);
             document.getElementById('totDisp').textContent = tot.toFixed(2);
@@ -366,23 +367,23 @@
         function getPayments() {
             var tot = parseFloat(document.getElementById('tot').textContent.replace('Rs ', '')) || 0;
             var cashAmt = parseFloat(document.getElementById('am-cash').value) || 0;
-            var blAmt = parseFloat(document.getElementById('am-bl').value) || 0;
-            var jlAmt = parseFloat(document.getElementById('am-jl').value) || 0;
+            var jbAmt = parseFloat(document.getElementById('am-jb').value) || 0;
+            var ahdAmt = parseFloat(document.getElementById('am-ahd').value) || 0;
             var zAmt = parseFloat(document.getElementById('am-z').value) || 0;
             var crAmt = parseFloat(document.getElementById('am-credit').value) || 0;
-            var otherTotal = blAmt + jlAmt + zAmt + crAmt;
+            var otherTotal = jbAmt + ahdAmt + zAmt + crAmt;
             var applied = cashAmt + otherTotal;
             var neededFromCash = Math.max(0, tot - otherTotal);
             var chg = cashAmt > neededFromCash ? cashAmt - neededFromCash : 0;
             var pays = [];
             if (cashAmt - chg > 0) pays.push({ method: 'cash', amount: Math.round((cashAmt - chg) * 100) / 100 });
-            if (blAmt > 0) pays.push({ method: 'bl', amount: blAmt });
-            if (jlAmt > 0) pays.push({ method: 'jl', amount: jlAmt });
+            if (jbAmt > 0) pays.push({ method: 'jb', amount: jbAmt });
+            if (ahdAmt > 0) pays.push({ method: 'ahd', amount: ahdAmt });
             if (zAmt > 0) pays.push({ method: 'z', amount: zAmt });
             if (crAmt > 0) pays.push({ method: 'credit', amount: crAmt });
             return { pays: pays, applied: applied, tot: tot, cashTendered: cashAmt, change: chg };
         }
-        function pay() {
+        function pay(autoPrint) {
             if (!cart.length) { f('Cart empty'); return; }
             var cnm = document.getElementById('cName').value.trim(), cph = document.getElementById('cPhone').value.trim();
             if (!walkIn && !selC && !cnm) { f('Please select or add a customer'); return; }
@@ -418,8 +419,8 @@
             })
                 .then(r => r.json()).then(d => {
                     if (d.error) { f(d.error); btn.disabled = false; btn.textContent = 'Charge Rs 0.00'; return; }
-                    showR(d); cart = []; isR = false; selC = null; walkIn = false; document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false;
-                    document.getElementById('notes').value = ''; document.getElementById('discPct').value = ''; document.getElementById('discAmt').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-bl').value = ''; document.getElementById('am-jl').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
+                    showR(d); if (autoPrint) { cl('rm'); setTimeout(printReceiptModal, 100); } cart = []; isR = false; selC = null; walkIn = false; document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false;
+                    document.getElementById('notes').value = ''; document.getElementById('discPct').value = ''; document.getElementById('discAmt').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-jb').value = ''; document.getElementById('am-ahd').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
                     updateModeButton(); renderC(); btn.disabled = false; document.getElementById('s').value = ''; closeDropdown(); document.getElementById('s').focus();
                 })
                 .catch(() => { f('Sale failed'); btn.disabled = false; });
@@ -453,7 +454,9 @@
                 <html>
                 <head>
                     <title>Receipt Print</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
                     <style>
+                        * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
                         @page { 
                             size: 80mm auto; 
                             margin: 0; 
@@ -461,7 +464,7 @@
                         body { 
                             margin: 0; 
                             padding: 0;
-                            font-family: "Courier New", monospace;
+                            font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                         }
                         .rec { 
                             width: 76mm; 
@@ -494,7 +497,7 @@
         }
         window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
         document.getElementById('s').focus();
-        document.addEventListener('keydown', function (e) { var t = (e.target || {}).tagName; if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return; if (document.querySelector('.modal.show')) return; document.getElementById('s').focus(); });
+        document.addEventListener('keydown', function (e) { var t = (e.target || {}).tagName; if (document.querySelector('.modal.show')) return; if (e.key === 'Enter') { var amtFlds = ['am-cash','am-jb','am-ahd','am-z','am-credit']; if (t !== 'INPUT' || amtFlds.includes(e.target.id)) { if (cart.length) pay(true); return; } } if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return; document.getElementById('s').focus(); });
         fetch('/api/employees').then(function (r) { return r.json() }).then(function (d) { staffList = d || []; if (!lastStaff && staffList.length) { lastStaff = staffList[0].id; cart.forEach(function (c) { if (!c.staff) c.staff = lastStaff; }); } renderC(); });
     </script>
 </body>

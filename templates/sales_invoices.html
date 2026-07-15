@@ -175,7 +175,9 @@
                 <html>
                 <head>
                     <title>Receipt Print</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
                     <style>
+                        * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
                         @page { 
                             size: 80mm auto; 
                             margin: 0; 
@@ -183,7 +185,7 @@
                         body { 
                             margin: 0; 
                             padding: 0;
-                            font-family: "Courier New", monospace;
+                            font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                         }
                         .rec { 
                             width: 76mm; 

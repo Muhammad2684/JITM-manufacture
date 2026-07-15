@@ -251,6 +251,12 @@
         document.getElementById('discPct').addEventListener('input', calc);
         document.getElementById('discAmt').addEventListener('input', calc);
 
+        document.getElementById('cPhone').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); document.getElementById('cName').focus(); } });
+        document.getElementById('cName').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); if (document.getElementById('cPhone').value.trim() && this.value.trim()) document.getElementById('s').focus(); else document.getElementById('walkIn').focus(); } });
+        document.getElementById('walkIn').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); document.getElementById('s').focus(); } });
+        document.getElementById('s').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); var sel = document.querySelector('#cart select'); if (sel) { sel.focus(); sel.showPicker(); } else document.getElementById('am-cash').focus(); } });
+        document.getElementById('cart').addEventListener('keydown', function(e) { if (e.target.tagName === 'SELECT' && e.key === 'Tab') { e.preventDefault(); document.getElementById('am-cash').focus(); } });
+
         function highlight(items) { items.forEach(function (el, i) { el.classList.toggle('hl', i === hlIdx) }); var h = items[hlIdx]; if (h) h.scrollIntoView({ block: 'nearest' }); }
         function closeDropdown() { var g = document.getElementById('prods'); g.innerHTML = ''; g.style.display = 'none'; hlIdx = -1; }
         function toggleScanner() { scMode = !scMode; var b = document.getElementById('scBtn'); b.textContent = scMode ? 'Scanner On' : 'Scanner'; b.className = scMode ? 'btn btn-sm btn-p' : 'btn btn-sm'; if (scMode) document.getElementById('s').focus(); }
@@ -496,7 +502,7 @@
             iframeDoc.close();
         }
         window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
-        document.getElementById('s').focus();
+        document.getElementById('cPhone').focus();
         document.addEventListener('keydown', function (e) { var t = (e.target || {}).tagName; if (document.querySelector('.modal.show')) return; if (e.key === 'Enter') { var amtFlds = ['am-cash','am-jb','am-ahd','am-z','am-credit']; if (t !== 'INPUT' || amtFlds.includes(e.target.id)) { if (cart.length) pay(true); return; } } if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return; document.getElementById('s').focus(); });
         fetch('/api/employees').then(function (r) { return r.json() }).then(function (d) { staffList = d || []; if (!lastStaff && staffList.length) { lastStaff = staffList[0].id; cart.forEach(function (c) { if (!c.staff) c.staff = lastStaff; }); } renderC(); });
     </script>

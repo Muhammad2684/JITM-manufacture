@@ -83,6 +83,8 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: no
 
 [Code]
 function InitializeSetup(): Boolean;
+var
+  ResultCode: Integer;
 begin
   // Close the app if it's already running so its .exe can be overwritten
   // cleanly during an update - avoids "file in use" failures.
@@ -92,6 +94,8 @@ begin
 end;
 
 function InitializeUninstall(): Boolean;
+var
+  ResultCode: Integer;
 begin
   Exec('taskkill.exe', '/F /IM {#MyAppExeName} /T', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);

@@ -1,30 +1,31 @@
 <div class="sidebar">
     <div class="brand">JITM <span>POS</span></div>
-    <div class="sec">Main Menu</div>
-    {% for item in items %}
-        {% if item.subs is defined %}
-            {% set ns = namespace(sub_active=false) %}
-            {% for sub in item.subs %}
-                {% if active == sub.url or active.startswith(sub.url ~ '/') %}
-                    {% set ns.sub_active = true %}
-                {% endif %}
-            {% endfor %}
-            {% if item.url %}
-                {% set is_active = (active == item.url or active.startswith(item.url ~ '/')) %}
-                <div class="nav-group"><a href="{{ item.url }}" class="{{ 'active' if is_active else '' }}">{{ item.label }} <span class="arrow">{% if ns.sub_active %}&#9660;{% else %}&#9654;{% endif %}</span></a>
-            {% else %}
-                <div class="nav-group"><span class="group-heading" style="display:flex;align-items:center;gap:4px;padding:10px 16px;font-size:13px;font-weight:600;color:#9ca3af;cursor:pointer">{{ item.label }} <span class="arrow" style="margin-left:auto;font-size:10px">{% if ns.sub_active %}&#9660;{% else %}&#9654;{% endif %}</span></span>
-            {% endif %}
-            <div class="sub-group {{ 'show' if ns.sub_active else '' }}">
+    <div class="sidebar-scroll">
+        <div class="sec">Main Menu</div>
+        {% for item in items %}
+            {% if item.subs is defined %}
+                {% set ns = namespace(sub_active=false) %}
                 {% for sub in item.subs %}
-                    <a href="{{ sub.url }}" class="sub {{ 'active' if active == sub.url else '' }}"{{ ' target="_blank"' if '/create' in sub.url or '/inventory/barcode' in sub.url else '' }}>{{ sub.label }}</a>
+                    {% if active == sub.url or active.startswith(sub.url ~ '/') %}
+                        {% set ns.sub_active = true %}
+                    {% endif %}
                 {% endfor %}
-            </div></div>
-        {% else %}
-            <a href="{{ item.url }}" class="{{ 'active' if item.url == active else '' }}"{{ ' target="_blank"' if item.url == '/pos' else '' }}>{{ item.label }}</a>
-        {% endif %}
-    {% endfor %}
-    <div class="spacer"></div>
+                {% if item.url %}
+                    {% set is_active = (active == item.url or active.startswith(item.url ~ '/')) %}
+                    <div class="nav-group"><a href="{{ item.url }}" class="{{ 'active' if is_active else '' }}">{{ item.label }} <span class="arrow">{% if ns.sub_active %}&#9660;{% else %}&#9654;{% endif %}</span></a>
+                {% else %}
+                    <div class="nav-group"><span class="group-heading" style="display:flex;align-items:center;gap:4px;padding:10px 16px;font-size:13px;font-weight:600;color:#9ca3af;cursor:pointer">{{ item.label }} <span class="arrow" style="margin-left:auto;font-size:10px">{% if ns.sub_active %}&#9660;{% else %}&#9654;{% endif %}</span></span>
+                {% endif %}
+                <div class="sub-group {{ 'show' if ns.sub_active else '' }}">
+                    {% for sub in item.subs %}
+                        <a href="{{ sub.url }}" class="sub {{ 'active' if active == sub.url else '' }}"{{ ' target="_blank"' if '/create' in sub.url or '/inventory/barcode' in sub.url else '' }}>{{ sub.label }}</a>
+                    {% endfor %}
+                </div></div>
+            {% else %}
+                <a href="{{ item.url }}" class="{{ 'active' if item.url == active else '' }}"{{ ' target="_blank"' if item.url == '/pos' else '' }}>{{ item.label }}</a>
+            {% endif %}
+        {% endfor %}
+    </div>
     <div class="user"><span>{{ name }}</span><span class="role">{{ role }}</span></div>
     <a href="/logout" class="logout-btn" style="display:block;padding:12px 16px;color:#9ca3af;text-decoration:none;font-size:13px;border-top:1px solid #2a2c3e;text-align:center;">Logout</a>
 </div>

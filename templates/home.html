@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JITM POS</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{{sidebar|safe}}
+<div class="main">
+    <div class="topbar">
+        <h2>Home</h2>
+        <div class="actions">
+            <span class="text-muted">{{name}}</span>
+        </div>
+    </div>
+    <div class="content">
+        <div class="home-grid">
+            {% for p in pages %}
+            <a href="{{p.url}}" class="home-card">
+                <div class="home-icon">{{p.icon}}</div>
+                <div class="home-label">{{p.label}}</div>
+                <div class="home-desc">{{p.desc}}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<style>
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  padding: 24px 0;
+}
+.home-card {
+  background: #fcfbf8;
+  border: 1px solid #e2e1de;
+  border-radius: 10px;
+  padding: 24px 16px;
+  text-align: center;
+  text-decoration: none;
+  color: #1e293b;
+  transition: box-shadow .15s, transform .15s;
+  cursor: pointer;
+}
+.home-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+.home-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+  line-height: 1;
+}
+.home-label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.home-desc {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+</style>
+</body>
+</html>

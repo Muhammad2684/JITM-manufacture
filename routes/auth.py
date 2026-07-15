@@ -52,7 +52,8 @@ def permission_required(permission):
                             pass
             
             # No permission - return 403 page
-            return render_template('403.html', sidebar='', role=user_role, name=session.get('name', '')), 403
+            from app import render_sidebar as _rs
+            return render_template('403.html', sidebar=_rs('/'), role=user_role, name=session.get('name', '')), 403
         return wrap
     return decorator
 

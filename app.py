@@ -141,7 +141,7 @@ def render_sidebar(active_page):
                     user_permissions = []
     
     menu_items = [
-        {'url': '/', 'label': 'Dashboard', 'permission': 'dashboard'},
+        {'url': '/dashboard', 'label': 'Dashboard', 'permission': 'dashboard'},
         {'url': '/pos', 'label': 'POS', 'permission': 'pos'},
         {'label': 'Purchase', 'permission': 'purchase', 'subs': [
             {'url': '/suppliers', 'label': 'Suppliers'},
@@ -182,7 +182,7 @@ def render_sidebar(active_page):
     return render_template('sidebar.html', items=filtered_items, active=active_page, name=user_name, role=user_role)
 
 
-def render_page(template_name, active_page='/', **kwargs):
+def render_page(template_name, active_page='/dashboard', **kwargs):
     """Render a page template with sidebar and user context."""
     return render_template(
         template_name,
@@ -193,12 +193,57 @@ def render_page(template_name, active_page='/', **kwargs):
     )
 
 
-@app.route('/', strict_slashes=False)
+@app.route('/dashboard', strict_slashes=False)
 @login_required
 @permission_required('dashboard')
 def dashboard():
     """Display the main dashboard."""
-    return render_page('dashboard.html', '/')
+    return render_page('dashboard.html', '/dashboard')
+
+
+@app.route('/', strict_slashes=False)
+@login_required
+def home():
+    """Display the navigation home page."""
+    user_role = session.get('role')
+    user_id = session.get('user_id')
+
+    user_permissions = []
+    if user_role == 'manager':
+        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary', 'payroll', 'reports', 'settings']
+    elif user_id:
+        from database import get_db
+        import json
+        with get_db() as db:
+            user = db.execute('SELECT permissions FROM users WHERE id=?', (user_id,)).fetchone()
+            if user and user['permissions']:
+                try:
+                    user_permissions = json.loads(user['permissions'])
+                except Exception:
+                    user_permissions = []
+
+    nav_pages = [
+        {'url': '/dashboard', 'label': 'Dashboard', 'icon': '📊', 'desc': 'Sales stats, charts and overview', 'permission': 'dashboard'},
+        {'url': '/pos', 'label': 'POS', 'icon': '🛒', 'desc': 'Point of Sale terminal', 'permission': 'pos'},
+        {'url': '/suppliers', 'label': 'Purchases', 'icon': '📦', 'desc': 'Suppliers, invoices & returns', 'permission': 'purchase'},
+        {'url': '/customers', 'label': 'Sales', 'icon': '🧾', 'desc': 'Customers, invoices & receipts', 'permission': 'sales'},
+        {'url': '/inventory', 'label': 'Inventory', 'icon': '📋', 'desc': 'Products, categories & barcodes', 'permission': 'inventory'},
+        {'url': '/accounts', 'label': 'Accounts', 'icon': '💰', 'desc': 'Cash & bank accounts', 'permission': 'accounts'},
+        {'url': '/staff', 'label': 'Staff', 'icon': '👥', 'desc': 'User accounts management', 'permission': 'staff'},
+        {'url': '/payroll', 'label': 'Payroll', 'icon': '💳', 'desc': 'Employee salaries & commission', 'permission': 'payroll'},
+        {'url': '/reports', 'label': 'Reports', 'icon': '📈', 'desc': 'Sales and business reports', 'permission': 'reports'},
+        {'url': '/summary', 'label': 'Summary', 'icon': '📄', 'desc': 'Business performance summary', 'permission': 'summary'},
+        {'url': '/data-management', 'label': 'Settings', 'icon': '⚙️', 'desc': 'Data backup & management', 'permission': 'settings'},
+    ]
+
+    visible = [p for p in nav_pages if p['permission'] in user_permissions]
+
+    return render_template('home.html',
+        role=user_role,
+        name=session.get('name'),
+        sidebar=render_sidebar('/home'),
+        pages=visible
+    )
 
 
 @app.route('/pos', strict_slashes=False)

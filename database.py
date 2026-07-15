@@ -30,7 +30,40 @@ import sys
 from werkzeug.security import generate_password_hash
 
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
+    # Packaged app: keep the database in per-user AppData, NOT next to the
+    # .exe. Folders under Program Files (a) usually need admin rights to
+    # write to and (b) get wiped by the uninstaller on uninstall/reinstall,
+    # which is why data wasn't surviving before.
+    _LEGACY_DIR = os.path.dirname(sys.executable)
+    BASE_DIR = os.path.join(
+        os.environ.get('LOCALAPPDATA', _LEGACY_DIR), 'JITM POS'
+    )
+    os.makedirs(BASE_DIR, exist_ok=True)
+
+    # One-time migration: if an older build left data next to the .exe,
+    # copy it into the new AppData location the first time this runs so
+    # existing installs don't appear to "lose" their data.
+    _legacy_db = os.path.join(_LEGACY_DIR, 'jitm.db')
+    _new_db = os.path.join(BASE_DIR, 'jitm.db')
+    if os.path.exists(_legacy_db) and not os.path.exists(_new_db):
+        try:
+            import shutil as _shutil
+            _shutil.copy2(_legacy_db, _new_db)
+            for _ext in ('-wal', '-shm'):
+                if os.path.exists(_legacy_db + _ext):
+                    _shutil.copy2(_legacy_db + _ext, _new_db + _ext)
+        except Exception:
+            pass
+
+    _legacy_cfg = os.path.join(_LEGACY_DIR, 'instance', 'db_config.json')
+    _new_cfg = os.path.join(BASE_DIR, 'instance', 'db_config.json')
+    if os.path.exists(_legacy_cfg) and not os.path.exists(_new_cfg):
+        try:
+            import shutil as _shutil
+            os.makedirs(os.path.dirname(_new_cfg), exist_ok=True)
+            _shutil.copy2(_legacy_cfg, _new_cfg)
+        except Exception:
+            pass
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

@@ -53,23 +53,23 @@ jobs:
             --icon "static\icon.ico" ^
             app.py
 
-      - name: Install NSIS
+      - name: Install Inno Setup
         run: |
-          choco install nsis -y
+          choco install innosetup -y
 
       - name: Build installer
         shell: cmd
         run: |
-          "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: JITM-POS-Installer
-          path: "*.exe"
+          path: "installer_output\\*.exe"
 
       - name: Upload to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: "*.exe"
+          files: "installer_output\\*.exe"

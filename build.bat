@@ -46,5 +46,26 @@ if %errorlevel% neq 0 (
 echo === Build complete ===
 echo Executable: dist\JITM.exe
 echo.
-echo To create an installer, run: makensis installer.nsi
+
+echo === Building installer ===
+set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+if not exist "%ISCC%" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+if not exist "%ISCC%" (
+    echo Inno Setup not found. Install it from https://jrsoftware.org/isdl.php
+    echo then re-run this script, or run manually:
+    echo   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+    pause
+    exit /b 1
+)
+
+"%ISCC%" installer.iss
+if %errorlevel% neq 0 (
+    echo Installer build failed!
+    pause
+    exit /b %errorlevel%
+)
+
+echo.
+echo === All done ===
+echo Installer: installer_output\JITM-POS-Setup-*.exe
 pause

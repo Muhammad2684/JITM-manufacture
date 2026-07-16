@@ -97,6 +97,7 @@
             <div class="search">
                 <input id="s" placeholder="Search receipts..." oninput="currentPage=1;load()">
             </div>
+            <div class="pagination" id="pagination-top"></div>
             <div class="table-wrap">
                 <table>
                     <thead>
@@ -230,7 +231,9 @@
         function renderPagination() {
             var pag = document.getElementById('pagination');
             if (totalPages <= 1) {
-                pag.innerHTML = '<button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
+                var sa = '<button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
+                pag.innerHTML = sa;
+                document.getElementById('pagination-top').innerHTML = sa;
                 return;
             }
             
@@ -244,6 +247,7 @@
             html += '</div>';
             html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             pag.innerHTML = html;
+            document.getElementById('pagination-top').innerHTML = html;
         }
         
         function render(l) {

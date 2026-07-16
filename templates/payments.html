@@ -9,6 +9,7 @@
     <div class="topbar"><h2>Payments</h2><div class="actions">{% if role=='manager' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Payment</button>{% endif %}<span class="text-muted">{{name}}</span></div></div>
     <div class="content">
         <div class="search"><input id="s" placeholder="Search payments..." oninput="currentPage=1;load()"></div>
+        <div class="pagination" id="pagination-top"></div>
         <div class="table-wrap"><table><thead><tr><th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th><th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Date <span id="si1"></span></th><th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Paid To <span id="si2"></span></th><th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Account <span id="si3"></span></th><th onclick="sortCol(4)" style="cursor:pointer;user-select:none">Ref Invoice <span id="si4"></span></th><th onclick="sortCol(5)" style="cursor:pointer;user-select:none">Description <span id="si5"></span></th><th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Amount <span id="si6"></span></th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
         <div class="pagination" id="pagination"></div>
         <div style="margin-top:12px;text-align:right"><button class="btn btn-sm btn-print" onclick="printTable()">Print</button></div>
@@ -68,7 +69,9 @@ function goToPage(p) {
 function renderPagination() {
     var pag = document.getElementById('pagination');
     if (totalPages <= 1) {
-        pag.innerHTML = '<button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
+        var sa = '<button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
+        pag.innerHTML = sa;
+        document.getElementById('pagination-top').innerHTML = sa;
         return;
     }
     
@@ -82,6 +85,7 @@ function renderPagination() {
     html += '</div>';
     html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
     pag.innerHTML = html;
+    document.getElementById('pagination-top').innerHTML = html;
 }
 function render(l){
     document.getElementById('tb').innerHTML=l.map(function(x,i){var p=x.party_name||(x.party_type==='other'?'Other':x.party_type);var plink='';if(x.party_type==='customer'||x.party_type==='supplier'){plink='<a href="/ledger/'+x.party_type+'/'+x.party_id+'" style="text-decoration:none;color:inherit">'+p+'</a>';}else{plink=p;}return'<tr><td style="color:#6b7280;font-size:12px">'+((currentPage - 1) * perPage + i + 1)+'</td><td>'+x.date+'</td><td>'+plink+'</td><td>'+x.account_name+'</td><td>'+(x.reference_label||'')+'</td><td>'+(x.description||'')+'</td><td class="text-right"><span class="bdg bdg-pay">Rs '+x.amount.toFixed(2)+'</span></td><td>'+({{role|tojson}}=='manager'?'<button class="btn btn-xs btn-ghost" onclick="showEdit('+x.id+')">Edit</button><button class="btn btn-xs btn-ghost" onclick="del('+x.id+')">Delete</button>':'')+'</td></tr>';}).join('');

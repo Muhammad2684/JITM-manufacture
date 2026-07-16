@@ -49,6 +49,7 @@
                 <input type="date" id="dt" onchange="load(1)" style="width:140px">
                 <button class="btn btn-sm" onclick="clearDates()">Clear</button>
             </div>
+            <div class="pagination" id="pagination-top"></div>
             <div class="table-wrap">
                 <table>
                     <thead>
@@ -227,6 +228,7 @@
             }
             html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             document.getElementById('pagination').innerHTML = html;
+            document.getElementById('pagination-top').innerHTML = html;
         }
         
         function render(l) {

@@ -34,6 +34,7 @@
             <div class="search">
                 <input id="s" placeholder="Search customers..." oninput="load()">
             </div>
+            <div class="pagination" id="pagination-top"></div>
             <div class="table-wrap">
                 <table>
                     <thead>
@@ -171,6 +172,7 @@
             }
             html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             document.getElementById('pagination').innerHTML = html;
+            document.getElementById('pagination-top').innerHTML = html;
         }
         
         function render(l) {

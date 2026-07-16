@@ -96,14 +96,13 @@
     
     <script>
         var editing = null;
-        var currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
+        var currentPage = 1, totalPages = 1, perPage = 50;
         
         load();
         
         function load(page) {
             if (page) currentPage = page;
-            var limit = showAll ? 100000 : perPage;
-            fetch('/api/staff?page=' + currentPage + '&per_page=' + limit)
+            fetch('/api/staff?page=' + currentPage + '&per_page=' + perPage)
                 .then(r => r.json())
                 .then(d => {
                     var staffList = d.items || d;
@@ -113,11 +112,6 @@
                 });
         }
         
-        function toggleShowAll() {
-            showAll = !showAll;
-            currentPage = 1;
-            load();
-        }
         function goToPage(p) {
             p = parseInt(p);
             if (p >= 1 && p <= totalPages) load(p);
@@ -125,9 +119,8 @@
         function renderPagination() {
             var pag = document.getElementById('pagination');
             if (totalPages <= 1) {
-                var sa = '<button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
-                pag.innerHTML = sa;
-                document.getElementById('pagination-top').innerHTML = sa;
+                pag.innerHTML = '';
+                document.getElementById('pagination-top').innerHTML = '';
                 return;
             }
             
@@ -139,7 +132,6 @@
             html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Next ›</button>';
             html += '<button class="btn btn-sm" onclick="load(' + totalPages + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Last »</button>';
             html += '</div>';
-            html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             pag.innerHTML = html;
             document.getElementById('pagination-top').innerHTML = html;
         }

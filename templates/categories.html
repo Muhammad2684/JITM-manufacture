@@ -11,7 +11,7 @@
         <div class="topbar">
             <h2>Categories</h2>
             <div class="actions">
-                {% if role == 'manager' %}
+                {% if role == 'manager' or role == 'owner' %}
                     <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Category</button>
                 {% endif %}
                 <span class="text-muted">{{name}}</span>
@@ -73,7 +73,7 @@
                 '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
                 '<td>' + c.name + '</td>' +
                 '<td style="color:#6b7280;font-size:13px">' + (c.created_at || '').slice(0, 10) + '</td>' +
-                '<td>' + ({{role|tojson}} == 'manager' ? 
+                '<td>' + ({{role|tojson}} == 'manager' || {{role|tojson}} == 'owner' ? 
                     '<button class="btn btn-xs btn-ghost" onclick="del(' + c.id + ')">Delete</button>' : '') +
                 '</td>' +
                 '</tr>'

@@ -11,7 +11,7 @@
         <div class="topbar">
             <h2>Cash & Bank Accounts</h2>
             <div class="actions">
-                {% if role == 'manager' %}
+                {% if role == 'manager' or role == 'owner' %}
                     <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Account</button>
                 {% endif %}
                 <span class="text-muted">{{name}}</span>
@@ -144,7 +144,7 @@
                 '<td style="font-weight:600"><a href="/ledger/account/' + a.id + '" style="text-decoration:none;color:inherit">' + a.name + '</a></td>' +
                 '<td><span class="bdg bdg-' + (a.type === 'bank' ? 'ok' : 'warn') + '">' + a.type + '</span></td>' +
                 '<td class="text-right">Rs ' + a.balance.toFixed(2) + '</td>' +
-                '<td>' + ({{role|tojson}} == 'manager' ? 
+                '<td>' + ({{role|tojson}} == 'manager' || {{role|tojson}} == 'owner' ? 
                     '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + a.id + ')">Edit</button>' +
                     '<button class="btn btn-xs btn-ghost" onclick="del(' + a.id + ')">Delete</button>' : '') +
                 '</td>' +

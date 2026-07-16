@@ -11,7 +11,7 @@
         <div class="topbar">
             <h2>Staff</h2>
             <div class="actions">
-                {% if role == 'manager' %}
+                {% if role == 'manager' or role == 'owner' %}
                     <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Account</button>
                 {% endif %}
                 <span class="text-muted">{{name}}</span>
@@ -41,6 +41,7 @@
                 <select id="sr">
                     <option value="staff">Staff</option>
                     <option value="manager">Manager</option>
+                    <option value="owner">Owner</option>
                 </select>
                 <label>Permissions</label>
                 <div id="permissions-container" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
@@ -151,7 +152,7 @@
                 var permStr = perms.length ? perms.join(', ') : 'None';
                 
                 var deleteBtn = '';
-                {% if role == 'manager' %}
+                {% if role == 'manager' or role == 'owner' %}
                 if (s.id !== currentUserId) {
                     deleteBtn = '<button class="btn btn-xs btn-ghost" onclick="del(' + s.id + ')" style="color:#dc2626">Delete</button>';
                 }
@@ -160,13 +161,13 @@
                 return '<div class="sc">' +
                 '<div class="sh">' +
                 '<h3>' + s.name + '</h3>' +
-                '<span class="bdg bdg-' + (s.role === 'manager' ? 'info' : 'ok') + '">' + s.role + '</span>' +
+                '<span class="bdg bdg-' + (s.role === 'manager' || s.role === 'owner' ? 'info' : 'ok') + '">' + s.role + '</span>' +
                 (s.active ? '' : '<span class="bdg bdg-err">Inactive</span>') +
                 '</div>' +
                 '<div class="sm">@' + s.username + (s.nick_name ? ' (' + s.nick_name + ')' : '') + '</div>' +
                 '<div class="sm" style="font-size:11px;color:#6b7280">Permissions: ' + permStr + '</div>' +
                 '<div class="sa">' +
-                '{% if role == "manager" %}' +
+                '{% if role == "manager" or role == "owner" %}' +
                 '<button class="btn btn-xs btn-ghost" onclick="analytics(' + s.id + ')">Analytics</button> ' +
                 '<button class="btn btn-xs" onclick="edit(' + s.id + ')">Edit</button> ' +
                 deleteBtn +

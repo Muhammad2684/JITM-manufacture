@@ -126,8 +126,7 @@ def render_sidebar(active_page):
     
     # Get user permissions
     user_permissions = []
-    if user_role == 'manager':
-        # Managers have all permissions
+    if user_role in ('manager', 'owner'):
         user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary', 'payroll', 'reports', 'settings']
     elif user_id:
         from database import get_db
@@ -209,7 +208,7 @@ def home():
     user_id = session.get('user_id')
 
     user_permissions = []
-    if user_role == 'manager':
+    if user_role in ('manager', 'owner'):
         user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary', 'payroll', 'reports', 'settings']
     elif user_id:
         from database import get_db
@@ -816,7 +815,7 @@ def ledger_page(entity_type, entity_id):
     user_id = session.get('user_id')
     
     has_permission = False
-    if user_role == 'manager':
+    if user_role in ('manager', 'owner'):
         has_permission = True
     elif user_id:
         from database import get_db

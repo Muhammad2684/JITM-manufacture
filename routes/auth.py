@@ -21,7 +21,7 @@ def login_required(f):
 def manager_required(f):
     @wraps(f)
     def wrap(*a, **kw):
-        if session.get('role') != 'manager':
+        if session.get('role') not in ('manager', 'owner'):
             return jsonify({'error': 'Manager access required'}), 403
         return f(*a, **kw)
     return wrap
@@ -35,8 +35,8 @@ def permission_required(permission):
             user_role = session.get('role')
             user_id = session.get('user_id')
             
-            # Managers have all permissions
-            if user_role == 'manager':
+            # Managers and owners have all permissions
+            if user_role in ('manager', 'owner'):
                 return f(*a, **kw)
             
             # Check user permissions
@@ -163,6 +163,11 @@ def api_delete_staff(sid):
             manager_count = db.execute('SELECT COUNT(*) as count FROM users WHERE role=?', ('manager',)).fetchone()['count']
             if manager_count <= 1:
                 return jsonify({'error': 'Cannot delete the last manager'}), 400
+
+        if user['role'] == 'owner':
+            owner_count = db.execute('SELECT COUNT(*) as count FROM users WHERE role=?', ('owner',)).fetchone()['count']
+            if owner_count <= 1:
+                return jsonify({'error': 'Cannot delete the last owner'}), 400
         
         db.execute('DELETE FROM users WHERE id=?', (sid,))
         return jsonify({'ok': True})

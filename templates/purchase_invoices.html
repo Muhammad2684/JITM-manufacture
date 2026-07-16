@@ -36,7 +36,7 @@
         <div class="topbar">
             <h2>Purchase Invoices</h2>
             <div class="actions">
-                {% if role == 'manager' %}
+                {% if role == 'manager' or role == 'owner' %}
                     <a class="btn btn-p btn-sm" href="/purchase-invoices/create" target="_blank">+ Add Invoice</a>
                 {% endif %}
                 <span class="text-muted">{{name}}</span>
@@ -245,7 +245,7 @@
                 '<td>' +
                 '<button class="btn btn-xs btn-ghost" onclick="viewPI(' + p.id + ')">View</button>' +
                 '<button class="btn btn-xs btn-ghost" onclick="window.open(\'/inventory/barcode?invoice_id=' + p.id + '\',\'_blank\')">Barcodes</button>' +
-                ({{role|tojson}} == 'manager' ? 
+                ({{role|tojson}} == 'manager' || {{role|tojson}} == 'owner' ? 
                     '<button class="btn btn-xs btn-ghost" onclick="window.open(\'/purchase-invoices/create?id=' + p.id + '\',\'_blank\')">Edit</button>' +
                     '<button class="btn btn-xs btn-ghost" onclick="del(' + p.id + ')">Delete</button>' : '') +
                 '</td>' +

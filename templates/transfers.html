@@ -84,7 +84,7 @@
         <div class="topbar">
             <h2>Inter Account Transfers</h2>
             <div class="actions">
-                {% if role == 'manager' %}
+                {% if role == 'manager' or role == 'owner' %}
                     <button class="btn btn-p btn-sm" onclick="showAdd()">+ New Transfer</button>
                 {% endif %}
                 <span class="text-muted">{{name}}</span>
@@ -222,7 +222,7 @@
                     '<td><span class="bdg bdg-in">' + x.to_name + '</span></td>' +
                     '<td class="text-right">Rs ' + x.amount.toFixed(2) + '</td>' +
                     '<td>' + (x.note || '') + '</td>' +
-                    '<td>' + ({{role|tojson}} == 'manager' ? 
+                    '<td>' + ({{role|tojson}} == 'manager' || {{role|tojson}} == 'owner' ? 
                         '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + x.id + ')">Edit</button> ' +
                         '<button class="btn btn-xs btn-ghost" onclick="del(' + x.id + ')">Delete</button>' : '') +
                     '</td>' +

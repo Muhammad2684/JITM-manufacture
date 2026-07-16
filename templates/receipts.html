@@ -87,7 +87,7 @@
         <div class="topbar">
             <h2>Receipts</h2>
             <div class="actions">
-                {% if role == 'manager' %}
+                {% if role == 'manager' or role == 'owner' %}
                     <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Receipt</button>
                 {% endif %}
                 <span class="text-muted">{{name}}</span>
@@ -268,7 +268,7 @@
                     '<td>' + (x.reference_label || '') + '</td>' +
                     '<td>' + (x.description || '') + '</td>' +
                     '<td class="text-right"><span class="bdg bdg-rec">Rs ' + x.amount.toFixed(2) + '</span></td>' +
-                    '<td>' + ({{role|tojson}} == 'manager' ? 
+                    '<td>' + ({{role|tojson}} == 'manager' || {{role|tojson}} == 'owner' ? 
                         '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + x.id + ')">Edit</button>' +
                         '<button class="btn btn-xs btn-ghost" onclick="del(' + x.id + ')">Delete</button>' : '') +
                     '</td>' +

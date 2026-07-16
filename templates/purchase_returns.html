@@ -11,7 +11,7 @@
         <div class="topbar">
             <h2>Purchase Returns</h2>
             <div class="actions">
-                {% if role == 'manager' %}<button class="btn btn-p btn-sm" onclick="window.open('/purchase-returns/create','_blank')">+ New Return</button>{% endif %}
+                {% if role == 'manager' or role == 'owner' %}<button class="btn btn-p btn-sm" onclick="window.open('/purchase-returns/create','_blank')">+ New Return</button>{% endif %}
                 <span class="text-muted">{{name}}</span>
             </div>
         </div>
@@ -108,7 +108,7 @@
             });
             document.getElementById('tb').innerHTML = filtered.map(function(p, idx) {
                 return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + idx + 1) + '</td><td><a href="/purchase-returns/' + p.id + '" style="text-decoration:none;color:inherit;font-weight:600">' + p.return_no + '</a></td><td>' + (p.return_date || '') + '</td><td>' + (p.supplier_name || '-') + '</td><td class="text-right">Rs ' + (p.total_amount || 0).toFixed(2) + '</td>' +
-                    '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.return_no.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>';
+                    '<td>' + (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.return_no.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>';
             }).join('');
             var tot = 0;
             filtered.forEach(function(p) { tot += p.total_amount || 0; });

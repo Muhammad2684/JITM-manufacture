@@ -13,7 +13,7 @@
         <div class="topbar">
             <h2>Inventory</h2>
             <div class="actions">
-                {% if role == 'manager' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ New Product</button>
+                {% if role == 'manager' or role == 'owner' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ New Product</button>
                 <button class="btn btn-sm" onclick="showImport()">Import</button>
                 <button class="btn btn-sm" onclick="showRestock()">Restock Log</button>{% endif %}
                 <button class="btn btn-sm" onclick="showLow()">Low Stock</button> <button class="btn btn-sm"
@@ -248,14 +248,14 @@
                 let vh = ''; if (p.variants && p.variants.length) {
                     const vc = p.cost_price || 0; vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="12" style="padding:6px 14px 8px;background:#f8f7f4">' +
                         p.variants.map(v => '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px"><span style="width:95px">' + (v.size || '-') + ' / ' + (v.color || '-') + '</span><span style="width:80px;color:#6b7280">' + v.sku + '</span><span style="width:45px;text-align:right" class="' + (v.stock <= p.low_stock ? 'bdg bdg-err' : '') + '">' + v.stock + '</span><span style="width:70px">' + (v.barcode ? '<code>' + v.barcode + '</code>' : '-') + '</span><span style="width:65px;font-weight:600;text-align:right">Rs ' + (v.price || p.base_price).toFixed(2) + '</span><span style="width:60px;text-align:right">Rs ' + vc.toFixed(2) + '</span><span style="width:65px;text-align:right;color:#6b7280">' + (p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '- -') + '</span><span style="width:65px;text-align:right;color:#374151">Rs ' + (vc * v.stock).toFixed(2) + '</span>' +
-                            (ROLE == 'manager' ? '<button class="btn btn-xs" onclick="editStock(' + v.id + ')">Stock</button>' : '') + '</div>').join('') + '</td></tr>';
+                            (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs" onclick="editStock(' + v.id + ')">Stock</button>' : '') + '</div>').join('') + '</td></tr>';
                 }
         const arrow = p.has_variants ? '<span onclick="toggleV(' + p.id + ')" style="cursor:pointer;font-size:10px;color:#9ca3af;margin-right:6px;user-select:none" id="a-' + p.id + '">&#9654;</span> ' : '';
         const tc = p.cost_price * p.total_stock;
         const lc = p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>';
         const psize = (p.variants && p.variants[0] && p.variants[0].size) || '-';
         return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + idx + 1) + '</td><td style="font-weight:600">' + arrow + '<a href="/ledger/product/'+p.id+'" style="text-decoration:none;color:inherit">'+p.name+'</a></td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (p.supplier_name || '-') + '</td>' +
-            '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>' + vh;}).join('');
+            '<td>' + (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>' + vh;}).join('');
     var totStock=0,totCost=0;
     l.forEach(function(p){totStock+=p.total_stock||0;totCost+=(p.cost_price||0)*(p.total_stock||0);});
     document.getElementById('tf').innerHTML='<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td><td></td></tr>';}

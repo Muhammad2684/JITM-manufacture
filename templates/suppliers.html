@@ -11,7 +11,7 @@
         <div class="topbar">
             <h2>Suppliers</h2>
             <div class="actions">
-                {% if role == 'manager' %}
+                {% if role == 'manager' or role == 'owner' %}
                     <button class="btn btn-p btn-sm" onclick="showAdd()">+ Add Supplier</button>
                     <button class="btn btn-sm" onclick="showImport()">Import</button>
                 {% endif %}
@@ -199,7 +199,7 @@
                 '<td>' + (s.company_phone || '-') + '</td>' +
                 '<td>' + (s.address || '-') + '</td>' +
                 '<td>Rs ' + s.balance.toFixed(2) + '</td>' +
-                '<td>' + ({{role|tojson}} == 'manager' ? 
+                '<td>' + ({{role|tojson}} == 'manager' || {{role|tojson}} == 'owner' ? 
                     '<button class="btn btn-xs btn-ghost" onclick="showEdit(' + s.id + ')">Edit</button>' +
                     '<button class="btn btn-xs btn-ghost" onclick="del(' + s.id + ')">Delete</button>' : '') +
                 '</td>' +

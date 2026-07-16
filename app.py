@@ -127,7 +127,7 @@ def render_sidebar(active_page):
     # Get user permissions
     user_permissions = []
     if user_role in ('manager', 'owner'):
-        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary', 'payroll', 'reports', 'settings']
+        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'payroll', 'reports', 'settings']
     elif user_id:
         from database import get_db
         import json
@@ -209,7 +209,7 @@ def home():
 
     user_permissions = []
     if user_role in ('manager', 'owner'):
-        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'summary', 'payroll', 'reports', 'settings']
+        user_permissions = ['dashboard', 'pos', 'purchase', 'sales', 'inventory', 'accounts', 'staff', 'payroll', 'reports', 'settings']
     elif user_id:
         from database import get_db
         import json

@@ -159,12 +159,13 @@
     
     <script>
         var list = [], sortIdx = -1, sortDir = 1, editId = null, accts = [];
-        var currentPage = 1, totalPages = 1, perPage = 50;
+        var currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
         
         function load(page) {
             if (page) currentPage = page;
             var q = document.getElementById('s').value.toLowerCase();
-            fetch('/api/account-transfers?page=' + currentPage + '&per_page=' + perPage)
+            var limit = showAll ? 100000 : perPage;
+            fetch('/api/account-transfers?page=' + currentPage + '&per_page=' + limit)
                 .then(r => r.json())
                 .then(d => {
                     list = d.items || d;
@@ -180,10 +181,15 @@
                 });
         }
         
+        function toggleShowAll() {
+            showAll = !showAll;
+            currentPage = 1;
+            load();
+        }
         function renderPagination() {
             var pag = document.getElementById('pagination');
             if (totalPages <= 1) {
-                pag.innerHTML = '';
+                pag.innerHTML = '<button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
                 return;
             }
             
@@ -194,6 +200,7 @@
             html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Next ›</button>';
             html += '<button class="btn btn-sm" onclick="load(' + totalPages + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>Last »</button>';
             html += '</div>';
+            html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             pag.innerHTML = html;
         }
         

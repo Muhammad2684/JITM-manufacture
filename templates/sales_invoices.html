@@ -74,7 +74,7 @@
         </div>
     </div>
     <script>
-        var allSales = [], sortIdx = -1, sortDir = 1, currentPage = 1, totalPages = 1;
+        var allSales = [], sortIdx = -1, sortDir = 1, currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
         function statusBadge(s) {
             if (s === 'Paid') return '<span class="bdg bdg-ok">Paid</span>';
             if (s === 'Partial') return '<span class="bdg bdg-warn">Partial</span>';
@@ -102,7 +102,7 @@
             var df = document.getElementById('df').value;
             var dt = document.getElementById('dt').value;
             currentPage = page || 1;
-            var url = '/api/sales?q=' + encodeURIComponent(q) + '&page=' + currentPage + '&per_page=50';
+            var url = '/api/sales?q=' + encodeURIComponent(q) + '&page=' + currentPage + '&per_page=' + (showAll ? 100000 : perPage);
             if (df) url += '&date_from=' + df;
             if (dt) url += '&date_to=' + dt;
             fetch(url)
@@ -120,6 +120,11 @@
             document.getElementById('dt').value = '';
             load(1);
         }
+        function toggleShowAll() {
+            showAll = !showAll;
+            currentPage = 1;
+            load();
+        }
         function renderPagination() {
             var html = '';
             if (totalPages > 1) {
@@ -127,12 +132,13 @@
                 html += '<span style="margin:0 12px;color:#6b7280;font-size:13px">Page ' + currentPage + ' of ' + totalPages + '</span>';
                 html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
             }
+            html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             document.getElementById('pagination').innerHTML = html;
         }
         function render(l) {
             try {
                 document.getElementById('tb').innerHTML = l.map(function (s, i) {
-                    return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + i + 1) + '</td><td style="font-weight:600">' + (s.receipt || '') + '</td>'
+                    return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + i + 1) + '</td><td style="font-weight:600">' + (s.receipt || '') + '</td>'
                         + '<td>' + ((s.created_at || '')).slice(0, 16) + '</td>'
                         + '<td>' + (s.customer_name ? '<a href="/ledger/customer/' + s.customer_id + '" style="text-decoration:none;color:inherit">' + s.customer_name + '</a>' : '-') + '</td>'
                         + '<td class="text-right">' + ((s.items && s.items.length) || 0) + '</td>'

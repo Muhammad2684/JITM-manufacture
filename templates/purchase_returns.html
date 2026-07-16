@@ -51,17 +51,22 @@
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
-        var all = [], sortIdx = -1, sortDir = 1, deleteId = null, currentPage = 1, totalPages = 1;
+        var all = [], sortIdx = -1, sortDir = 1, deleteId = null, currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
         load();
         function load(page) {
             const q = document.getElementById('s').value;
             currentPage = page || 1;
-            fetch('/api/purchase-returns?page=' + currentPage + '&per_page=50').then(r => r.json()).then(d => {
+            fetch('/api/purchase-returns?page=' + currentPage + '&per_page=' + (showAll ? 100000 : perPage)).then(r => r.json()).then(d => {
                 all = d.items || [];
                 totalPages = d.total_pages || 1;
                 render(all);
                 renderPagination();
             });
+        }
+        function toggleShowAll() {
+            showAll = !showAll;
+            currentPage = 1;
+            load();
         }
         function renderPagination() {
             var html = '';
@@ -70,6 +75,7 @@
                 html += '<span style="margin:0 12px;color:#6b7280;font-size:13px">Page ' + currentPage + ' of ' + totalPages + '</span>';
                 html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
             }
+            html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             document.getElementById('pagination').innerHTML = html;
         }
         function sortCol(i) {
@@ -92,7 +98,7 @@
                 return !q || (p.return_no || '').toLowerCase().includes(q) || (p.supplier_name || '').toLowerCase().includes(q);
             });
             document.getElementById('tb').innerHTML = filtered.map(function(p, idx) {
-                return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + idx + 1) + '</td><td><a href="/purchase-returns/' + p.id + '" style="text-decoration:none;color:inherit;font-weight:600">' + p.return_no + '</a></td><td>' + (p.return_date || '') + '</td><td>' + (p.supplier_name || '-') + '</td><td class="text-right">Rs ' + (p.total_amount || 0).toFixed(2) + '</td>' +
+                return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + idx + 1) + '</td><td><a href="/purchase-returns/' + p.id + '" style="text-decoration:none;color:inherit;font-weight:600">' + p.return_no + '</a></td><td>' + (p.return_date || '') + '</td><td>' + (p.supplier_name || '-') + '</td><td class="text-right">Rs ' + (p.total_amount || 0).toFixed(2) + '</td>' +
                     '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.return_no.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>';
             }).join('');
             var tot = 0;

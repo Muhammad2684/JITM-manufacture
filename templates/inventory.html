@@ -183,12 +183,12 @@
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
-        var editing = null, avId = null, svId = null, all = [], sortIdx = -1, sortDir = 1, catList = [], ccList = [], sizeList = [], supList = [], currentPage = 1, totalPages = 1;
+        var editing = null, avId = null, svId = null, all = [], sortIdx = -1, sortDir = 1, catList = [], ccList = [], sizeList = [], supList = [], currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
         load();
         function load(page) {
             const q = document.getElementById('s').value;
             currentPage = page || 1;
-            fetch('/api/products?q=' + encodeURIComponent(q) + '&page=' + currentPage + '&per_page=50').then(r => r.json()).then(d => { 
+            fetch('/api/products?q=' + encodeURIComponent(q) + '&page=' + currentPage + '&per_page=' + (showAll ? 100000 : perPage)).then(r => r.json()).then(d => { 
                 all = d.items || []; 
                 totalPages = d.total_pages || 1;
                 render(all); 
@@ -199,6 +199,11 @@
             fetch('/api/sizes').then(r => r.json()).then(d => { sizeList = d; });
             fetch('/api/suppliers?per_page=1000').then(r => r.json()).then(d => { supList = d.items || d; });
         }
+        function toggleShowAll() {
+            showAll = !showAll;
+            currentPage = 1;
+            load();
+        }
         function renderPagination() {
             var html = '';
             if (totalPages > 1) {
@@ -206,6 +211,7 @@
                 html += '<span style="margin:0 12px;color:#6b7280;font-size:13px">Page ' + currentPage + ' of ' + totalPages + '</span>';
                 html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
             }
+            html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             document.getElementById('pagination').innerHTML = html;
         }
         function sortCol(i){
@@ -239,7 +245,7 @@
         const tc = p.cost_price * p.total_stock;
         const lc = p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>';
         const psize = (p.variants && p.variants[0] && p.variants[0].size) || '-';
-        return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + idx + 1) + '</td><td style="font-weight:600">' + arrow + '<a href="/ledger/product/'+p.id+'" style="text-decoration:none;color:inherit">'+p.name+'</a></td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (p.supplier_name || '-') + '</td>' +
+        return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + idx + 1) + '</td><td style="font-weight:600">' + arrow + '<a href="/ledger/product/'+p.id+'" style="text-decoration:none;color:inherit">'+p.name+'</a></td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (p.supplier_name || '-') + '</td>' +
             '<td>' + (ROLE == 'manager' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>' + vh;}).join('');
     var totStock=0,totCost=0;
     l.forEach(function(p){totStock+=p.total_stock||0;totCost+=(p.cost_price||0)*(p.total_stock||0);});

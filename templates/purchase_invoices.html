@@ -138,7 +138,7 @@
     </div>
     
     <script>
-        var piList = [], sortIdx = -1, sortDir = 1, editId = null, suppliers = [], currentPage = 1, totalPages = 1;
+        var piList = [], sortIdx = -1, sortDir = 1, editId = null, suppliers = [], currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
         
         function statusBadge(s) {
             if (s === 'Paid') return '<span class="bdg bdg-ok">Paid</span>';
@@ -182,7 +182,7 @@
             var df = document.getElementById('df').value;
             var dt = document.getElementById('dt').value;
             currentPage = page || 1;
-            var url = '/api/purchase-invoices?page=' + currentPage + '&per_page=50';
+            var url = '/api/purchase-invoices?page=' + currentPage + '&per_page=' + (showAll ? 100000 : perPage);
             if (df) url += '&date_from=' + df;
             if (dt) url += '&date_to=' + dt;
             fetch(url)
@@ -206,6 +206,11 @@
             load(1);
         }
         
+        function toggleShowAll() {
+            showAll = !showAll;
+            currentPage = 1;
+            load();
+        }
         function renderPagination() {
             var html = '';
             if (totalPages > 1) {
@@ -213,13 +218,14 @@
                 html += '<span style="margin:0 12px;color:#6b7280;font-size:13px">Page ' + currentPage + ' of ' + totalPages + '</span>';
                 html += '<button class="btn btn-sm" onclick="load(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
             }
+            html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
             document.getElementById('pagination').innerHTML = html;
         }
         
         function render(l) {
             document.getElementById('tb').innerHTML = l.map((p, i) => 
                 '<tr>' +
-                '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * 50 + i + 1) + '</td>' +
+                '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + i + 1) + '</td>' +
                 '<td style="font-weight:600">' + p.invoice_no + '</td>' +
                 '<td>' + (p.issue_date || '') + '</td>' +
                 '<td>' + (p.supplier_name ? '<a href="/ledger/supplier/' + p.supplier_id + '" style="text-decoration:none;color:inherit">' + p.supplier_name + '</a>' : '-') + '</td>' +

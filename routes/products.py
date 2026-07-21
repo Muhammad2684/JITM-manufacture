@@ -167,7 +167,7 @@ def update_product(pid):
 @login_required
 @manager_required
 def delete_product(pid):
-    """Delete a product if it has no sale or purchase invoice references."""
+    """Delete a product if it has no invoice or stock-log references."""
     with get_db() as db:
         sale_count = db.execute(
             'SELECT COUNT(DISTINCT s.id) as cnt FROM sales s '
@@ -179,15 +179,33 @@ def delete_product(pid):
             'JOIN purchase_invoice_items pii ON pii.invoice_id = pi.id WHERE pii.product_id=?',
             (pid,)
         ).fetchone()['cnt']
+        return_count = db.execute(
+            'SELECT COUNT(DISTINCT pr.id) as cnt FROM purchase_returns pr '
+            'JOIN purchase_return_items pri ON pri.return_id = pr.id WHERE pri.product_id=?',
+            (pid,)
+        ).fetchone()['cnt']
+        restock_count = db.execute(
+            'SELECT COUNT(*) as cnt FROM restock_log rl '
+            'JOIN variants v ON v.id = rl.variant_id WHERE v.product_id=?',
+            (pid,)
+        ).fetchone()['cnt']
 
-        if sale_count > 0 and purchase_count > 0:
-            return jsonify({'error': f'Cannot delete: product appears in {sale_count} sale(s) and {purchase_count} purchase invoice(s)'}), 400
+        refs = []
         if sale_count > 0:
-            return jsonify({'error': f'Cannot delete: product appears in {sale_count} sale(s)'}), 400
+            refs.append(f'{sale_count} sale(s)')
         if purchase_count > 0:
-            return jsonify({'error': f'Cannot delete: product appears in {purchase_count} purchase invoice(s)'}), 400
+            refs.append(f'{purchase_count} purchase invoice(s)')
+        if return_count > 0:
+            refs.append(f'{return_count} purchase return(s)')
+        if restock_count > 0:
+            refs.append(f'{restock_count} stock log entry(ies)')
+        if refs:
+            return jsonify({'error': 'Cannot delete: product appears in ' + ', '.join(refs)}), 400
 
-        db.execute('DELETE FROM products WHERE id=?', (pid,))
+        try:
+            db.execute('DELETE FROM products WHERE id=?', (pid,))
+        except Exception as e:
+            return jsonify({'error': 'Cannot delete: product is referenced by other records in the system.'}), 400
         return jsonify({'ok': True})
 
 

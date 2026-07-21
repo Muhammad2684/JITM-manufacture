@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JITM · Data Tools</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Data Tools</h2>
+            <div class="actions">
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">Bulk Operations</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:32px"><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
+                                <th>Entity</th>
+                                <th>Records</th>
+                                <th>Clear</th>
+                                <th>Import &amp; Replace</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tb"></tbody>
+                    </table>
+                </div>
+                <div style="padding:10px 14px;border-top:1px solid #e2e1de;display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-sm btn-d" onclick="clearSelected()">Clear Selected</button>
+                    <span id="status" style="font-size:12px;color:#6b7280"></span>
+                </div>
+            </div>
+
+            <div class="card" style="background:#fef9ee;border-color:#fde68a">
+                <div class="card-header" style="color:#92400e">Warning</div>
+                <div style="padding:14px;font-size:13px;color:#78350f">
+                    Clearing data removes all records from the selected entities. This action cannot be undone.
+                    Consider exporting your data first from the <a href="/data-management" style="color:#3b4fe2">Data Management</a> page.
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="modal" id="clearModal">
+        <div class="mc" style="max-width:450px">
+            <button class="mx" onclick="cl('clearModal')">&times;</button>
+            <h3>Clear Data</h3>
+            <p style="font-size:14px;color:#374151">Are you sure you want to clear all records from:</p>
+            <div id="clearList" style="font-weight:600;margin:8px 0 12px;font-size:14px"></div>
+            <p style="font-size:13px;color:#dc2626">This action cannot be undone!</p>
+            <div id="clearResult" style="display:none"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn" onclick="cl('clearModal')">Cancel</button>
+                <button class="btn btn-p" id="clearBtn" onclick="doClear()" style="background:#dc2626">Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="replaceModal">
+        <div class="mc" style="max-width:500px">
+            <button class="mx" onclick="cl('replaceModal')">&times;</button>
+            <h2 id="replaceTitle">Import &amp; Replace</h2>
+            <p style="font-size:13px;color:#6b7280;margin:6px 0 12px">
+                All existing records will be deleted and replaced with the data from your file.
+            </p>
+            <div id="replaceBody">
+                <form onsubmit="uploadReplace(event)">
+                    <input type="file" id="replaceFile" accept=".csv,.xlsx" required style="margin:8px 0">
+                    <button class="btn btn-p" type="submit" id="replaceBtn" style="background:#dc2626">Replace All</button>
+                </form>
+            </div>
+            <div id="replaceResult" style="display:none"></div>
+        </div>
+    </div>
+
+    <script>
+        var entities = [];
+        var replaceEntity = null;
+        var pendingClear = [];
+
+        function load() {
+            fetch('/api/data/entities')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    entities = d;
+                    render(d);
+                });
+        }
+
+        function render(l) {
+            var h = '';
+            for (var i = 0; i < l.length; i++) {
+                var e = l[i];
+                h += '<tr>' +
+                    '<td><input type="checkbox" class="entity-cb" value="' + e.id + '"></td>' +
+                    '<td><strong>' + e.label + '</strong></td>' +
+                    '<td style="color:#6b7280">' + e.count + '</td>' +
+                    '<td><button class="btn btn-xs btn-d" onclick="confirmClear(\'' + e.id + '\')">Clear</button></td>' +
+                    '<td><button class="btn btn-xs btn-p" onclick="showReplace(\'' + e.id + '\')" style="background:#dc2626">Replace</button></td>' +
+                    '</tr>';
+            }
+            document.getElementById('tb').innerHTML = h;
+        }
+
+        function toggleAll() {
+            var checked = document.getElementById('selectAll').checked;
+            var cbs = document.querySelectorAll('.entity-cb');
+            for (var i = 0; i < cbs.length; i++) {
+                cbs[i].checked = checked;
+            }
+        }
+
+        function getSelected() {
+            var ids = [];
+            var cbs = document.querySelectorAll('.entity-cb:checked');
+            for (var i = 0; i < cbs.length; i++) {
+                ids.push(cbs[i].value);
+            }
+            return ids;
+        }
+
+        function setStatus(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+
+        function confirmClear(eid) {
+            var ids = eid ? [eid] : getSelected();
+            if (ids.length === 0) {
+                setStatus('Select at least one entity to clear');
+                return;
+            }
+            pendingClear = ids;
+            var labels = [];
+            for (var i = 0; i < ids.length; i++) {
+                for (var j = 0; j < entities.length; j++) {
+                    if (entities[j].id === ids[i]) {
+                        labels.push(entities[j].label);
+                        break;
+                    }
+                }
+            }
+            document.getElementById('clearList').textContent = labels.join(', ');
+            document.getElementById('clearResult').style.display = 'none';
+            document.getElementById('clearBtn').disabled = false;
+            document.getElementById('clearBtn').textContent = 'Clear All';
+            document.getElementById('clearModal').classList.add('show');
+        }
+
+        function clearSelected() {
+            confirmClear(null);
+        }
+
+        function doClear() {
+            var btn = document.getElementById('clearBtn');
+            btn.disabled = true;
+            btn.textContent = 'Clearing...';
+            var completed = 0;
+            var errors = [];
+            function clearNext() {
+                if (completed >= pendingClear.length) {
+                    var msg = 'Cleared ' + completed + ' entit' + (completed === 1 ? 'y' : 'ies') + '.';
+                    if (errors.length) msg += ' Errors: ' + errors.join('; ');
+                    document.getElementById('clearResult').innerHTML = '<div class="alert alert-success">' + msg + '</div>';
+                    document.getElementById('clearResult').style.display = '';
+                    btn.textContent = 'Done';
+                    load();
+                    return;
+                }
+                var eid = pendingClear[completed];
+                fetch('/api/data/clear/' + eid, { method: 'DELETE' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        if (d.error) {
+                            errors.push(eid + ': ' + d.error);
+                        }
+                        completed++;
+                        clearNext();
+                    })
+                    .catch(function(err) {
+                        errors.push(eid + ': ' + err.message);
+                        completed++;
+                        clearNext();
+                    });
+            }
+            clearNext();
+        }
+
+        function showReplace(eid) {
+            replaceEntity = eid;
+            var label = '';
+            for (var i = 0; i < entities.length; i++) {
+                if (entities[i].id === eid) { label = entities[i].label; break; }
+            }
+            document.getElementById('replaceTitle').textContent = 'Replace ' + label;
+            document.getElementById('replaceBody').style.display = '';
+            document.getElementById('replaceResult').style.display = 'none';
+            document.getElementById('replaceFile').value = '';
+            document.getElementById('replaceBtn').textContent = 'Replace All';
+            document.getElementById('replaceBtn').disabled = false;
+            document.getElementById('replaceModal').classList.add('show');
+        }
+
+        function uploadReplace(e) {
+            e.preventDefault();
+            var file = document.getElementById('replaceFile').files[0];
+            if (!file) return;
+            var fd = new FormData();
+            fd.append('file', file);
+            document.getElementById('replaceBtn').textContent = 'Replacing...';
+            document.getElementById('replaceBtn').disabled = true;
+            fetch('/api/data/import-replace/' + replaceEntity, {
+                method: 'POST',
+                body: fd
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                document.getElementById('replaceBody').style.display = 'none';
+                if (d.error) {
+                    document.getElementById('replaceResult').innerHTML = '<div class="alert alert-error">' + d.error + '</div>';
+                } else {
+                    var html = '<div class="alert alert-success">Replace complete</div>' +
+                        '<p style="font-size:13px">Imported: <strong>' + d.created + '</strong></p>';
+                    if (d.errors && d.errors.length) {
+                        html += '<p style="font-size:13px;color:#dc2626">Errors:</p><ul style="font-size:12px;color:#dc2626">';
+                        for (var i = 0; i < d.errors.length; i++) {
+                            html += '<li>' + d.errors[i] + '</li>';
+                        }
+                        html += '</ul>';
+                    }
+                    html += '<button class="btn btn-sm btn-p" onclick="cl(\'replaceModal\');load()">Done</button>';
+                    document.getElementById('replaceResult').innerHTML = html;
+                }
+                document.getElementById('replaceResult').style.display = '';
+            })
+            .catch(function(err) {
+                document.getElementById('replaceBody').style.display = 'none';
+                document.getElementById('replaceResult').innerHTML = '<div class="alert alert-error">Error: ' + err.message + '</div>';
+                document.getElementById('replaceResult').style.display = '';
+            });
+        }
+
+        function cl(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        window.onclick = function(e) {
+            document.querySelectorAll('.modal').forEach(function(m) {
+                if (e.target === m) m.classList.remove('show');
+            });
+        };
+
+        load();
+    </script>
+</body>
+</html>

@@ -174,6 +174,7 @@ def render_sidebar(active_page):
         {'url': '/summary', 'label': 'Summary', 'permission': 'summary'},
         {'label': 'Settings', 'permission': 'settings', 'subs': [
             {'url': '/data-management', 'label': 'Data Management'},
+            {'url': '/data-tools', 'label': 'Data Tools'},
         ]},
     ]
     
@@ -751,6 +752,14 @@ def summary():
 def data_management():
     """Display the data management page."""
     return render_page('data_management.html', '/data-management')
+
+
+@app.route('/data-tools', strict_slashes=False)
+@login_required
+@permission_required('settings')
+def data_tools():
+    """Display the data tools page."""
+    return render_page('data_tools.html', '/data-tools')
 
 
 @app.route('/inventory/categories', strict_slashes=False)

@@ -499,7 +499,7 @@
             btn.disabled = true;
             btn.textContent = 'Deleting...';
             fetch('/api/products/' + deleteId, { method: 'DELETE' })
-                .then(r => r.json())
+                .then(r => r.json().catch(() => ({ error: 'Server error (status ' + r.status + ')' })))
                 .then(d => {
                     if (d.error) {
                         var msg = document.getElementById('dmsg');

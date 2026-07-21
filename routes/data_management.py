@@ -683,3 +683,290 @@ def change_db_path():
                 shutil.copy2(f, os.path.join(dirname, os.path.basename(f)))
     database.set_db_path(new_path)
     return jsonify({'ok': True, 'new_path': database.DB, 'message': 'Database path updated. Restart the app for the change to take effect.'})
+
+
+_CLEAR_ORDER = {
+    'products': ['restock_log', 'variants', 'products'],
+    'customers': ['customers'],
+    'suppliers': ['suppliers'],
+    'sales': ['sale_items', 'payments', 'sales'],
+    'purchases': ['purchase_invoice_items', 'purchase_invoices'],
+    'accounts': ['account_transfers', 'transactions', 'accounts'],
+    'payments': ['payments'],
+    'expenses': ['expenses'],
+}
+
+
+def _clear_entity(entity_id):
+    with get_db() as db:
+        db.execute('PRAGMA foreign_keys=OFF')
+        try:
+            tables = _CLEAR_ORDER.get(entity_id, [entity_id])
+            for t in tables:
+                db.execute(f'DELETE FROM {t}')
+        finally:
+            db.execute('PRAGMA foreign_keys=ON')
+
+
+@data_bp.route('/data/clear/<entity>', methods=['DELETE'])
+@login_required
+@manager_required
+def clear_entity(entity):
+    ent = next((e for e in ENTITIES if e['id'] == entity), None)
+    if not ent:
+        return jsonify({'error': 'Unknown entity'}), 400
+    _clear_entity(entity)
+    return jsonify({'ok': True, 'message': f'All {ent["label"]} records cleared.'})
+
+
+@data_bp.route('/data/import-replace/<entity>', methods=['POST'])
+@login_required
+@manager_required
+def import_replace(entity):
+    ent = next((e for e in ENTITIES if e['id'] == entity), None)
+    if not ent:
+        return jsonify({'error': 'Unknown entity'}), 400
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'No file uploaded'}), 400
+    rows, err = parse_upload(file)
+    if err:
+        return jsonify({'error': err}), 400
+    if not rows:
+        return jsonify({'error': 'No data rows found'}), 400
+    header_cols = set(rows[0].keys())
+    missing = [c for c in ent['required'] if c not in header_cols]
+    if missing:
+        return jsonify({'error': f'Missing required columns: {", ".join(missing)}'}), 400
+
+    _clear_entity(entity)
+
+    created = 0
+    updated = 0
+    changes = []
+    skipped = 0
+    errors = []
+    staff_name = session.get('name', '')
+    with get_db() as db:
+        db.execute('PRAGMA foreign_keys=OFF')
+        try:
+            db.execute('BEGIN IMMEDIATE')
+            if entity == 'products':
+                existing_skus = set()
+                existing_barcodes = set()
+                for idx, row in enumerate(rows, start=2):
+                    name = (row.get('name') or '').strip()
+                    sku = (row.get('sku') or '').strip()
+                    if not name or not sku:
+                        errors.append(f'Row {idx}: name and sku are required')
+                        continue
+                    try:
+                        cost_price = float(row.get('cost_price', 0) or 0)
+                        base_price = float(row.get('base_price', 0) or 0)
+                        low_stock = int(row.get('low_stock', 5) or 5)
+                        stock = int(row.get('stock', 0) or 0)
+                    except (ValueError, TypeError) as e:
+                        errors.append(f'Row {idx}: invalid numeric value - {str(e)}')
+                        continue
+                    barcode = (row.get('barcode') or '').strip() or None
+                    commission_class = (row.get('commission_class') or '').strip() or None
+                    category = (row.get('category') or '').strip()
+                    brand = (row.get('brand') or '').strip()
+                    make = (row.get('make') or '').strip()
+                    color = (row.get('color') or '').strip()
+                    if barcode and barcode in existing_barcodes:
+                        errors.append(f'Row {idx}: duplicate barcode "{barcode}"')
+                        continue
+                    if sku in existing_skus:
+                        errors.append(f'Row {idx}: duplicate SKU "{sku}"')
+                        continue
+                    try:
+                        cur = db.execute(
+                            'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, brand, make, color) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                            (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, brand, make, color)
+                        )
+                        pid = cur.lastrowid
+                        cur2 = db.execute('INSERT INTO variants (product_id, sku, stock) VALUES (?,?,?)', (pid, sku, stock))
+                        if stock > 0:
+                            db.execute('INSERT INTO restock_log (variant_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?)',
+                                       (cur2.lastrowid, 0, stock, stock, cost_price, 'Opening stock', staff_name))
+                        existing_skus.add(sku)
+                        if barcode:
+                            existing_barcodes.add(barcode)
+                        created += 1
+                    except Exception as e:
+                        errors.append(f'Row {idx}: {str(e)}')
+            elif entity == 'customers':
+                for idx, row in enumerate(rows, start=2):
+                    name = (row.get('name') or '').strip()
+                    if not name:
+                        errors.append(f'Row {idx}: name is required')
+                        continue
+                    try:
+                        credit = float(row.get('credit', 0) or 0)
+                        credit_limit = float(row.get('credit_limit', 0) or 0) or None
+                    except (ValueError, TypeError):
+                        errors.append(f'Row {idx}: invalid credit value')
+                        continue
+                    try:
+                        db.execute(
+                            'INSERT INTO customers (name, phone, email, address, baby_name, baby_birth, notes, credit, credit_limit) VALUES (?,?,?,?,?,?,?,?,?)',
+                            (name, row.get('phone', ''), row.get('email', ''), row.get('address', ''),
+                             row.get('baby_name', ''), row.get('baby_birth', ''), row.get('notes', ''), credit, credit_limit)
+                        )
+                        created += 1
+                    except Exception as e:
+                        errors.append(f'Row {idx}: {str(e)}')
+            elif entity == 'suppliers':
+                for idx, row in enumerate(rows, start=2):
+                    name = (row.get('name') or '').strip()
+                    if not name:
+                        errors.append(f'Row {idx}: name is required')
+                        continue
+                    try:
+                        balance = float(row.get('balance', 0) or 0)
+                    except (ValueError, TypeError):
+                        errors.append(f'Row {idx}: invalid balance')
+                        continue
+                    try:
+                        db.execute(
+                            'INSERT INTO suppliers (name, phone, email, address, contact_person, notes, balance, company_phone, supplier_code, type, area, city, country, telephone, fax, account_no, due_days) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                            (name, row.get('phone', ''), row.get('email', ''), row.get('address', ''),
+                             row.get('contact_person', ''), row.get('notes', ''), balance, row.get('company_phone', ''),
+                             row.get('supplier_code', ''), row.get('type', ''), row.get('area', ''),
+                             row.get('city', ''), row.get('country', ''), row.get('telephone', ''),
+                             row.get('fax', ''), row.get('account_no', ''), int(row.get('due_days', 0) or 0))
+                        )
+                        created += 1
+                    except Exception as e:
+                        errors.append(f'Row {idx}: {str(e)}')
+            elif entity == 'sales':
+                for idx, row in enumerate(rows, start=2):
+                    receipt = (row.get('receipt') or '').strip()
+                    if not receipt:
+                        errors.append(f'Row {idx}: receipt is required')
+                        continue
+                    try:
+                        subtotal = float(row.get('subtotal', 0) or 0)
+                        discount = float(row.get('discount', 0) or 0)
+                        discount_type = (row.get('discount_type') or 'percent').strip()
+                        tax = float(row.get('tax', 0) or 0)
+                        total = float(row.get('total', 0) or 0)
+                        payment = (row.get('payment') or 'cash').strip()
+                        status = (row.get('status') or 'Paid').strip()
+                        paid = float(row.get('paid', 0) or 0)
+                        customer_name = (row.get('customer_name') or '').strip()
+                        row_staff = (row.get('staff_name') or staff_name).strip()
+                        notes = (row.get('notes') or '').strip()
+                        created_at = (row.get('created_at') or '').strip()
+                        cur = db.execute(
+                            'INSERT INTO sales (receipt, subtotal, discount, discount_type, tax, total, payment, status, paid, customer_name, staff_name, notes, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                            (receipt, subtotal, discount, discount_type, tax, total, payment, status, paid, customer_name, row_staff, notes, created_at or None)
+                        )
+                        sale_id = cur.lastrowid
+                        product_name = (row.get('product_name') or '').strip()
+                        if product_name:
+                            variant_label = (row.get('variant_label') or '').strip()
+                            item_sku = (row.get('sku') or '').strip()
+                            qty = int(row.get('qty', 1) or 1)
+                            price = float(row.get('price', 0) or 0)
+                            item_total = float(row.get('item_total', 0) or 0)
+                            db.execute(
+                                'INSERT INTO sale_items (sale_id, product_id, product_name, variant_label, sku, quantity, price, total) VALUES (?,?,?,?,?,?,?,?)',
+                                (sale_id, 0, product_name, variant_label, item_sku, qty, price, item_total)
+                            )
+                        created += 1
+                    except Exception as e:
+                        errors.append(f'Row {idx}: {str(e)}')
+            elif entity == 'purchases':
+                for idx, row in enumerate(rows, start=2):
+                    invoice_no = (row.get('invoice_no') or '').strip()
+                    if not invoice_no:
+                        errors.append(f'Row {idx}: invoice_no is required')
+                        continue
+                    try:
+                        invoice_amount = float(row.get('invoice_amount', 0) or 0)
+                        balance_due = float(row.get('balance_due', 0) or 0)
+                        status = (row.get('status') or 'Unpaid').strip()
+                        issue_date = (row.get('issue_date') or '').strip()
+                        due_date = (row.get('due_date') or '').strip()
+                        supplier_name = (row.get('supplier_name') or '').strip()
+                        description = (row.get('description') or '').strip()
+                        supplier_id = None
+                        if supplier_name:
+                            sup = db.execute('SELECT id FROM suppliers WHERE name=?', (supplier_name,)).fetchone()
+                            if sup:
+                                supplier_id = sup['id']
+                        cur = db.execute(
+                            'INSERT INTO purchase_invoices (invoice_no, issue_date, due_date, supplier_id, description, invoice_amount, balance_due, status) VALUES (?,?,?,?,?,?,?,?)',
+                            (invoice_no, issue_date, due_date, supplier_id, description, invoice_amount, balance_due, status)
+                        )
+                        inv_id = cur.lastrowid
+                        item = (row.get('item') or '').strip()
+                        if item:
+                            qty = float(row.get('qty', 1) or 1)
+                            unit_price = float(row.get('unit_price', 0) or 0)
+                            item_total = float(row.get('item_total', 0) or 0)
+                            product_id = None
+                            try:
+                                product_id = int(row.get('product_id')) if row.get('product_id', '').strip() else None
+                            except (ValueError, TypeError):
+                                pass
+                            db.execute(
+                                'INSERT INTO purchase_invoice_items (invoice_id, line_number, item, product_id, qty, unit_price, total) VALUES (?,?,?,?,?,?,?)',
+                                (inv_id, 1, item, product_id, qty, unit_price, item_total)
+                            )
+                        created += 1
+                    except Exception as e:
+                        errors.append(f'Row {idx}: {str(e)}')
+            elif entity == 'accounts':
+                for idx, row in enumerate(rows, start=2):
+                    name = (row.get('name') or '').strip()
+                    if not name:
+                        errors.append(f'Row {idx}: name is required')
+                        continue
+                    balance = float(row.get('balance', 0) or 0)
+                    acct_type = (row.get('type') or 'cash').strip()
+                    try:
+                        db.execute('INSERT INTO accounts (name, type, balance) VALUES (?,?,?)', (name, acct_type, balance))
+                        created += 1
+                    except Exception as e:
+                        errors.append(f'Row {idx}: {str(e)}')
+            elif entity == 'payments':
+                for idx, row in enumerate(rows, start=2):
+                    receipt = (row.get('receipt') or '').strip()
+                    method = (row.get('method') or '').strip()
+                    amount = float(row.get('amount', 0) or 0)
+                    if not receipt or not method or amount <= 0:
+                        errors.append(f'Row {idx}: receipt, method, and amount>0 are required')
+                        continue
+                    sale = db.execute('SELECT id FROM sales WHERE receipt=?', (receipt,)).fetchone()
+                    if not sale:
+                        errors.append(f'Row {idx}: sale with receipt "{receipt}" not found')
+                        continue
+                    try:
+                        db.execute(
+                            'INSERT INTO payments (sale_id, method, amount, reference, created_at) VALUES (?,?,?,?,?)',
+                            (sale['id'], method, amount, row.get('reference', ''), (row.get('created_at') or '').strip() or None)
+                        )
+                        created += 1
+                    except Exception as e:
+                        errors.append(f'Row {idx}: {str(e)}')
+            elif entity == 'expenses':
+                for idx, row in enumerate(rows, start=2):
+                    category = (row.get('category') or '').strip()
+                    amount = float(row.get('amount', 0) or 0)
+                    if not category or amount <= 0:
+                        errors.append(f'Row {idx}: category and amount>0 are required')
+                        continue
+                    try:
+                        db.execute(
+                            'INSERT INTO expenses (category, amount, note, created_at) VALUES (?,?,?,?)',
+                            (category, amount, (row.get('note') or '').strip(), (row.get('created_at') or '').strip() or None)
+                        )
+                        created += 1
+                    except Exception as e:
+                        errors.append(f'Row {idx}: {str(e)}')
+        finally:
+            db.execute('PRAGMA foreign_keys=ON')
+    return jsonify({'ok': True, 'created': created, 'updated': updated, 'changes': changes, 'skipped': skipped, 'errors': errors})

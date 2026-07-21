@@ -263,9 +263,12 @@
         function scanBarcode(code) {
             if (!code) return;
             fetch('/api/products/search?q=' + encodeURIComponent(code)).then(function (r) { return r.json() }).then(function (d) {
-                if (d.length === 1) { closeDropdown(); add(d[0].vid, d[0].price); }
-                else if (d.length > 1) { allP = d; renderP(d); f('Multiple products found'); }
-                else { f('No product found'); }
+                if (!d.length) { f('No product found'); return; }
+                var exact = d.filter(function(p){ return p.sku === code || p.barcode === code; });
+                if (exact.length === 1) { closeDropdown(); add(exact[0].vid, exact[0].price); }
+                else if (exact.length > 1) { allP = exact; renderP(exact); }
+                else if (d.length === 1) { closeDropdown(); add(d[0].vid, d[0].price); }
+                else { allP = d; renderP(d); }
             }).catch(function () { f('Search failed'); });
         }
         function search() { fetch('/api/products/search?q=' + encodeURIComponent(document.getElementById('s').value)).then(function (r) { if (!r.ok) throw Error(r.status); return r.json() }).then(function (d) { allP = d; renderP(d) }).catch(function () { allP = []; f('Search failed'); }); }

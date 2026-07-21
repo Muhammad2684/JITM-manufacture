@@ -158,8 +158,8 @@ def update_product(pid):
              d.get('brand', ''), d.get('make', ''), d.get('color', ''), pid)
         )
         if not d.get('has_variants'):
-            db.execute('UPDATE variants SET size=? WHERE product_id=?',
-                       (d.get('size', ''), pid))
+            db.execute('UPDATE variants SET size=?, sku=? WHERE product_id=?',
+                       (d.get('size', ''), d['sku'], pid))
         return jsonify({'ok': True})
 
 

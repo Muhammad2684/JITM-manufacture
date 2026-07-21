@@ -752,7 +752,7 @@ def import_replace(entity):
         try:
             db.execute('BEGIN IMMEDIATE')
             if entity == 'products':
-                existing_skus = set()
+                all_products = {}
                 existing_barcodes = set()
                 for idx, row in enumerate(rows, start=2):
                     name = (row.get('name') or '').strip()
@@ -774,28 +774,97 @@ def import_replace(entity):
                     brand = (row.get('brand') or '').strip()
                     make = (row.get('make') or '').strip()
                     color = (row.get('color') or '').strip()
-                    if barcode and barcode in existing_barcodes:
-                        errors.append(f'Row {idx}: duplicate barcode "{barcode}"')
-                        continue
-                    if sku in existing_skus:
-                        errors.append(f'Row {idx}: duplicate SKU "{sku}"')
-                        continue
-                    try:
-                        cur = db.execute(
-                            'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, brand, make, color) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                            (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, brand, make, color)
-                        )
-                        pid = cur.lastrowid
-                        cur2 = db.execute('INSERT INTO variants (product_id, sku, stock) VALUES (?,?,?)', (pid, sku, stock))
-                        if stock > 0:
-                            db.execute('INSERT INTO restock_log (variant_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?)',
-                                       (cur2.lastrowid, 0, stock, stock, cost_price, 'Opening stock', staff_name))
-                        existing_skus.add(sku)
-                        if barcode:
-                            existing_barcodes.add(barcode)
-                        created += 1
-                    except Exception as e:
-                        errors.append(f'Row {idx}: {str(e)}')
+
+                    if sku in all_products:
+                        p = all_products[sku]
+                        changed = []
+                        updates = []
+                        params = []
+                        if p['name'] != name:
+                            changed.append('name')
+                            updates.append('name=?')
+                            params.append(name)
+                        if (p.get('category') or '') != category:
+                            changed.append('category')
+                            updates.append('category=?')
+                            params.append(category)
+                        if (p['base_price'] or 0) != base_price:
+                            changed.append('base_price')
+                            updates.append('base_price=?')
+                            params.append(base_price)
+                        if (p['cost_price'] or 0) != cost_price:
+                            changed.append('cost_price')
+                            updates.append('cost_price=?')
+                            params.append(cost_price)
+                        if (p.get('low_stock') or 5) != low_stock:
+                            changed.append('low_stock')
+                            updates.append('low_stock=?')
+                            params.append(low_stock)
+                        if (p.get('commission_class') or '') != (commission_class or ''):
+                            changed.append('commission_class')
+                            updates.append('commission_class=?')
+                            params.append(commission_class)
+                        if (p.get('brand') or '') != brand:
+                            changed.append('brand')
+                            updates.append('brand=?')
+                            params.append(brand)
+                        if (p.get('make') or '') != make:
+                            changed.append('make')
+                            updates.append('make=?')
+                            params.append(make)
+                        if (p.get('color') or '') != color:
+                            changed.append('color')
+                            updates.append('color=?')
+                            params.append(color)
+                        if barcode and barcode in existing_barcodes and barcode != p.get('barcode'):
+                            errors.append(f'Row {idx}: barcode "{barcode}" belongs to another product')
+                            continue
+                        if (p.get('barcode') or '') != (barcode or ''):
+                            changed.append('barcode')
+                            updates.append('barcode=?')
+                            params.append(barcode or None)
+                        if updates:
+                            params.append(p['id'])
+                            db.execute(f'UPDATE products SET {",".join(updates)} WHERE id=?', params)
+                        vid = p.get('vid')
+                        old_stock = p.get('vstock') or 0
+                        if vid and stock != old_stock:
+                            db.execute('UPDATE variants SET stock=? WHERE id=?', (stock, vid))
+                            changed.append('stock')
+                            if stock > old_stock:
+                                qty = stock - old_stock
+                                db.execute(
+                                    'INSERT INTO restock_log (variant_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?)',
+                                    (vid, old_stock, stock, qty, cost_price, 'Import stock update', staff_name)
+                                )
+                        if changed:
+                            updated += 1
+                            changes.append(f'Row {idx} ({sku}): {", ".join(changed)} updated')
+                        else:
+                            skipped += 1
+                    else:
+                        if barcode and barcode in existing_barcodes:
+                            errors.append(f'Row {idx}: barcode "{barcode}" already exists')
+                            continue
+                        try:
+                            cur = db.execute(
+                                'INSERT INTO products (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, brand, make, color) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                                (name, category, base_price, cost_price, sku, barcode, low_stock, commission_class, brand, make, color)
+                            )
+                            pid = cur.lastrowid
+                            cur2 = db.execute('INSERT INTO variants (product_id, sku, stock) VALUES (?,?,?)', (pid, sku, stock))
+                            if stock > 0:
+                                db.execute('INSERT INTO restock_log (variant_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?)',
+                                           (cur2.lastrowid, 0, stock, stock, cost_price, 'Opening stock', staff_name))
+                            all_products[sku] = {'id': pid, 'vid': cur2.lastrowid, 'name': name,
+                                'base_price': base_price, 'cost_price': cost_price, 'low_stock': low_stock,
+                                'vstock': stock, 'barcode': barcode, 'category': category,
+                                'commission_class': commission_class, 'brand': brand, 'make': make, 'color': color}
+                            if barcode:
+                                existing_barcodes.add(barcode)
+                            created += 1
+                        except Exception as e:
+                            errors.append(f'Row {idx}: {str(e)}')
             elif entity == 'customers':
                 for idx, row in enumerate(rows, start=2):
                     name = (row.get('name') or '').strip()

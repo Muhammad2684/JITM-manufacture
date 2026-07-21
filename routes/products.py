@@ -460,6 +460,94 @@ def list_barcodes():
         return jsonify([dict(v) for v in variants])
 
 
+@prod_bp.route('/products/bulk-delete', methods=['POST'])
+@login_required
+@manager_required
+def bulk_delete_products():
+    d = request.get_json() or {}
+    ids = d.get('ids', [])
+    if not ids:
+        return jsonify({'error': 'No product IDs provided'}), 400
+    deleted = 0
+    errors = []
+    with get_db() as db:
+        for pid in ids:
+            sale_count = db.execute(
+                'SELECT COUNT(DISTINCT s.id) as cnt FROM sales s '
+                'JOIN sale_items si ON si.sale_id = s.id WHERE si.product_id=?', (pid,)
+            ).fetchone()['cnt']
+            purchase_count = db.execute(
+                'SELECT COUNT(DISTINCT pi.id) as cnt FROM purchase_invoices pi '
+                'JOIN purchase_invoice_items pii ON pii.invoice_id = pi.id WHERE pii.product_id=?', (pid,)
+            ).fetchone()['cnt']
+            return_count = db.execute(
+                'SELECT COUNT(DISTINCT pr.id) as cnt FROM purchase_returns pr '
+                'JOIN purchase_return_items pri ON pri.return_id = pr.id WHERE pri.product_id=?', (pid,)
+            ).fetchone()['cnt']
+            restock_count = db.execute(
+                'SELECT COUNT(*) as cnt FROM restock_log rl '
+                'JOIN variants v ON v.id = rl.variant_id WHERE v.product_id=?', (pid,)
+            ).fetchone()['cnt']
+            if sale_count or purchase_count or return_count or restock_count:
+                refs = []
+                if sale_count: refs.append(f'{sale_count} sale(s)')
+                if purchase_count: refs.append(f'{purchase_count} purchase invoice(s)')
+                if return_count: refs.append(f'{return_count} return(s)')
+                if restock_count: refs.append(f'{restock_count} stock log(s)')
+                p = db.execute('SELECT name FROM products WHERE id=?', (pid,)).fetchone()
+                name = p['name'] if p else f'ID {pid}'
+                errors.append(f'{name}: referenced in {", ".join(refs)}')
+                continue
+            try:
+                db.execute('DELETE FROM products WHERE id=?', (pid,))
+                deleted += 1
+            except Exception as e:
+                errors.append(f'ID {pid}: {str(e)}')
+    return jsonify({'ok': True, 'deleted': deleted, 'errors': errors})
+
+
+@prod_bp.route('/products/bulk', methods=['PUT'])
+@login_required
+@manager_required
+def bulk_update_products():
+    d = request.get_json() or {}
+    ids = d.get('ids', [])
+    fields = d.get('fields', {})
+    if not ids:
+        return jsonify({'error': 'No product IDs provided'}), 400
+    if not fields:
+        return jsonify({'error': 'No fields to update'}), 400
+    allowed = {'base_price', 'cost_price', 'category', 'commission_class', 'supplier_id', 'low_stock'}
+    updates = []
+    params = []
+    for key, value in fields.items():
+        if key not in allowed:
+            continue
+        if value == '' or value is None:
+            if key in ('supplier_id', 'commission_class'):
+                updates.append(f'{key}=NULL')
+            else:
+                updates.append(f'{key}=?')
+                params.append(value)
+        elif key in ('base_price', 'cost_price', 'low_stock'):
+            updates.append(f'{key}=?')
+            params.append(float(value) if key != 'low_stock' else int(value))
+        elif key == 'supplier_id':
+            updates.append(f'{key}=?')
+            params.append(int(value) if value else None)
+        else:
+            updates.append(f'{key}=?')
+            params.append(str(value))
+    if not updates:
+        return jsonify({'error': 'No valid fields to update'}), 400
+    placeholders = ','.join('?' for _ in ids)
+    sql = f'UPDATE products SET {",".join(updates)} WHERE id IN ({placeholders})'
+    params.extend(ids)
+    with get_db() as db:
+        db.execute(sql, params)
+    return jsonify({'ok': True, 'updated': len(ids)})
+
+
 @prod_bp.route('/commission-classes')
 @login_required
 def list_commission_classes():

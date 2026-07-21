@@ -15,6 +15,7 @@
             <div class="actions">
                 {% if role == 'manager' or role == 'owner' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ New Product</button>
                 <button class="btn btn-sm" onclick="showImport()">Import</button>
+                <button class="btn btn-sm" id="selectBtn" onclick="toggleSelectMode()">Select</button>
                 <button class="btn btn-sm" onclick="showRestock()">Restock Log</button>{% endif %}
                 <button class="btn btn-sm" onclick="showLow()">Low Stock</button> <button class="btn btn-sm"
                     onclick="showBarcodes()">Barcodes</button>
@@ -23,11 +24,18 @@
         </div>
         <div class="content">
             <div class="search"><input id="s" placeholder="Search products..." oninput="load()"></div>
+            <div id="bulkBar" style="display:none;padding:8px 0;gap:8px;align-items:center;flex-wrap:wrap">
+                <span style="font-size:13px;font-weight:600"><span id="selCount">0</span> selected</span>
+                <button class="btn btn-sm" onclick="selectAllProducts()">Select All</button>
+                <button class="btn btn-sm" onclick="deselectAllProducts()">Deselect All</button>
+                <button class="btn btn-sm btn-p" onclick="bulkEdit()" style="margin-left:8px">Edit Selected</button>
+                <button class="btn btn-sm btn-d" onclick="bulkDelete()">Delete Selected</button>
+            </div>
             <div class="pagination" id="pagination-top"></div>
             <div class="table-wrap">
                 <table>
                     <thead>
-                        <tr>
+                        <tr id="headerRow">
                             <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
                             <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Product <span id="si1"></span></th>
                             <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Size <span id="si2"></span></th>
@@ -170,10 +178,31 @@
             <div id="ir" style="margin-top:12px"></div>
         </div>
     </div>
+    <div class="modal" id="bem">
+        <div class="mc" style="max-width:450px"><button class="mx" onclick="cl('bem')">&times;</button>
+            <h3>Bulk Edit <span id="beCount" style="font-weight:400;font-size:14px;color:#6b7280"></span></h3>
+            <p style="font-size:12px;color:#6b7280;margin:0 0 10px">Leave blank fields unchanged.</p>
+            <form onsubmit="saveBulkEdit(event)">
+                <div class="form-row">
+                    <div><label>Price (Rs)</label><input id="bep" type="number" step="0.01"></div>
+                    <div><label>Cost (Rs)</label><input id="bec" type="number" step="0.01"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>Category</label><select id="becat"><option value="">-- No change --</option></select></div>
+                    <div><label>Commission Class</label><select id="becc"><option value="">-- No change --</option></select></div>
+                </div>
+                <div><label>Supplier</label><select id="besup"><option value="">-- No change --</option></select></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+                    <button class="btn" type="button" onclick="cl('bem')">Cancel</button>
+                    <button class="btn btn-p" type="submit" id="beBtn">Update All</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <div class="modal" id="dm">
-        <div class="mc" style="max-width:400px"><button class="mx" onclick="cl('dm')">&times;</button>
+        <div class="mc" style="max-width:450px"><button class="mx" onclick="cl('dm')">&times;</button>
             <h3>Delete Product</h3>
-            <p style="font-size:14px;color:#374151">Are you sure you want to delete <strong id="dname"></strong>?</p>
+            <p id="dmsgP" style="font-size:14px;color:#374151">Are you sure you want to delete <strong id="dname"></strong>?</p>
             <div id="dmsg" style="display:none;padding:8px;border-radius:6px;margin-bottom:10px;font-size:13px"></div>
             <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
                 <button class="btn" onclick="cl('dm')">Cancel</button>
@@ -185,6 +214,7 @@
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
         var editing = null, avId = null, svId = null, all = [], sortIdx = -1, sortDir = 1, catList = [], ccList = [], sizeList = [], supList = [], currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
+        var selectMode = false, selectedIds = new Set();
         load();
         function load(page) {
             const q = document.getElementById('s').value;
@@ -244,21 +274,30 @@
             render(all);
         }
         function render(l) {
+            var chkCol = selectMode ? '<th style="width:28px"><input type="checkbox" id="selectAllPage" onchange="togglePage()"></th>' : '';
             document.getElementById('tb').innerHTML = l.map((p, idx) => {
-                let vh = ''; if (p.variants && p.variants.length) {
-                    const vc = p.cost_price || 0; vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="12" style="padding:6px 14px 8px;background:#f8f7f4">' +
+                let vh = '';
+                if (p.variants && p.variants.length) {
+                    const vc = p.cost_price || 0;
+                    var vSpan = selectMode ? 13 : 12;
+                    vh = '<tr id="v-' + p.id + '" style="display:none"><td colspan="' + vSpan + '" style="padding:6px 14px 8px;background:#f8f7f4">' +
                         p.variants.map(v => '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px"><span style="width:95px">' + (v.size || '-') + ' / ' + (v.color || '-') + '</span><span style="width:80px;color:#6b7280">' + v.sku + '</span><span style="width:45px;text-align:right" class="' + (v.stock <= p.low_stock ? 'bdg bdg-err' : '') + '">' + v.stock + '</span><span style="width:70px">' + (v.barcode ? '<code>' + v.barcode + '</code>' : '-') + '</span><span style="width:65px;font-weight:600;text-align:right">Rs ' + (v.price || p.base_price).toFixed(2) + '</span><span style="width:60px;text-align:right">Rs ' + vc.toFixed(2) + '</span><span style="width:65px;text-align:right;color:#6b7280">' + (p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '- -') + '</span><span style="width:65px;text-align:right;color:#374151">Rs ' + (vc * v.stock).toFixed(2) + '</span>' +
                             (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs" onclick="editStock(' + v.id + ')">Stock</button>' : '') + '</div>').join('') + '</td></tr>';
                 }
-        const arrow = p.has_variants ? '<span onclick="toggleV(' + p.id + ')" style="cursor:pointer;font-size:10px;color:#9ca3af;margin-right:6px;user-select:none" id="a-' + p.id + '">&#9654;</span> ' : '';
-        const tc = p.cost_price * p.total_stock;
-        const lc = p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>';
-        const psize = (p.variants && p.variants[0] && p.variants[0].size) || '-';
-        return '<tr><td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + idx + 1) + '</td><td style="font-weight:600">' + arrow + '<a href="/ledger/product/'+p.id+'" style="text-decoration:none;color:inherit">'+p.name+'</a></td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (p.supplier_name || '-') + '</td>' +
+                const checked = selectedIds.has(p.id) ? ' checked' : '';
+                const chk = selectMode ? '<td><input type="checkbox" class="sel-cb" value="' + p.id + '"' + checked + ' onchange="toggleSel(' + p.id + ',this.checked)"></td>' : '';
+                const arrow = p.has_variants ? '<span onclick="toggleV(' + p.id + ')" style="cursor:pointer;font-size:10px;color:#9ca3af;margin-right:6px;user-select:none" id="a-' + p.id + '">&#9654;</span> ' : '';
+                const tc = p.cost_price * p.total_stock;
+                const lc = p.last_purchased_cost !== null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>';
+                const psize = (p.variants && p.variants[0] && p.variants[0].size) || '-';
+                return '<tr>' + chk + '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + idx + 1) + '</td><td style="font-weight:600">' + arrow + '<a href="/ledger/product/'+p.id+'" style="text-decoration:none;color:inherit">'+p.name+'</a></td><td style="font-size:12px;color:#6b7280">' + psize + '</td><td>' + p.sku + '</td><td class="text-right">' + p.total_stock + '</td><td>' + (p.category || '-') + '</td><td class="text-right">Rs ' + p.base_price.toFixed(2) + '</td><td class="text-right">Rs ' + p.cost_price.toFixed(2) + '</td><td class="text-right">' + lc + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (p.supplier_name || '-') + '</td>' +
             '<td>' + (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs" onclick="addV(' + p.id + ')">+ Variant</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>' + vh;}).join('');
-    var totStock=0,totCost=0;
-    l.forEach(function(p){totStock+=p.total_stock||0;totCost+=(p.cost_price||0)*(p.total_stock||0);});
-    document.getElementById('tf').innerHTML='<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td><td></td></tr>';}
+            var totStock=0,totCost=0;
+            l.forEach(function(p){totStock+=p.total_stock||0;totCost+=(p.cost_price||0)*(p.total_stock||0);});
+            var tfColspan = selectMode ? '5' : '4';
+            document.getElementById('tf').innerHTML='<tr><td colspan="'+tfColspan+'" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">'+totStock+'</td><td></td><td></td><td></td><td></td><td class="text-right" style="padding:6px 8px">Rs '+totCost.toFixed(2)+'</td><td></td><td></td></tr>';
+            updateSelCount();
+        }
         function toggleV(id) { const e = document.getElementById('v-' + id); const a = document.getElementById('a-' + id); if (e.style.display === 'none') { e.style.display = ''; a.innerHTML = '&#9660;'; } else { e.style.display = 'none'; a.innerHTML = '&#9654;'; } }
         function autoSku(on) {
             const inp = document.getElementById('ps');
@@ -486,41 +525,197 @@
                 }).catch(function(){ btn.textContent = 'Upload & Import'; btn.disabled = false; alert('Upload failed'); });
         }
         var deleteId = null;
-        function confirmDelete(id, name) {
-            deleteId = id;
-            document.getElementById('dname').textContent = name;
+        function f(m, t) { const e = document.getElementById('flash'); e.innerHTML = '<div class="fl fl-' + t + '">' + m + '</div>'; setTimeout(() => { const f = e.querySelector('.fl'); if (f) { f.style.opacity = '0'; setTimeout(() => f.remove(), 300); } }, 3000); }
+        function cl(id) { document.getElementById(id).classList.remove('show'); }
+        window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
+        function printTable(){document.body.classList.add('printing');window.print();}
+        window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
+
+        function toggleSelectMode() {
+            selectMode = !selectMode;
+            if (!selectMode) { selectedIds.clear(); }
+            document.getElementById('selectBtn').textContent = selectMode ? 'Cancel' : 'Select';
+            document.getElementById('bulkBar').style.display = selectMode ? 'flex' : 'none';
+            updateCheckboxHeader();
+            render(all);
+        }
+        function updateCheckboxHeader() {
+            var hr = document.getElementById('headerRow');
+            var existing = document.getElementById('chkHead');
+            if (selectMode) {
+                if (!existing) {
+                    var th = document.createElement('th');
+                    th.id = 'chkHead';
+                    th.style.width = '28px';
+                    th.innerHTML = '<input type="checkbox" id="selectAllPage" onchange="togglePage()">';
+                    hr.insertBefore(th, hr.firstChild);
+                }
+            } else {
+                if (existing) existing.remove();
+            }
+        }
+        function togglePage() {
+            var checked = document.getElementById('selectAllPage').checked;
+            var cbs = document.querySelectorAll('.sel-cb');
+            for (var i = 0; i < cbs.length; i++) {
+                cbs[i].checked = checked;
+                toggleSel(parseInt(cbs[i].value), checked);
+            }
+        }
+        function toggleSel(id, checked) {
+            if (checked) { selectedIds.add(id); } else { selectedIds.delete(id); }
+            updateSelCount();
+        }
+        function updateSelCount() {
+            document.getElementById('selCount').textContent = selectedIds.size;
+        }
+        function selectAllProducts() {
+            for (var i = 0; i < all.length; i++) { selectedIds.add(all[i].id); }
+            var cbs = document.querySelectorAll('.sel-cb');
+            for (var i = 0; i < cbs.length; i++) { cbs[i].checked = true; }
+            var pa = document.getElementById('selectAllPage');
+            if (pa) pa.checked = true;
+            updateSelCount();
+        }
+        function deselectAllProducts() {
+            selectedIds.clear();
+            var cbs = document.querySelectorAll('.sel-cb');
+            for (var i = 0; i < cbs.length; i++) { cbs[i].checked = false; }
+            var pa = document.getElementById('selectAllPage');
+            if (pa) pa.checked = false;
+            updateSelCount();
+        }
+
+        var bulkDeleteIds = [];
+        function bulkDelete() {
+            var ids = Array.from(selectedIds);
+            if (!ids.length) { f('Select products to delete', 'err'); return; }
+            bulkDeleteIds = ids;
+            document.getElementById('dname').textContent = ids.length + ' product' + (ids.length > 1 ? 's' : '');
+            document.getElementById('dmsgP').innerHTML = 'Are you sure you want to delete <strong>' + ids.length + ' product' + (ids.length > 1 ? 's' : '') + '</strong>?';
             document.getElementById('dmsg').style.display = 'none';
             document.getElementById('dbtn').disabled = false;
-            document.getElementById('dbtn').textContent = 'Delete';
+            document.getElementById('dbtn').textContent = 'Delete All';
             document.getElementById('dm').classList.add('show');
         }
         function doDelete() {
             var btn = document.getElementById('dbtn');
             btn.disabled = true;
             btn.textContent = 'Deleting...';
-            fetch('/api/products/' + deleteId, { method: 'DELETE' })
-                .then(r => r.json().catch(() => ({ error: 'Server error (status ' + r.status + ')' })))
-                .then(d => {
-                    if (d.error) {
+            if (bulkDeleteIds && bulkDeleteIds.length > 1) {
+                fetch('/api/products/bulk-delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ids: bulkDeleteIds}) })
+                    .then(r => r.json())
+                    .then(d => {
                         var msg = document.getElementById('dmsg');
-                        msg.textContent = d.error;
+                        if (d.error) {
+                            msg.textContent = d.error;
+                            msg.style.display = '';
+                            msg.style.background = '#fef2f2';
+                            msg.style.color = '#dc2626';
+                            btn.disabled = false;
+                            btn.textContent = 'Delete All';
+                            return;
+                        }
+                        var html = 'Deleted: <strong>' + d.deleted + '</strong>';
+                        if (d.errors && d.errors.length) {
+                            html += '<div style="margin-top:6px;font-size:12px">Could not delete:<br>' + d.errors.join('<br>') + '</div>';
+                        }
+                        msg.innerHTML = html;
                         msg.style.display = '';
-                        msg.style.background = '#fef2f2';
-                        msg.style.color = '#dc2626';
+                        msg.style.background = '#f0fdf4';
+                        msg.style.color = '#16a34a';
+                        btn.textContent = 'Done';
                         btn.disabled = false;
-                        btn.textContent = 'Delete';
-                        return;
-                    }
-                    cl('dm');
-                    load();
-                    f('Product deleted', 'ok');
-                });
+                        bulkDeleteIds = null;
+                        selectedIds.clear();
+                        selectMode = false;
+                        document.getElementById('selectBtn').textContent = 'Select';
+                        document.getElementById('bulkBar').style.display = 'none';
+                        updateCheckboxHeader();
+                        load();
+                    });
+            } else if (deleteId) {
+                fetch('/api/products/' + deleteId, { method: 'DELETE' })
+                    .then(r => r.json().catch(() => ({ error: 'Server error (status ' + r.status + ')' })))
+                    .then(d => {
+                        if (d.error) {
+                            var msg = document.getElementById('dmsg');
+                            msg.textContent = d.error;
+                            msg.style.display = '';
+                            msg.style.background = '#fef2f2';
+                            msg.style.color = '#dc2626';
+                            btn.disabled = false;
+                            btn.textContent = 'Delete';
+                            return;
+                        }
+                        cl('dm');
+                        load();
+                        f('Product deleted', 'ok');
+                    });
+            }
         }
-        function f(m, t) { const e = document.getElementById('flash'); e.innerHTML = '<div class="fl fl-' + t + '">' + m + '</div>'; setTimeout(() => { const f = e.querySelector('.fl'); if (f) { f.style.opacity = '0'; setTimeout(() => f.remove(), 300); } }, 3000); }
-        function cl(id) { document.getElementById(id).classList.remove('show'); }
-        window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
-        function printTable(){document.body.classList.add('printing');window.print();}
-        window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
+
+        function bulkEdit() {
+            var ids = Array.from(selectedIds);
+            if (!ids.length) { f('Select products to edit', 'err'); return; }
+            document.getElementById('beCount').textContent = '(' + ids.length + ' product' + (ids.length > 1 ? 's' : '') + ')';
+            document.getElementById('bep').value = '';
+            document.getElementById('bec').value = '';
+            populateBulkDropdowns();
+            document.getElementById('bem').classList.add('show');
+        }
+        function populateBulkDropdowns() {
+            var catSel = document.getElementById('becat');
+            catSel.innerHTML = '<option value="">-- No change --</option>' + catList.map(function(c){ return '<option value="' + c.name.replace(/"/g, '&quot;') + '">' + c.name + '</option>'; }).join('');
+            var ccSel = document.getElementById('becc');
+            ccSel.innerHTML = '<option value="">-- No change --</option>' + ccList.map(function(c){ return '<option value="' + c.name.replace(/"/g, '&quot;') + '">' + c.name + '</option>'; }).join('');
+            var supSel = document.getElementById('besup');
+            supSel.innerHTML = '<option value="">-- No change --</option>' + supList.map(function(s){ return '<option value="' + s.id + '">' + s.name.replace(/"/g, '&quot;') + '</option>'; }).join('');
+        }
+        function saveBulkEdit(e) {
+            e.preventDefault();
+            var ids = Array.from(selectedIds);
+            if (!ids.length) { cl('bem'); return; }
+            var fields = {};
+            var price = document.getElementById('bep').value;
+            var cost = document.getElementById('bec').value;
+            var cat = document.getElementById('becat').value;
+            var cc = document.getElementById('becc').value;
+            var sup = document.getElementById('besup').value;
+            if (price !== '') fields.base_price = price;
+            if (cost !== '') fields.cost_price = cost;
+            if (cat !== '') fields.category = cat;
+            if (cc !== '') fields.commission_class = cc;
+            if (sup !== '') fields.supplier_id = sup;
+            if (!Object.keys(fields).length) { cl('bem'); return; }
+            var btn = document.getElementById('beBtn');
+            btn.textContent = 'Updating...';
+            btn.disabled = true;
+            fetch('/api/products/bulk', {
+                method: 'PUT',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ids: ids, fields: fields})
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                btn.textContent = 'Update All';
+                btn.disabled = false;
+                cl('bem');
+                if (d.error) { f(d.error, 'err'); return; }
+                f('Updated ' + d.updated + ' product' + (d.updated > 1 ? 's' : ''), 'ok');
+                load();
+            });
+        }
+        function confirmDelete(id, name) {
+            bulkDeleteIds = null;
+            deleteId = id;
+            document.getElementById('dname').textContent = name;
+            document.getElementById('dmsgP').innerHTML = 'Are you sure you want to delete <strong>' + name + '</strong>?';
+            document.getElementById('dmsg').style.display = 'none';
+            document.getElementById('dbtn').disabled = false;
+            document.getElementById('dbtn').textContent = 'Delete';
+            document.getElementById('dm').classList.add('show');
+        }
     </script>
 </body>
 

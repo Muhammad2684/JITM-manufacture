@@ -250,7 +250,6 @@
         document.getElementById('s').addEventListener('blur', function () { setTimeout(closeDropdown, 200) });
         document.getElementById('discPct').addEventListener('input', calc);
         document.getElementById('discAmt').addEventListener('input', calc);
-        document.getElementById('discAmt').addEventListener('keydown', function(e) { if (e.key === 'Tab') { var fi = document.querySelector('#cart input[type="number"]'); if (fi) { e.preventDefault(); fi.focus(); } } });
 
         document.getElementById('cPhone').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); document.getElementById('cName').focus(); } });
         document.getElementById('cName').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); if (document.getElementById('cPhone').value.trim() && this.value.trim()) document.getElementById('s').focus(); else document.getElementById('walkIn').focus(); } });
@@ -261,13 +260,13 @@
             var tr = e.target.closest('tr');
             if (!tr) return;
             e.preventDefault();
-            var nxt = tr.nextElementSibling;
             if (e.target.tagName === 'SELECT') {
+                var disc = tr.querySelector('input[type="number"]');
+                if (disc) { disc.focus(); return; }
+            } else if (e.target.tagName === 'INPUT') {
+                var nxt = tr.nextElementSibling;
                 if (nxt) { var ns = nxt.querySelector('select'); if (ns) { ns.focus(); return; } }
                 document.getElementById('discPct').focus();
-            } else if (e.target.tagName === 'INPUT') {
-                if (nxt) { var ni = nxt.querySelector('input[type="number"]'); if (ni) { ni.focus(); return; } }
-                document.getElementById('am-cash').focus();
             }
         });
 

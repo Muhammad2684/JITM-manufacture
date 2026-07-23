@@ -18,7 +18,7 @@
     <div class="content">
         <div class="home-grid">
             {% for p in pages %}
-            <a href="{{p.url}}" class="home-card">
+            <a href="{{p.url}}" class="home-card"{{ ' target="_blank"' if p.url == '/pos' else '' }}>
                 <div class="home-icon">{{p.icon}}</div>
                 <div class="home-label">{{p.label}}</div>
                 <div class="home-desc">{{p.desc}}</div>

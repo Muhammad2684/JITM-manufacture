@@ -148,7 +148,7 @@ function loadSuppliers() {
     });
 }
 function loadProducts(supplierId) {
-    var url = '/api/products?per_page=10000';
+    var url = '/api/products?per_page=100000';
     if (supplierId) url += '&supplier_id=' + supplierId;
     fetch(url).then(r=>r.json()).then(d=>{products=d.items||d;});
 }

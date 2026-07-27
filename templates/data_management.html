@@ -53,6 +53,18 @@
                 </div>
             </div>
 
+            <div class="card" style="margin-top:20px">
+                <div class="card-header">Backup &amp; Restore</div>
+                <div style="padding:14px">
+                    <p style="font-size:13px;color:#6b7280;margin-bottom:12px">Create a complete backup of all data as a single JSON file, or restore from a previous backup to migrate to a different device.</p>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-p" onclick="downloadBackup()">Download Full Backup</button>
+                        <button class="btn btn-sm btn-ghost" onclick="showRestore()">Restore from Backup</button>
+                    </div>
+                    <div id="restoreStatus" style="margin-top:10px;font-size:13px;display:none"></div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -83,6 +95,23 @@
                 </form>
             </div>
             <div id="importResult" style="display:none"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="restoreModal">
+        <div class="mc" style="max-width:500px">
+            <button class="mx" onclick="cl('restoreModal')">&times;</button>
+            <h2>Restore from Backup</h2>
+            <div id="restoreBody">
+                <div class="alert alert-warning" style="font-size:13px;margin-bottom:10px">
+                    <strong>Warning:</strong> This will replace ALL existing data with the data from the backup file. This action cannot be undone. We recommend creating a backup first.
+                </div>
+                <form onsubmit="uploadRestore(event)">
+                    <input type="file" id="restoreFile" accept=".json" required style="margin:8px 0">
+                    <button class="btn btn-p" type="submit" id="restoreBtn">Upload & Restore</button>
+                </form>
+            </div>
+            <div id="restoreResult" style="display:none"></div>
         </div>
     </div>
 
@@ -248,6 +277,83 @@
                     }
                     document.getElementById('curPath').innerHTML = d.current_path + ' <span style="color:#6b7280;font-size:11px">(' + sizeLabel + ')</span>';
                 });
+        }
+
+        function downloadBackup() {
+            setRestoreStatus('Creating backup...', '');
+            fetch('/api/data/backup')
+                .then(function(r) {
+                    if (!r.ok) { throw new Error('Backup failed'); }
+                    return r.blob();
+                })
+                .then(function(blob) {
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'jitm_backup.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setRestoreStatus('Backup downloaded successfully', 'success');
+                })
+                .catch(function(err) {
+                    setRestoreStatus('Error: ' + err.message, 'error');
+                });
+        }
+
+        function showRestore() {
+            document.getElementById('restoreFile').value = '';
+            document.getElementById('restoreBody').style.display = '';
+            document.getElementById('restoreResult').style.display = 'none';
+            document.getElementById('restoreBtn').textContent = 'Upload & Restore';
+            document.getElementById('restoreBtn').disabled = false;
+            document.getElementById('restoreModal').classList.add('show');
+        }
+
+        function uploadRestore(e) {
+            e.preventDefault();
+            var file = document.getElementById('restoreFile').files[0];
+            if (!file) return;
+            if (!confirm('This will replace ALL existing data with the backup. Are you sure you want to continue?')) return;
+            var fd = new FormData();
+            fd.append('file', file);
+            document.getElementById('restoreBtn').textContent = 'Restoring...';
+            document.getElementById('restoreBtn').disabled = true;
+            fetch('/api/data/restore', {
+                method: 'POST',
+                body: fd
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                document.getElementById('restoreBody').style.display = 'none';
+                if (d.error) {
+                    document.getElementById('restoreResult').innerHTML = '<div class="alert alert-error">' + d.error + '</div>';
+                } else {
+                    var html = '<div class="alert alert-success">' + d.message + '</div>';
+                    if (d.counts) {
+                        html += '<table style="font-size:12px;margin-top:8px;width:100%"><tr><th style="text-align:left">Table</th><th style="text-align:right">Records</th></tr>';
+                        var keys = Object.keys(d.counts);
+                        for (var i = 0; i < keys.length; i++) {
+                            html += '<tr><td>' + keys[i] + '</td><td style="text-align:right">' + d.counts[keys[i]] + '</td></tr>';
+                        }
+                        html += '</table>';
+                    }
+                    html += '<button class="btn btn-sm btn-p" style="margin-top:10px" onclick="cl(\'restoreModal\');load()">Done</button>';
+                    document.getElementById('restoreResult').innerHTML = html;
+                }
+                document.getElementById('restoreResult').style.display = '';
+            })
+            .catch(function(err) {
+                document.getElementById('restoreBody').style.display = 'none';
+                document.getElementById('restoreResult').innerHTML = '<div class="alert alert-error">Error: ' + err.message + '</div>';
+                document.getElementById('restoreResult').style.display = '';
+            });
+        }
+
+        function setRestoreStatus(msg, type) {
+            var el = document.getElementById('restoreStatus');
+            el.textContent = msg;
+            el.style.display = 'block';
+            el.style.color = type === 'error' ? '#dc2626' : '#16a34a';
         }
 
         function showChangePath() {

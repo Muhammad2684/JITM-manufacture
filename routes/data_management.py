@@ -3,6 +3,7 @@ import io
 import json
 import os
 import shutil
+from datetime import datetime
 
 import openpyxl
 from flask import Blueprint, request, jsonify, session, send_file
@@ -695,6 +696,127 @@ _CLEAR_ORDER = {
     'payments': ['payments'],
     'expenses': ['expenses'],
 }
+
+ALL_TABLES = [
+    'commission_classes', 'categories', 'sizes', 'users', 'suppliers',
+    'accounts', 'customers', 'products', 'variants', 'employees',
+    'purchase_invoices', 'purchase_invoice_items', 'purchase_returns',
+    'purchase_return_items', 'sales', 'sale_items', 'payments',
+    'restock_log', 'account_transfers', 'transactions', 'expenses',
+    'settings', 'attendance',
+]
+
+_CLEAR_ALL_ORDER = [
+    'attendance',
+    'restock_log',
+    'payments',
+    'sale_items',
+    'sales',
+    'purchase_return_items',
+    'purchase_returns',
+    'purchase_invoice_items',
+    'purchase_invoices',
+    'account_transfers',
+    'transactions',
+    'variants',
+    'products',
+    'employees',
+    'customers',
+    'accounts',
+    'suppliers',
+    'users',
+    'sizes',
+    'categories',
+    'commission_classes',
+    'expenses',
+    'settings',
+]
+
+_INSERT_ORDER = list(reversed(_CLEAR_ALL_ORDER))
+
+
+def _clear_all():
+    with get_db() as db:
+        db.execute('PRAGMA foreign_keys=OFF')
+        try:
+            for t in _CLEAR_ALL_ORDER:
+                db.execute(f'DELETE FROM {t}')
+        finally:
+            db.execute('PRAGMA foreign_keys=ON')
+
+
+@data_bp.route('/data/backup')
+@login_required
+@manager_required
+def backup_data():
+    backup = {
+        'version': 1,
+        'created_at': datetime.now().isoformat(),
+        'tables': {},
+    }
+    with get_db() as db:
+        for table in ALL_TABLES:
+            try:
+                rows = [dict(r) for r in db.execute(f'SELECT * FROM {table} ORDER BY id').fetchall()]
+                backup['tables'][table] = rows
+            except Exception:
+                backup['tables'][table] = []
+    return send_file(
+        io.BytesIO(json.dumps(backup, indent=2).encode('utf-8')),
+        mimetype='application/json',
+        as_attachment=True,
+        download_name='jitm_backup.json'
+    )
+
+
+@data_bp.route('/data/restore', methods=['POST'])
+@login_required
+@manager_required
+def restore_data():
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'No file uploaded'}), 400
+    try:
+        data = json.loads(file.read().decode('utf-8'))
+    except Exception as e:
+        return jsonify({'error': f'Invalid JSON: {str(e)}'}), 400
+    if not isinstance(data, dict) or 'tables' not in data:
+        return jsonify({'error': 'Invalid backup format: missing "tables" key'}), 400
+    tables = data.get('tables', {})
+    counts = {}
+    with get_db() as db:
+        db.execute('PRAGMA foreign_keys=OFF')
+        try:
+            for t in _CLEAR_ALL_ORDER:
+                db.execute(f'DELETE FROM {t}')
+            for table in _INSERT_ORDER:
+                rows = tables.get(table, [])
+                if not rows:
+                    counts[table] = 0
+                    continue
+                if table == 'settings':
+                    for row in rows:
+                        db.execute(
+                            'INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)',
+                            (row['key'], row['value'])
+                        )
+                    counts[table] = len(rows)
+                    continue
+                col_names = list(rows[0].keys()) if rows else []
+                if not col_names:
+                    counts[table] = 0
+                    continue
+                placeholders = ','.join(['?' for _ in col_names])
+                cols_csv = ','.join(col_names)
+                for row in rows:
+                    values = [row.get(c) for c in col_names]
+                    db.execute(f'INSERT INTO {table} ({cols_csv}) VALUES ({placeholders})', values)
+                counts[table] = len(rows)
+        except Exception as e:
+            return jsonify({'error': f'Restore failed at table "{table}": {str(e)}'}), 500
+        finally:
+            db.execute('PRAGMA foreign_keys=ON')
+    return jsonify({'ok': True, 'counts': counts, 'message': 'Database restored successfully'})
 
 
 def _clear_entity(entity_id):

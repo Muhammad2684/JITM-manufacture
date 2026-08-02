@@ -632,7 +632,6 @@ function submitInvoice() {
         window.location.href = '/purchase-invoices';
     });
 }
-window.onclick=function(e){document.querySelectorAll('.modal').forEach(function(m){if(e.target===m)m.classList.remove('show');});};
 document.getElementById('issue_date').value=new Date().toISOString().slice(0,10);
 loadProducts();
 fetch('/api/categories').then(r=>r.json()).then(function(d){catList=d;});

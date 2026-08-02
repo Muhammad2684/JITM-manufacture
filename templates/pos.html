@@ -584,7 +584,6 @@
             `);
             iframeDoc.close();
         }
-        window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
         document.getElementById('cPhone').focus();
         document.addEventListener('keydown', function (e) { if (document.querySelector('.modal.show')) return; if (e.key === 'Enter') { var amtFlds = ['am-cash','am-jb','am-ahd','am-z','am-credit']; if (amtFlds.includes(e.target.id) && cart.length) { pay(true); return; } } var t = (e.target || {}).tagName; if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return; document.getElementById('s').focus(); });
         fetch('/api/employees').then(function (r) { return r.json() }).then(function (d) { staffList = d || []; if (!lastStaff && staffList.length) { lastStaff = staffList[0].id; cart.forEach(function (c) { if (!c.staff) c.staff = lastStaff; }); } renderC(); });

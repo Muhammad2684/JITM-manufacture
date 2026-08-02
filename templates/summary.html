@@ -519,18 +519,6 @@
             document.getElementById('detailModal').classList.remove('show');
         }
         
-        document.getElementById('detailModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeModal();
-            }
-        });
-        
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeModal();
-            }
-        });
-        
         loadSummary();
     </script>
 </body>

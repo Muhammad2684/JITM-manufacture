@@ -231,7 +231,6 @@
             `);
             iframeDoc.close();
         }
-        window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
         load();
         function printTable() { document.body.classList.add('printing'); window.print(); }
         window.addEventListener('afterprint', function () { document.body.classList.remove('printing'); });

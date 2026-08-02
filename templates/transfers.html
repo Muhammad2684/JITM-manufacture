@@ -368,11 +368,6 @@
             document.getElementById(id).classList.remove('show');
         }
         
-        window.onclick = function(e) {
-            document.querySelectorAll('.modal').forEach(m => {
-                if (e.target === m) m.classList.remove('show');
-            });
-        };
         
         load();
         loadAccts();

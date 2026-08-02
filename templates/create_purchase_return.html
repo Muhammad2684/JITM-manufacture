@@ -574,7 +574,6 @@ function submitReturn() {
         window.location.href = '/purchase-returns';
     });
 }
-window.onclick=function(e){document.querySelectorAll('.modal').forEach(function(m){if(e.target===m)m.classList.remove('show');});};
 document.getElementById('return_date').value=new Date().toISOString().slice(0,10);
 loadSuppliers();
 loadProducts();

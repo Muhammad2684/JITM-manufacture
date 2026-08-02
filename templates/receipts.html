@@ -569,12 +569,6 @@
             document.getElementById(id).classList.remove('show');
         }
         
-        window.onclick = function(e) {
-            var ms = document.querySelectorAll('.modal');
-            ms.forEach(function(m) {
-                if (e.target === m) m.classList.remove('show');
-            });
-        };
         
         function printTable() {
             document.body.classList.add('printing');

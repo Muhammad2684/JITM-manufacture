@@ -721,7 +721,6 @@ function loadSale(id) {
     });
 }
 
-window.onclick=function(e){document.querySelectorAll('.modal').forEach(function(m){if(e.target===m)m.classList.remove('show');});};
 document.getElementById('sale_date').value = new Date().toISOString().slice(0,10);
 document.getElementById('receipt_no').value = generateReceipt();
 loadCustomers();

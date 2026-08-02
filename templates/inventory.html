@@ -527,7 +527,6 @@
         var deleteId = null;
         function f(m, t) { const e = document.getElementById('flash'); e.innerHTML = '<div class="fl fl-' + t + '">' + m + '</div>'; setTimeout(() => { const f = e.querySelector('.fl'); if (f) { f.style.opacity = '0'; setTimeout(() => f.remove(), 300); } }, 3000); }
         function cl(id) { document.getElementById(id).classList.remove('show'); }
-        window.onclick = function (e) { document.querySelectorAll('.modal').forEach(m => { if (e.target === m) m.classList.remove('show'); }); };
         function printTable(){document.body.classList.add('printing');window.print();}
         window.addEventListener('afterprint',function(){document.body.classList.remove('printing');});
 

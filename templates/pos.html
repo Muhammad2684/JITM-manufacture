@@ -252,13 +252,13 @@
         document.getElementById('discPct').addEventListener('input', calc);
         document.getElementById('discAmt').addEventListener('input', calc);
 
-        document.getElementById('cPhone').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); document.getElementById('cName').focus(); } });
-        document.getElementById('cName').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); if (document.getElementById('cPhone').value.trim() && this.value.trim()) document.getElementById('s').focus(); else document.getElementById('walkIn').focus(); } });
-        document.getElementById('walkIn').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); document.getElementById('s').focus(); } });
-        document.getElementById('s').addEventListener('keydown', function(e) { if (e.key === 'Tab') { e.preventDefault(); var sel = document.querySelector('#cart select'); if (sel) { focusSelect(sel); } else document.getElementById('am-cash').focus(); } });
+        document.getElementById('cPhone').addEventListener('keydown', function(e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); document.getElementById('cName').focus(); } });
+        document.getElementById('cName').addEventListener('keydown', function(e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); if (document.getElementById('cPhone').value.trim() && this.value.trim()) document.getElementById('s').focus(); else document.getElementById('walkIn').focus(); } });
+        document.getElementById('walkIn').addEventListener('keydown', function(e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); document.getElementById('s').focus(); } });
+        document.getElementById('s').addEventListener('keydown', function(e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); var sel = document.querySelector('#cart select'); if (sel) { focusSelect(sel); } else document.getElementById('am-cash').focus(); } });
         function focusSelect(el) { el.focus(); el.showPicker(); }
         document.getElementById('cart').addEventListener('keydown', function(e) {
-            if (e.key !== 'Tab') return;
+            if (e.key !== 'Tab' || e.shiftKey) return;
             var tr = e.target.closest('tr');
             if (!tr) return;
             e.preventDefault();

@@ -17,7 +17,7 @@
 .ci-entity label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600;display:block;margin-bottom:4px}
 .ci-entity select,.ci-entity input{width:100%;padding:8px 12px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
 .ci-entity select:focus,.ci-entity input:focus{outline:none;border-color:#3b4fe2}
-.ssheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;margin-bottom:16px}
+.ssheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;margin-bottom:16px;overflow-x:auto}
 
 .ssheet table{width:100%;border-collapse:collapse;table-layout:fixed}
 .ssheet th{background:#f3f4f6;padding:6px 8px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db;border-right:1px solid #e5e7eb}
@@ -38,8 +38,11 @@
 .ci-footer .gt{margin-left:auto;font-size:16px;font-weight:700;color:#1e293b}
 .ssheet .item-wrap{position:relative;display:flex;align-items:center;gap:6px}
 .ssheet .item-wrap .cell{width:auto;flex:1;min-width:0}
-.ssheet .sku-tag{font-size:11px;color:#9ca3af;white-space:nowrap;flex-shrink:0;pointer-events:none}
 .ssheet .cell-static{padding:6px 8px;font-size:12px;color:#6b7280;text-align:right}
+.ssheet th.sku-col,.ssheet td.sku-col{position:sticky;left:0;z-index:2}
+.ssheet th.sku-col{background:#f3f4f6}
+.ssheet td.sku-col{background:#fff}
+.ssheet td.sku-col .cell-static{color:#1e293b}
 .ssheet .ac-list{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:4px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .ssheet .ac-list div{padding:6px 8px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6}
 .ssheet .ac-list div:hover{background:#eef2ff}
@@ -72,7 +75,7 @@
             </div>
             <div class="ssheet">
                 <table>
-                    <thead><tr><th style="width:28%">Item</th><th style="width:8%" class="text-right">Stock</th><th style="width:10%" class="text-right">Avg Cost</th><th style="width:11%" class="text-right">Qty</th><th style="width:15%" class="text-right">Unit Price</th><th style="width:16%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
+                    <thead><tr><th style="width:22%">Item</th><th style="width:14%" class="sku-col">SKU</th><th style="width:7%" class="text-right">Stock</th><th style="width:9%" class="text-right">Avg Cost</th><th style="width:10%" class="text-right">Qty</th><th style="width:14%" class="text-right">Unit Price</th><th style="width:15%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
                     <tbody id="items_tb"></tbody>
                 </table>
                 <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button></div>
@@ -224,7 +227,8 @@ function addRow(data) {
     var total = data ? data.total : 0;
     var pid = data ? (data.pid || null) : null;
     var html = '<tr id="rr-'+rowId+'"' + (pid ? ' data-pid="'+pid+'"' : '') + '>';
-    html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><span class="sku-tag" id="sk-'+rowId+'"></span><div class="ac-list" id="ac-'+rowId+'"></div></td>';
+    html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
+    html += '<td class="sku-col"><div class="cell-static" id="sk-'+rowId+'"></div></td>';
     html += '<td class="text-right"><div class="cell-static" id="stk-'+rowId+'">&mdash;</div></td>';
     html += '<td class="text-right"><div class="cell-static" id="avg-'+rowId+'">&mdash;</div></td>';
     html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
@@ -450,7 +454,7 @@ function saveProduct(e) {
             if (tr) {
                 tr.dataset.pid = d.id;
                 var skuEl = document.getElementById('sk-'+createTargetRid);
-                if (skuEl) skuEl.textContent = data.sku ? '['+data.sku+']' : '';
+                if (skuEl) skuEl.textContent = data.sku || '';
                 var stkEl = document.getElementById('stk-'+createTargetRid);
                 if (stkEl) stkEl.textContent = '0';
                 var avgEl = document.getElementById('avg-'+createTargetRid);
@@ -504,7 +508,7 @@ function setSkuTag(rid, pid) {
     var el = document.getElementById('sk-'+rid);
     if (!el) return;
     var p = pid ? products.find(function(x){ return x.id === pid; }) : null;
-    el.textContent = p && p.sku ? '[' + p.sku + ']' : '';
+    el.textContent = p && p.sku ? p.sku : '';
 }
 function refreshSkuTags() {
     document.querySelectorAll('#items_tb tr[data-pid]').forEach(function(tr){

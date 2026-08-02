@@ -629,6 +629,16 @@ def init_db():
         except Exception:
             pass
 
+        try:
+            db.execute('CREATE INDEX IF NOT EXISTS idx_variants_product_id ON variants(product_id)')
+        except Exception:
+            pass
+
+        try:
+            db.execute('CREATE INDEX IF NOT EXISTS idx_restock_log_variant_id ON restock_log(variant_id)')
+        except Exception:
+            pass
+
         hashed_admin = generate_password_hash('admin123')
         hashed_staff = generate_password_hash('staff123')
         db.execute(

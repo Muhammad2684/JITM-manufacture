@@ -14,48 +14,76 @@ def list_products():
     q = request.args.get('q', '')
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
+    supplier_id = request.args.get('supplier_id', type=int)
     offset = (page - 1) * per_page
     
     with get_db() as db:
         if q:
+            params = [f'%{q}%', f'%{q}%', f'%{q}%', q, q, f'%{q}%']
+            if supplier_id:
+                params.append(supplier_id)
+            sup_cond = ' AND p.supplier_id=?' if supplier_id else ''
             count_row = db.execute(
                 'SELECT COUNT(DISTINCT p.id) as cnt FROM products p LEFT JOIN variants v ON v.product_id=p.id '
-                'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? OR p.category LIKE ?',
-                (f'%{q}%', f'%{q}%', f'%{q}%', q, q, f'%{q}%')
+                'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? OR p.category LIKE ?' + sup_cond,
+                params
             ).fetchone()
             total = count_row['cnt']
             rows = db.execute(
                 'SELECT DISTINCT p.id, p.name, p.category, p.base_price, p.cost_price, p.sku, p.barcode, p.has_variants, p.low_stock, p.created_at, p.commission_class, p.supplier_id, s.name as supplier_name FROM products p '
                 'LEFT JOIN suppliers s ON s.id=p.supplier_id '
                 'LEFT JOIN variants v ON v.product_id=p.id '
-                'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? OR p.category LIKE ? '
-                'ORDER BY p.name LIMIT ? OFFSET ?',
-                (f'%{q}%', f'%{q}%', f'%{q}%', q, q, f'%{q}%', per_page, offset)
+                'WHERE p.name LIKE ? OR p.sku LIKE ? OR v.sku LIKE ? OR v.barcode=? OR p.barcode=? OR p.category LIKE ?' + sup_cond +
+                ' ORDER BY p.name LIMIT ? OFFSET ?',
+                params + [per_page, offset]
             ).fetchall()
         else:
-            count_row = db.execute('SELECT COUNT(*) as cnt FROM products').fetchone()
-            total = count_row['cnt']
-            rows = db.execute(
-                'SELECT p.*, s.name as supplier_name FROM products p '
-                'LEFT JOIN suppliers s ON s.id=p.supplier_id '
-                'ORDER BY p.name LIMIT ? OFFSET ?',
-                (per_page, offset)
-            ).fetchall()
+            if supplier_id:
+                count_row = db.execute('SELECT COUNT(*) as cnt FROM products WHERE supplier_id=?', (supplier_id,)).fetchone()
+                total = count_row['cnt']
+                rows = db.execute(
+                    'SELECT p.*, s.name as supplier_name FROM products p '
+                    'LEFT JOIN suppliers s ON s.id=p.supplier_id '
+                    'WHERE p.supplier_id=? ORDER BY p.name LIMIT ? OFFSET ?',
+                    (supplier_id, per_page, offset)
+                ).fetchall()
+            else:
+                count_row = db.execute('SELECT COUNT(*) as cnt FROM products').fetchone()
+                total = count_row['cnt']
+                rows = db.execute(
+                    'SELECT p.*, s.name as supplier_name FROM products p '
+                    'LEFT JOIN suppliers s ON s.id=p.supplier_id '
+                    'ORDER BY p.name LIMIT ? OFFSET ?',
+                    (per_page, offset)
+                ).fetchall()
         
         products = []
-        for p in rows:
-            variants = db.execute('SELECT * FROM variants WHERE product_id=? ORDER BY size, color', (p['id'],)).fetchall()
-            p = dict(p)
-            p['variants'] = [dict(v) for v in variants]
-            p['total_stock'] = sum(v['stock'] for v in variants)
-            p['is_low'] = any(v['stock'] <= p['low_stock'] for v in variants) if variants else p['total_stock'] <= p['low_stock']
-            last_cost = db.execute(
-                'SELECT cost FROM restock_log r JOIN variants v ON v.id=r.variant_id '
-                'WHERE v.product_id=? AND r.cost>0 ORDER BY r.id DESC LIMIT 1',
-                (p['id'],)
-            ).fetchone()
-            p['last_purchased_cost'] = round(last_cost['cost'], 2) if last_cost else None
-            products.append(p)
+        if rows:
+            ids = [p['id'] for p in rows]
+            vars_by_prod = {}
+            for i in range(0, len(ids), 500):
+                chunk = ids[i:i+500]
+                ph = ','.join('?' * len(chunk))
+                for v in db.execute(f'SELECT * FROM variants WHERE product_id IN ({ph}) ORDER BY product_id, size, color', chunk).fetchall():
+                    vars_by_prod.setdefault(v['product_id'], []).append(dict(v))
+            last_cost_by_prod = {}
+            for i in range(0, len(ids), 500):
+                chunk = ids[i:i+500]
+                ph = ','.join('?' * len(chunk))
+                for r in db.execute(
+                    f'SELECT v.product_id, r.cost FROM restock_log r JOIN variants v ON v.id=r.variant_id '
+                    f'WHERE v.product_id IN ({ph}) AND r.cost>0 ORDER BY r.id',
+                    chunk
+                ).fetchall():
+                    last_cost_by_prod[r['product_id']] = round(r['cost'], 2)
+            for p in rows:
+                p = dict(p)
+                variants = vars_by_prod.get(p['id'], [])
+                p['variants'] = variants
+                p['total_stock'] = sum(v['stock'] for v in variants)
+                p['is_low'] = any(v['stock'] <= p['low_stock'] for v in variants) if variants else p['total_stock'] <= p['low_stock']
+                p['last_purchased_cost'] = last_cost_by_prod.get(p['id'])
+                products.append(p)
         
         return jsonify({
             'items': products,

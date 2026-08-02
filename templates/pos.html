@@ -202,10 +202,10 @@
                 </div>
                 <button class="btn btn-s btn-lg" id="chg" onclick="pay(true)" style="justify-content:center">Charge Rs
                     0.00</button>
-                <button class="btn btn-lg" onclick="pay()" style="justify-content:center;margin-top:-6px">Complete</button>
+                <button class="btn btn-lg" id="completeBtn" onclick="pay()" style="justify-content:center;margin-top:-6px">Complete</button>
                 <div style="display:flex;gap:6px">
                     <button class="btn btn-ghost btn-sm" onclick="cycleMode()" id="modeBtn">Sale</button>
-                    <button class="btn btn-ghost btn-sm" onclick="clearCart()">Clear</button>
+                    <button class="btn btn-ghost btn-sm" id="clearBtn" onclick="clearCart()">Clear</button>
                 </div>
                 <input id="notes" placeholder="Notes..." style="padding:6px 10px;font-size:12px">
             </div>
@@ -281,6 +281,53 @@
                 if (nxt) { var ns = nxt.querySelector('select'); if (ns) { focusSelect(ns); return; } }
                 document.getElementById('discPct').focus();
             }
+        });
+        var navIds = ['cPhone', 'cName', 'walkIn', 's', 'scBtn', 'discPct', 'discAmt', 'am-cash', 'am-jb', 'am-ahd', 'am-z', 'am-credit', 'chg', 'completeBtn', 'modeBtn', 'clearBtn', 'notes'];
+        function lastCartEl(tr) { var a = tr.querySelectorAll('select,input,button'); return a[a.length - 1]; }
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            var id = e.target.id, tr = e.target.closest('tr');
+            if (tr && tr.closest('#cart')) {
+                e.preventDefault();
+                var els = Array.prototype.slice.call(tr.querySelectorAll('select,input,button')), i = els.indexOf(e.target);
+                if (e.key === 'ArrowDown') {
+                    var nx = els[i + 1];
+                    if (nx) { nx.focus(); return; }
+                    var nr = tr.nextElementSibling;
+                    if (nr) { var nf = nr.querySelector('select'); if (nf) { nf.focus(); return; } }
+                    document.getElementById('discPct').focus();
+                } else {
+                    var pv = els[i - 1];
+                    if (pv) { pv.focus(); return; }
+                    var pr = tr.previousElementSibling;
+                    if (pr) { lastCartEl(pr).focus(); return; }
+                    document.getElementById('scBtn').focus();
+                }
+                return;
+            }
+            if (id === 's') {
+                if (document.querySelectorAll('#prods .pd-item').length) return;
+                e.preventDefault();
+                if (e.key === 'ArrowDown') { document.getElementById('scBtn').focus(); } else { document.getElementById('walkIn').focus(); }
+                return;
+            }
+            if (id === 'scBtn') {
+                e.preventDefault();
+                if (e.key === 'ArrowDown') { var f = document.querySelector('#cart select'); if (f) { f.focus(); return; } document.getElementById('discPct').focus(); } else { document.getElementById('s').focus(); }
+                return;
+            }
+            if (id === 'discPct' && e.key === 'ArrowUp') {
+                e.preventDefault();
+                var rows = document.querySelectorAll('#cart tbody tr');
+                if (rows.length) { lastCartEl(rows[rows.length - 1]).focus(); return; }
+                document.getElementById('scBtn').focus();
+                return;
+            }
+            var idx = navIds.indexOf(id);
+            if (idx === -1) return;
+            e.preventDefault();
+            var ni = (idx + (e.key === 'ArrowDown' ? 1 : -1) + navIds.length) % navIds.length;
+            document.getElementById(navIds[ni]).focus();
         });
 
         function highlight(items) { items.forEach(function (el, i) { el.classList.toggle('hl', i === hlIdx) }); var h = items[hlIdx]; if (h) h.scrollIntoView({ block: 'nearest' }); }

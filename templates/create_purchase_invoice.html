@@ -39,6 +39,7 @@
 .ssheet .item-wrap{position:relative;display:flex;align-items:center;gap:6px}
 .ssheet .item-wrap .cell{width:auto;flex:1;min-width:0}
 .ssheet .sku-tag{font-size:11px;color:#9ca3af;white-space:nowrap;flex-shrink:0;pointer-events:none}
+.ssheet .cell-static{padding:6px 8px;font-size:12px;color:#6b7280;text-align:right}
 .ssheet .ac-list{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:4px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .ssheet .ac-list div{padding:6px 8px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6}
 .ssheet .ac-list div:hover{background:#eef2ff}
@@ -71,7 +72,7 @@
             </div>
             <div class="ssheet">
                 <table>
-                    <thead><tr><th style="width:38%">Item</th><th style="width:14%" class="text-right">Qty</th><th style="width:18%" class="text-right">Unit Price</th><th style="width:18%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
+                    <thead><tr><th style="width:28%">Item</th><th style="width:8%" class="text-right">Stock</th><th style="width:10%" class="text-right">Avg Cost</th><th style="width:11%" class="text-right">Qty</th><th style="width:15%" class="text-right">Unit Price</th><th style="width:16%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
                     <tbody id="items_tb"></tbody>
                 </table>
                 <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button></div>
@@ -207,7 +208,7 @@ function recalcDueDate(issueId, dueId, byId) {
 function loadProducts(supplierId) {
     var url = '/api/products?per_page=100000';
     if (supplierId) url += '&supplier_id=' + supplierId;
-    fetch(url).then(r=>r.json()).then(d=>{products=d.items||d; refreshSkuTags();});
+    fetch(url).then(r=>r.json()).then(d=>{products=d.items||d; refreshSkuTags(); refreshItemStats();});
 }
 
 function isLastRow(el) {
@@ -224,6 +225,8 @@ function addRow(data) {
     var pid = data ? (data.pid || null) : null;
     var html = '<tr id="rr-'+rowId+'"' + (pid ? ' data-pid="'+pid+'"' : '') + '>';
     html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><span class="sku-tag" id="sk-'+rowId+'"></span><div class="ac-list" id="ac-'+rowId+'"></div></td>';
+    html += '<td class="text-right"><div class="cell-static" id="stk-'+rowId+'">&mdash;</div></td>';
+    html += '<td class="text-right"><div class="cell-static" id="avg-'+rowId+'">&mdash;</div></td>';
     html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
     html += '<td><input class="cell num up" value="'+up.toFixed(2)+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
     html += '<td><div class="total-cell" id="rt-'+rowId+'">Rs '+total.toFixed(2)+'</div></td>';
@@ -236,6 +239,10 @@ function addRow(data) {
 function onItemInput(inp, rid) {
     var skuEl = document.getElementById('sk-'+rid);
     if (skuEl) skuEl.textContent = '';
+    var stkEl = document.getElementById('stk-'+rid);
+    if (stkEl) stkEl.textContent = '&mdash;';
+    var avgEl = document.getElementById('avg-'+rid);
+    if (avgEl) avgEl.textContent = '&mdash;';
     acShow(inp, rid);
     if (!isLastRow(inp)) return;
     if (inp.value.trim() !== '') {
@@ -444,6 +451,10 @@ function saveProduct(e) {
                 tr.dataset.pid = d.id;
                 var skuEl = document.getElementById('sk-'+createTargetRid);
                 if (skuEl) skuEl.textContent = data.sku ? '['+data.sku+']' : '';
+                var stkEl = document.getElementById('stk-'+createTargetRid);
+                if (stkEl) stkEl.textContent = '0';
+                var avgEl = document.getElementById('avg-'+createTargetRid);
+                if (avgEl) avgEl.textContent = 'Rs ' + (parseFloat(data.cost_price) || 0).toFixed(2);
                 tr.querySelector('.up').value = parseFloat(data.cost_price).toFixed(2);
                 var inp = tr.querySelector('.item-wrap .cell');
                 inp.value = data.name + (data.size ? ' ['+data.size+']' : '');
@@ -464,6 +475,7 @@ function cl(id) { document.getElementById(id).classList.remove('show'); }
 function acPick(rid, pid, name, price) {
     document.getElementById('in-'+rid).value = name;
     setSkuTag(rid, pid);
+    setItemStats(rid, pid);
     document.getElementById('ac-'+rid).style.display = 'none';
     acHighlightIdx = -1;
     var tr = document.getElementById('rr-'+rid);
@@ -474,6 +486,19 @@ function acPick(rid, pid, name, price) {
     if (isLastRow(tr.querySelector('.item-wrap .cell'))) {
         addRow();
     }
+}
+function setItemStats(rid, pid) {
+    var stkEl = document.getElementById('stk-'+rid);
+    var avgEl = document.getElementById('avg-'+rid);
+    if (!stkEl && !avgEl) return;
+    var p = pid ? products.find(function(x){ return x.id === pid; }) : null;
+    if (stkEl) stkEl.textContent = p ? (p.total_stock != null ? p.total_stock : '&mdash;') : '&mdash;';
+    if (avgEl) avgEl.textContent = p && p.cost_price != null ? 'Rs ' + p.cost_price.toFixed(2) : '&mdash;';
+}
+function refreshItemStats() {
+    document.querySelectorAll('#items_tb tr[data-pid]').forEach(function(tr){
+        setItemStats(parseInt(tr.id.replace('rr-','')), parseInt(tr.dataset.pid));
+    });
 }
 function setSkuTag(rid, pid) {
     var el = document.getElementById('sk-'+rid);
@@ -617,6 +642,7 @@ function applyCSVData() {
     csvData = null;
     calcGrand();
     refreshSkuTags();
+    refreshItemStats();
 }
 
 function loadInvoice(id) {
@@ -645,6 +671,7 @@ function loadInvoice(id) {
         oldBalanceDue = inv.balance_due || 0;
         calcGrand();
         refreshSkuTags();
+        refreshItemStats();
     });
 }
 

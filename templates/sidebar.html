@@ -18,11 +18,11 @@
                 {% endif %}
                 <div class="sub-group {{ 'show' if ns.sub_active else '' }}">
                     {% for sub in item.subs %}
-                        <a href="{{ sub.url }}" class="sub {{ 'active' if active == sub.url else '' }}"{{ ' target="_blank"' if '/create' in sub.url or '/inventory/barcode' in sub.url else '' }}>{{ sub.label }}</a>
+                        <a href="{{ sub.url }}" class="sub {{ 'active' if active == sub.url else '' }}"{{ ' data-newtab' if '/create' in sub.url or '/inventory/barcode' in sub.url else '' }}>{{ sub.label }}</a>
                     {% endfor %}
                 </div></div>
             {% else %}
-                <a href="{{ item.url }}" class="{{ 'active' if item.url == active else '' }}"{{ ' target="_blank"' if item.url == '/pos' else '' }}>{{ item.label }}</a>
+                <a href="{{ item.url }}" class="{{ 'active' if item.url == active else '' }}"{{ ' data-newtab' if item.url == '/pos' else '' }}>{{ item.label }}</a>
             {% endif %}
         {% endfor %}
     </div>
@@ -38,6 +38,11 @@ document.querySelector('.sidebar').addEventListener('click',function(e){
     }else if(e.target.classList.contains('arrow')){
         var g = e.target.closest('.nav-group');var s = g.querySelector('.sub-group');var ar = g.querySelector('.arrow');
         s.classList.toggle('show');ar.innerHTML = s.classList.contains('show')?'&#9660;':'&#9654;';e.preventDefault();
+    }
+    var nt = e.target.closest('a[data-newtab]');
+    if(nt){
+        e.preventDefault();
+        window.open(nt.href, 'jitm-' + Date.now());
     }
 });
 </script>

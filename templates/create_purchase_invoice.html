@@ -2,6 +2,12 @@
 <html>
 <head><title>JITM · Create Purchase Invoice</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/static/style.css">
 <style>
+.sup-pg{display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:#fff;border:1px solid #e2e1de;border-radius:8px;max-height:300px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1);margin-top:4px}
+.sup-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f2ef}
+.sup-item:last-child{border-bottom:none}
+.sup-item.hl{background:#f0effc}
+.sup-name{font-size:13px;font-weight:600;color:#1a1c2e}
+.sup-detail{font-size:11px;color:#6b7280}
 .ci-wrap{max-width:960px;margin:0 auto}
 .ci-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
 .ci-meta label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600;display:block;margin-bottom:4px}
@@ -58,7 +64,7 @@
                 <div><label>Invoice No.</label><input type="text" id="invoice_no" placeholder="e.g. INV-001" required></div>
             </div>
             <div class="ci-entity">
-                <div style="margin-bottom:12px"><label>Supplier</label><select id="supplier_id" onkeydown="supType('supplier_id',event)"><option value="">-- Select Supplier --</option></select></div>
+                <div style="margin-bottom:12px;position:relative"><label>Supplier</label><input type="text" id="supplier_search" placeholder="Search supplier..." autocomplete="off" oninput="supSearch()" onfocus="supSearch()" onkeydown="supKey(event)" onblur="setTimeout(supClose,200)"><div class="sup-pg" id="supList"></div><input type="hidden" id="supplier_id"></div>
                 <div><label>Description</label><input type="text" id="description" placeholder="Invoice description (optional)"></div>
             </div>
             <div class="ssheet">
@@ -135,9 +141,8 @@
 var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [], sizeList = [], oldInvoiceAmount = 0, oldBalanceDue = 0;
 
 function loadSuppliers() {
-    fetch('/api/suppliers').then(r=>r.json()).then(d=>{
+    fetch('/api/suppliers?per_page=100000').then(r=>r.json()).then(d=>{
         suppliers = d.items || d;
-        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>'<option value="'+s.id+'">'+s.name+' — Rs '+parseFloat(s.balance||0).toFixed(2)+'</option>').join('');
         var params = new URLSearchParams(window.location.search);
         var editIdParam = params.get('id');
         if (editIdParam) {
@@ -146,6 +151,47 @@ function loadSuppliers() {
             addRow();
         }
     });
+}
+var supHl = -1;
+function supSearch() {
+    var q = document.getElementById('supplier_search').value.toLowerCase().trim();
+    var list = q ? suppliers.filter(function(s){ return s.name.toLowerCase().indexOf(q) !== -1 || String(s.phone || '').toLowerCase().indexOf(q) !== -1; }) : suppliers;
+    var g = document.getElementById('supList'); supHl = -1;
+    if (!list.length) { g.style.display = 'none'; g.innerHTML = ''; return; }
+    g.style.display = 'block';
+    g.innerHTML = list.map(function(s){
+        return '<div class="sup-item" data-id="' + s.id + '" onmousedown="event.preventDefault();pickSup(' + s.id + ')"><div class="sup-name">' + s.name + '</div><div class="sup-detail">' + (s.phone ? s.phone + ' &middot; ' : '') + 'Balance: Rs ' + parseFloat(s.balance || 0).toFixed(2) + '</div></div>';
+    }).join('');
+    supHl = 0;
+    highlightSup();
+}
+function highlightSup() {
+    var its = document.querySelectorAll('#supList .sup-item');
+    for (var i = 0; i < its.length; i++) its[i].classList.toggle('hl', i === supHl);
+}
+function supKey(e) {
+    var its = document.querySelectorAll('#supList .sup-item');
+    if (e.key === 'ArrowDown' && its.length) { e.preventDefault(); supHl = (supHl + 1) % its.length; highlightSup(); }
+    else if (e.key === 'ArrowUp' && its.length) { e.preventDefault(); supHl = (supHl - 1 + its.length) % its.length; highlightSup(); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (its.length) pickSup(parseInt(its[Math.max(supHl, 0)].dataset.id)); }
+    else if (e.key === 'Escape') { supClose(); }
+}
+function pickSup(id) {
+    var s = suppliers.find(function(x){ return x.id === id; });
+    if (!s) return;
+    document.getElementById('supplier_id').value = s.id;
+    document.getElementById('supplier_search').value = s.name;
+    supClose();
+    loadProducts(s.id);
+    var db = document.getElementById('due_by');
+    if (parseInt(s.due_days || 0) > 0 && !db.value) {
+        db.value = s.due_days;
+        recalcDueDate('issue_date', 'due_date', 'due_by');
+    }
+}
+function supClose() {
+    var g = document.getElementById('supList');
+    g.style.display = 'none'; g.innerHTML = ''; supHl = -1;
 }
 function recalcDueDate(issueId, dueId, byId) {
     var days = document.getElementById(byId).value;
@@ -156,45 +202,11 @@ function recalcDueDate(issueId, dueId, byId) {
     var fmt = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     document.getElementById(dueId).value = fmt;
 }
-var supBuf = {}, supTimer = {};
-function supType(selId, e) {
-    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
-    clearTimeout(supTimer[selId]);
-    supBuf[selId] = (supBuf[selId] || '') + e.key.toLowerCase();
-    var q = supBuf[selId];
-    var sel = document.getElementById(selId);
-    var old = sel.value, picked = null;
-    for (var i = 0; i < sel.options.length; i++) {
-        var o = sel.options[i];
-        if (!o.value) continue;
-        var show = o.textContent.toLowerCase().indexOf(q) !== -1;
-        o.style.display = show ? '' : 'none';
-        if (show && !picked) picked = o;
-    }
-    if (picked) {
-        sel.value = picked.value;
-        if (sel.value !== old) sel.dispatchEvent(new Event('change'));
-    }
-    supTimer[selId] = setTimeout(function() {
-        supBuf[selId] = '';
-        for (var j = 0; j < sel.options.length; j++) sel.options[j].style.display = '';
-    }, 800);
-    e.preventDefault();
-}
 function loadProducts(supplierId) {
     var url = '/api/products?per_page=100000';
     if (supplierId) url += '&supplier_id=' + supplierId;
     fetch(url).then(r=>r.json()).then(d=>{products=d.items||d;});
 }
-document.getElementById('supplier_id').addEventListener('change', function() {
-    loadProducts(this.value || null);
-    var sup = suppliers.find(function(s){ return String(s.id) === this; }, this.value);
-    var db = document.getElementById('due_by');
-    if (sup && parseInt(sup.due_days || 0) > 0 && !db.value) {
-        db.value = sup.due_days;
-        recalcDueDate('issue_date', 'due_date', 'due_by');
-    }
-});
 
 function isLastRow(el) {
     var rows = document.querySelectorAll('#items_tb tr');
@@ -596,13 +608,8 @@ function loadInvoice(id) {
         document.getElementById('due_date').value = inv.due_date || '';
         document.getElementById('description').value = inv.description || '';
         document.querySelector('.btn-p').textContent = 'Update';
-        var sel = document.getElementById('supplier_id');
-        if (inv.supplier_id) {
-            var opts = sel.options;
-            for (var i = 0; i < opts.length; i++) {
-                if (parseInt(opts[i].value) === inv.supplier_id) { sel.value = inv.supplier_id; break; }
-            }
-        }
+        document.getElementById('supplier_search').value = inv.supplier_id ? (suppliers.find(function(x){ return x.id === inv.supplier_id; }) || {}).name || '' : '';
+        document.getElementById('supplier_id').value = inv.supplier_id || '';
         document.getElementById('items_tb').innerHTML = '';
         rowId = 0;
         (inv.items || []).forEach(function(item) {

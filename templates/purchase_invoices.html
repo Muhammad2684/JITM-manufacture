@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="stylesheet" href="/static/style.css">
     <style>
+        .sup-pg { display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: #fff; border: 1px solid #e2e1de; border-radius: 8px; max-height: 300px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0, 0, 0, .1); margin-top: 4px; }
+        .sup-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f3f2ef; }
+        .sup-item:last-child { border-bottom: none; }
+        .sup-item.hl { background: #f0effc; }
+        .sup-name { font-size: 13px; font-weight: 600; color: #1a1c2e; }
+        .sup-detail { font-size: 11px; color: #6b7280; }
         .bdg {
             display: inline-block;
             padding: 2px 8px;
@@ -89,9 +95,11 @@
                 <input id="pdd" type="date">
                 <input id="pddb" type="number" min="0" placeholder="Due by (days)" oninput="recalcDueDate('pid','pdd','pddb')">
                 <label>Supplier</label>
-                <select id="pis" onkeydown="supType('pis',event)" onchange="applySupDueDays('pis','pddb')">
-                    <option value="">-- Select --</option>
-                </select>
+                <div style="position:relative">
+                    <input type="text" id="pis_search" placeholder="Search supplier..." autocomplete="off" oninput="supSearch('pis')" onfocus="supSearch('pis')" onkeydown="supKey('pis',event)" onblur="setTimeout(function(){supClose('pis')},200)">
+                    <div class="sup-pg" id="pis_list"></div>
+                    <input type="hidden" id="pis">
+                </div>
                 <label>Invoice Amount (Rs)</label>
                 <input id="pia" type="number" step="0.01" min="0" value="0" oninput="calcBalance()">
                 <label>Balance Due (Rs)</label>
@@ -121,9 +129,11 @@
                 <input id="edd" type="date">
                 <input id="eddb" type="number" min="0" placeholder="Due by (days)" oninput="recalcDueDate('eid','edd','eddb')">
                 <label>Supplier</label>
-                <select id="eis" onkeydown="supType('eis',event)" onchange="applySupDueDays('eis','eddb')">
-                    <option value="">-- Select --</option>
-                </select>
+                <div style="position:relative">
+                    <input type="text" id="eis_search" placeholder="Search supplier..." autocomplete="off" oninput="supSearch('eis')" onfocus="supSearch('eis')" onkeydown="supKey('eis',event)" onblur="setTimeout(function(){supClose('eis')},200)">
+                    <div class="sup-pg" id="eis_list"></div>
+                    <input type="hidden" id="eis">
+                </div>
                 <label>Invoice Amount (Rs)</label>
                 <input id="eia" type="number" step="0.01" min="0" value="0" oninput="calcEditBalance()">
                 <label>Balance Due (Rs)</label>
@@ -326,30 +336,42 @@
             document.getElementById(dueId).value = fmt;
         }
         
-        var supBuf = {}, supTimer = {};
-        function supType(selId, e) {
-            if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
-            clearTimeout(supTimer[selId]);
-            supBuf[selId] = (supBuf[selId] || '') + e.key.toLowerCase();
-            var q = supBuf[selId];
-            var sel = document.getElementById(selId);
-            var old = sel.value, picked = null;
-            for (var i = 0; i < sel.options.length; i++) {
-                var o = sel.options[i];
-                if (!o.value) continue;
-                var show = o.textContent.toLowerCase().indexOf(q) !== -1;
-                o.style.display = show ? '' : 'none';
-                if (show && !picked) picked = o;
-            }
-            if (picked) {
-                sel.value = picked.value;
-                if (sel.value !== old) sel.dispatchEvent(new Event('change'));
-            }
-            supTimer[selId] = setTimeout(function() {
-                supBuf[selId] = '';
-                for (var j = 0; j < sel.options.length; j++) sel.options[j].style.display = '';
-            }, 800);
-            e.preventDefault();
+        var supHl = { pis: -1, eis: -1 };
+        function supSearch(selId) {
+            var q = document.getElementById(selId + '_search').value.toLowerCase().trim();
+            var list = q ? suppliers.filter(function(s){ return s.name.toLowerCase().indexOf(q) !== -1 || String(s.phone || '').toLowerCase().indexOf(q) !== -1; }) : suppliers;
+            var g = document.getElementById(selId + '_list'); supHl[selId] = -1;
+            if (!list.length) { g.style.display = 'none'; g.innerHTML = ''; return; }
+            g.style.display = 'block';
+            g.innerHTML = list.map(function(s){
+                return '<div class="sup-item" data-id="' + s.id + '" onmousedown="event.preventDefault();pickSup(\'' + selId + '\',' + s.id + ')"><div class="sup-name">' + s.name + '</div><div class="sup-detail">' + (s.phone ? s.phone + ' &middot; ' : '') + 'Balance: Rs ' + parseFloat(s.balance || 0).toFixed(2) + '</div></div>';
+            }).join('');
+            supHl[selId] = 0;
+            highlightSup(selId);
+        }
+        function highlightSup(selId) {
+            var its = document.querySelectorAll('#' + selId + '_list .sup-item');
+            for (var i = 0; i < its.length; i++) its[i].classList.toggle('hl', i === supHl[selId]);
+        }
+        function supKey(selId, e) {
+            var its = document.querySelectorAll('#' + selId + '_list .sup-item');
+            if (e.key === 'ArrowDown' && its.length) { e.preventDefault(); supHl[selId] = (supHl[selId] + 1) % its.length; highlightSup(selId); }
+            else if (e.key === 'ArrowUp' && its.length) { e.preventDefault(); supHl[selId] = (supHl[selId] - 1 + its.length) % its.length; highlightSup(selId); }
+            else if (e.key === 'Enter') { e.preventDefault(); if (its.length) pickSup(selId, parseInt(its[Math.max(supHl[selId], 0)].dataset.id)); }
+            else if (e.key === 'Escape') { supClose(selId); }
+        }
+        function pickSup(selId, id) {
+            var s = suppliers.find(function(x){ return x.id === id; });
+            if (!s) return;
+            document.getElementById(selId).value = s.id;
+            document.getElementById(selId + '_search').value = s.name;
+            supClose(selId);
+            var by = selId === 'pis' ? 'pddb' : 'eddb';
+            applySupDueDays(selId, by);
+        }
+        function supClose(selId) {
+            var g = document.getElementById(selId + '_list');
+            g.style.display = 'none'; g.innerHTML = ''; supHl[selId] = -1;
         }
         
         function applySupDueDays(selId, byId) {
@@ -380,6 +402,7 @@
             document.getElementById('pdd').value = '';
             document.getElementById('pddb').value = '';
             document.getElementById('pis').value = '';
+            document.getElementById('pis_search').value = '';
             document.getElementById('pia').value = '0';
             document.getElementById('pbd').value = '0.00';
             document.getElementById('pst').value = 'Unpaid';
@@ -424,13 +447,8 @@
             document.getElementById('ebd').value = p.balance_due;
             document.getElementById('est').value = p.status;
             loadSuppliers('eis');
-            
-            var sel = document.getElementById('eis');
-            setTimeout(function() {
-                if (p.supplier_id && [...sel.options].some(o => o.value == String(p.supplier_id))) {
-                    sel.value = p.supplier_id;
-                }
-            }, 100);
+            document.getElementById('eis_search').value = p.supplier_name || '';
+            document.getElementById('eis').value = p.supplier_id || '';
             
             document.getElementById('em').classList.add('show');
         }

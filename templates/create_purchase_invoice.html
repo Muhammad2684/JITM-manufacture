@@ -36,7 +36,9 @@
 .ssheet-foot{display:flex;align-items:center;padding:8px 10px;gap:8px;border-top:1px solid #e5e7eb}
 .ci-footer{display:flex;gap:10px;align-items:center;padding-top:4px}
 .ci-footer .gt{margin-left:auto;font-size:16px;font-weight:700;color:#1e293b}
-.ssheet .item-wrap{position:relative}
+.ssheet .item-wrap{position:relative;display:flex;align-items:center;gap:6px}
+.ssheet .item-wrap .cell{width:auto;flex:1;min-width:0}
+.ssheet .sku-tag{font-size:11px;color:#9ca3af;white-space:nowrap;flex-shrink:0;pointer-events:none}
 .ssheet .ac-list{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:4px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .ssheet .ac-list div{padding:6px 8px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6}
 .ssheet .ac-list div:hover{background:#eef2ff}
@@ -205,7 +207,7 @@ function recalcDueDate(issueId, dueId, byId) {
 function loadProducts(supplierId) {
     var url = '/api/products?per_page=100000';
     if (supplierId) url += '&supplier_id=' + supplierId;
-    fetch(url).then(r=>r.json()).then(d=>{products=d.items||d;});
+    fetch(url).then(r=>r.json()).then(d=>{products=d.items||d; refreshSkuTags();});
 }
 
 function isLastRow(el) {
@@ -221,7 +223,7 @@ function addRow(data) {
     var total = data ? data.total : 0;
     var pid = data ? (data.pid || null) : null;
     var html = '<tr id="rr-'+rowId+'"' + (pid ? ' data-pid="'+pid+'"' : '') + '>';
-    html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
+    html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><span class="sku-tag" id="sk-'+rowId+'"></span><div class="ac-list" id="ac-'+rowId+'"></div></td>';
     html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
     html += '<td><input class="cell num up" value="'+up.toFixed(2)+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
     html += '<td><div class="total-cell" id="rt-'+rowId+'">Rs '+total.toFixed(2)+'</div></td>';
@@ -232,6 +234,8 @@ function addRow(data) {
 }
 
 function onItemInput(inp, rid) {
+    var skuEl = document.getElementById('sk-'+rid);
+    if (skuEl) skuEl.textContent = '';
     acShow(inp, rid);
     if (!isLastRow(inp)) return;
     if (inp.value.trim() !== '') {
@@ -438,6 +442,8 @@ function saveProduct(e) {
             var tr = document.getElementById('rr-'+createTargetRid);
             if (tr) {
                 tr.dataset.pid = d.id;
+                var skuEl = document.getElementById('sk-'+createTargetRid);
+                if (skuEl) skuEl.textContent = data.sku ? '['+data.sku+']' : '';
                 tr.querySelector('.up').value = parseFloat(data.cost_price).toFixed(2);
                 var inp = tr.querySelector('.item-wrap .cell');
                 inp.value = data.name + (data.size ? ' ['+data.size+']' : '');
@@ -457,6 +463,7 @@ function cl(id) { document.getElementById(id).classList.remove('show'); }
 
 function acPick(rid, pid, name, price) {
     document.getElementById('in-'+rid).value = name;
+    setSkuTag(rid, pid);
     document.getElementById('ac-'+rid).style.display = 'none';
     acHighlightIdx = -1;
     var tr = document.getElementById('rr-'+rid);
@@ -467,6 +474,17 @@ function acPick(rid, pid, name, price) {
     if (isLastRow(tr.querySelector('.item-wrap .cell'))) {
         addRow();
     }
+}
+function setSkuTag(rid, pid) {
+    var el = document.getElementById('sk-'+rid);
+    if (!el) return;
+    var p = pid ? products.find(function(x){ return x.id === pid; }) : null;
+    el.textContent = p && p.sku ? '[' + p.sku + ']' : '';
+}
+function refreshSkuTags() {
+    document.querySelectorAll('#items_tb tr[data-pid]').forEach(function(tr){
+        setSkuTag(parseInt(tr.id.replace('rr-','')), parseInt(tr.dataset.pid));
+    });
 }
 function calcRow(el) {
     var tr = el.closest('tr');
@@ -598,6 +616,7 @@ function applyCSVData() {
     if (!document.querySelectorAll('#items_tb tr').length) addRow();
     csvData = null;
     calcGrand();
+    refreshSkuTags();
 }
 
 function loadInvoice(id) {
@@ -625,6 +644,7 @@ function loadInvoice(id) {
         oldInvoiceAmount = inv.invoice_amount || 0;
         oldBalanceDue = inv.balance_due || 0;
         calcGrand();
+        refreshSkuTags();
     });
 }
 

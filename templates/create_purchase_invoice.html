@@ -58,7 +58,7 @@
                 <div><label>Invoice No.</label><input type="text" id="invoice_no" placeholder="e.g. INV-001" required></div>
             </div>
             <div class="ci-entity">
-                <div style="margin-bottom:12px"><label>Supplier</label><select id="supplier_id"><option value="">-- Select Supplier --</option></select></div>
+                <div style="margin-bottom:12px"><label>Supplier</label><input type="text" placeholder="Search supplier..." style="width:100%;box-sizing:border-box;margin-bottom:6px" oninput="filterSup('supplier_id',this.value)" onkeydown="supSearchKey('supplier_id',event)"><select id="supplier_id"><option value="">-- Select Supplier --</option></select></div>
                 <div><label>Description</label><input type="text" id="description" placeholder="Invoice description (optional)"></div>
             </div>
             <div class="ssheet">
@@ -137,7 +137,7 @@ var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null
 function loadSuppliers() {
     fetch('/api/suppliers').then(r=>r.json()).then(d=>{
         suppliers = d.items || d;
-        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('');
+        document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(s=>'<option value="'+s.id+'">'+s.name+' — Rs '+parseFloat(s.balance||0).toFixed(2)+'</option>').join('');
         var params = new URLSearchParams(window.location.search);
         var editIdParam = params.get('id');
         if (editIdParam) {
@@ -155,6 +155,30 @@ function recalcDueDate(issueId, dueId, byId) {
     d.setDate(d.getDate() + parseInt(days));
     var fmt = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     document.getElementById(dueId).value = fmt;
+}
+function filterSup(selId, val) {
+    var q = (val || '').toLowerCase().trim();
+    var sel = document.getElementById(selId);
+    var first = null;
+    for (var i = 0; i < sel.options.length; i++) {
+        var o = sel.options[i];
+        if (!o.value) continue;
+        var show = !q || o.textContent.toLowerCase().indexOf(q) !== -1;
+        o.style.display = show ? '' : 'none';
+        if (show && !first) first = o;
+    }
+    var target = q ? (first ? first.value : '') : '';
+    if (sel.value !== target) {
+        sel.value = target;
+        sel.dispatchEvent(new Event('change'));
+    }
+}
+function supSearchKey(selId, e) {
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        var sel = document.getElementById(selId);
+        if (sel.showPicker) sel.showPicker();
+    }
 }
 function loadProducts(supplierId) {
     var url = '/api/products?per_page=100000';

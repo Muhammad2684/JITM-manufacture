@@ -89,6 +89,7 @@
                 <input id="pdd" type="date">
                 <input id="pddb" type="number" min="0" placeholder="Due by (days)" oninput="recalcDueDate('pid','pdd','pddb')">
                 <label>Supplier</label>
+                <input type="text" id="piss" placeholder="Search supplier..." oninput="filterSup('pis',this.value)" onkeydown="supSearchKey('pis',event)">
                 <select id="pis" onchange="applySupDueDays('pis','pddb')">
                     <option value="">-- Select --</option>
                 </select>
@@ -121,6 +122,7 @@
                 <input id="edd" type="date">
                 <input id="eddb" type="number" min="0" placeholder="Due by (days)" oninput="recalcDueDate('eid','edd','eddb')">
                 <label>Supplier</label>
+                <input type="text" id="eiss" placeholder="Search supplier..." oninput="filterSup('eis',this.value)" onkeydown="supSearchKey('eis',event)">
                 <select id="eis" onchange="applySupDueDays('eis','eddb')">
                     <option value="">-- Select --</option>
                 </select>
@@ -310,7 +312,7 @@
                 .then(d => {
                     suppliers = d.items || d;
                     const opts = '<option value="">-- Select --</option>' + suppliers.map(s => 
-                        '<option value="' + s.id + '">' + s.name + '</option>'
+                        '<option value="' + s.id + '">' + s.name + ' — Rs ' + parseFloat(s.balance || 0).toFixed(2) + '</option>'
                     ).join('');
                     document.getElementById(selId).innerHTML = opts;
                 });
@@ -324,6 +326,32 @@
             d.setDate(d.getDate() + parseInt(days));
             var fmt = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
             document.getElementById(dueId).value = fmt;
+        }
+        
+        function filterSup(selId, val) {
+            var q = (val || '').toLowerCase().trim();
+            var sel = document.getElementById(selId);
+            var first = null;
+            for (var i = 0; i < sel.options.length; i++) {
+                var o = sel.options[i];
+                if (!o.value) continue;
+                var show = !q || o.textContent.toLowerCase().indexOf(q) !== -1;
+                o.style.display = show ? '' : 'none';
+                if (show && !first) first = o;
+            }
+            var target = q ? (first ? first.value : '') : '';
+            if (sel.value !== target) {
+                sel.value = target;
+                sel.dispatchEvent(new Event('change'));
+            }
+        }
+        
+        function supSearchKey(selId, e) {
+            if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                var sel = document.getElementById(selId);
+                if (sel.showPicker) sel.showPicker();
+            }
         }
         
         function applySupDueDays(selId, byId) {
@@ -353,6 +381,8 @@
             document.getElementById('pid').value = new Date().toISOString().slice(0, 10);
             document.getElementById('pdd').value = '';
             document.getElementById('pddb').value = '';
+            document.getElementById('piss').value = '';
+            document.getElementById('pis').value = '';
             document.getElementById('pia').value = '0';
             document.getElementById('pbd').value = '0.00';
             document.getElementById('pst').value = 'Unpaid';
@@ -392,6 +422,8 @@
             document.getElementById('ein').value = p.invoice_no;
             document.getElementById('eid').value = p.issue_date;
             document.getElementById('edd').value = p.due_date || '';
+            document.getElementById('eddb').value = '';
+            document.getElementById('eiss').value = '';
             document.getElementById('eia').value = p.invoice_amount;
             document.getElementById('ebd').value = p.balance_due;
             document.getElementById('est').value = p.status;

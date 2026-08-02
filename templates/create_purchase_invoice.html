@@ -75,7 +75,7 @@
                 <div><label>Invoice No.</label><input type="text" id="invoice_no" placeholder="e.g. INV-001" required></div>
             </div>
             <div class="ci-entity">
-                <div style="margin-bottom:12px;position:relative"><label>Supplier</label><input type="text" id="supplier_search" placeholder="Search supplier..." autocomplete="off" oninput="supSearch()" onfocus="supSearch()" onkeydown="supKey(event)" onblur="setTimeout(supClose,200)"><div class="sup-pg" id="supList"></div><input type="hidden" id="supplier_id"></div>
+                <div style="margin-bottom:12px;position:relative"><label>Supplier</label><input type="text" id="supplier_search" placeholder="Search supplier..." autocomplete="off" oninput="supSearch()" onfocus="supSearch()" onkeydown="supKey(event)" onblur="setTimeout(supClose,200)"><div class="sup-pg" id="supList"></div><input type="hidden" id="supplier_id"><div id="supBalance" style="display:none;margin-top:6px;font-size:12px;color:#6b7280"></div></div>
                 <div><label>Description</label><input type="text" id="description" placeholder="Invoice description (optional)"></div>
             </div>
             <div class="ssheet">
@@ -164,7 +164,15 @@ function loadSuppliers() {
     });
 }
 var supHl = -1;
+function showSupBalance(s) {
+    var b = document.getElementById('supBalance');
+    if (!b) return;
+    if (!s) { b.style.display = 'none'; return; }
+    b.style.display = 'block';
+    b.innerHTML = 'Balance: <b style="color:#1e293b">Rs ' + parseFloat(s.balance || 0).toFixed(2) + '</b>' + (s.phone ? ' &middot; ' + s.phone : '');
+}
 function supSearch() {
+    showSupBalance(null);
     var q = document.getElementById('supplier_search').value.toLowerCase().trim();
     var list = q ? suppliers.filter(function(s){ return s.name.toLowerCase().indexOf(q) !== -1 || String(s.phone || '').toLowerCase().indexOf(q) !== -1; }) : suppliers;
     var g = document.getElementById('supList'); supHl = -1;
@@ -193,6 +201,7 @@ function pickSup(id) {
     document.getElementById('supplier_id').value = s.id;
     document.getElementById('supplier_search').value = s.name;
     supClose();
+    showSupBalance(s);
     loadProducts(s.id);
     var db = document.getElementById('due_by');
     if (parseInt(s.due_days || 0) > 0 && !db.value) {
@@ -720,6 +729,7 @@ function loadInvoice(id) {
         document.querySelector('.btn-p').textContent = 'Update';
         document.getElementById('supplier_search').value = inv.supplier_id ? (suppliers.find(function(x){ return x.id === inv.supplier_id; }) || {}).name || '' : '';
         document.getElementById('supplier_id').value = inv.supplier_id || '';
+        showSupBalance(inv.supplier_id ? (suppliers.find(function(x){ return x.id === inv.supplier_id; }) || null) : null);
         document.getElementById('items_tb').innerHTML = '';
         rowId = 0;
         (inv.items || []).forEach(function(item) {

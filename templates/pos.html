@@ -252,16 +252,27 @@
         document.getElementById('discPct').addEventListener('input', calc);
         document.getElementById('discAmt').addEventListener('input', calc);
 
-        document.getElementById('cPhone').addEventListener('keydown', function(e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); document.getElementById('cName').focus(); } });
-        document.getElementById('cName').addEventListener('keydown', function(e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); if (document.getElementById('cPhone').value.trim() && this.value.trim()) document.getElementById('s').focus(); else document.getElementById('walkIn').focus(); } });
-        document.getElementById('walkIn').addEventListener('keydown', function(e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); document.getElementById('s').focus(); } });
-        document.getElementById('s').addEventListener('keydown', function(e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); var sel = document.querySelector('#cart select'); if (sel) { focusSelect(sel); } else document.getElementById('am-cash').focus(); } });
         function focusSelect(el) { el.focus(); el.showPicker(); }
+        document.getElementById('cPhone').addEventListener('keydown', function(e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('am-credit').focus(); return; } document.getElementById('cName').focus(); });
+        document.getElementById('cName').addEventListener('keydown', function(e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('cPhone').focus(); return; } if (document.getElementById('cPhone').value.trim() && this.value.trim()) document.getElementById('s').focus(); else document.getElementById('walkIn').focus(); });
+        document.getElementById('walkIn').addEventListener('keydown', function(e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('cName').focus(); return; } document.getElementById('s').focus(); });
+        document.getElementById('s').addEventListener('keydown', function(e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('walkIn').focus(); return; } var sel = document.querySelector('#cart select'); if (sel) { focusSelect(sel); } else document.getElementById('am-cash').focus(); });
+        var amtIds = ['am-cash', 'am-jb', 'am-ahd', 'am-z', 'am-credit'];
+        amtIds.forEach(function (id, i) { document.getElementById(id).addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById(i ? amtIds[i - 1] : 'discAmt').focus(); } else { document.getElementById(i < amtIds.length - 1 ? amtIds[i + 1] : 'chg').focus(); } }); });
+        document.getElementById('discAmt').addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('discPct').focus(); return; } document.getElementById('am-cash').focus(); });
+        document.getElementById('discPct').addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { var rows = document.querySelectorAll('#cart select'); if (rows.length) focusSelect(rows[rows.length - 1]); else document.getElementById('s').focus(); return; } document.getElementById('discAmt').focus(); });
         document.getElementById('cart').addEventListener('keydown', function(e) {
-            if (e.key !== 'Tab' || e.shiftKey) return;
+            if (e.key !== 'Tab') return;
             var tr = e.target.closest('tr');
             if (!tr) return;
             e.preventDefault();
+            if (e.shiftKey) {
+                if (e.target.tagName === 'INPUT') { var sel = tr.querySelector('select'); if (sel) { sel.focus(); return; } }
+                var prev = tr.previousElementSibling;
+                if (prev) { var ps = prev.querySelector('select'); if (ps) { focusSelect(ps); return; } }
+                document.getElementById('s').focus();
+                return;
+            }
             if (e.target.tagName === 'SELECT') {
                 var disc = tr.querySelector('input[type="number"]');
                 if (disc) { disc.focus(); return; }

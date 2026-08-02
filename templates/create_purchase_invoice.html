@@ -8,7 +8,7 @@
 .sup-item.hl{background:#f0effc}
 .sup-name{font-size:13px;font-weight:600;color:#1a1c2e}
 .sup-detail{font-size:11px;color:#6b7280}
-.ci-wrap{max-width:960px;margin:0 auto}
+.ci-wrap{max-width:960px;margin:0 auto;width:100%}
 .ci-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
 .ci-meta label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600;display:block;margin-bottom:4px}
 .ci-meta input,.ci-meta select{width:100%;padding:7px 10px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
@@ -19,7 +19,7 @@
 .ci-entity select:focus,.ci-entity input:focus{outline:none;border-color:#3b4fe2}
 .ssheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;margin-bottom:16px;overflow-x:auto}
 
-.ssheet table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:980px}
+.ssheet table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:820px}
 .ssheet th{background:#f3f4f6;padding:6px 8px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db;border-right:1px solid #e5e7eb}
 .ssheet th:last-child{border-right:none}
 .ssheet td{padding:0;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
@@ -58,6 +58,8 @@
 #csv_preview_modal .tag-match{background:#dbeafe;color:#1e40af}
 #csv_preview_modal .tag-new{background:#fef3c7;color:#92400e}
 #csv_preview_modal tr.csv-excluded td{opacity:.4;text-decoration:line-through}
+@media (max-width:900px){.ci-meta{grid-template-columns:1fr 1fr}}
+@media (max-width:640px){.ci-meta{grid-template-columns:1fr}.content{padding:16px 12px}}
 </style></head>
 <body>
 {{sidebar|safe}}

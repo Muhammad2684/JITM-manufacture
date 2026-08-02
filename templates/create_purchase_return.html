@@ -8,7 +8,7 @@
 .sup-item.hl{background:#f0effc}
 .sup-name{font-size:13px;font-weight:600;color:#1a1c2e}
 .sup-detail{font-size:11px;color:#6b7280}
-.ci-wrap{max-width:960px;margin:0 auto}
+.ci-wrap{max-width:960px;margin:0 auto;width:100%}
 .ci-meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;background:#fcfbf8;border:1px solid #e2e1de;border-radius:10px;padding:16px 20px;margin-bottom:16px}
 .ci-meta label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;font-weight:600;display:block;margin-bottom:4px}
 .ci-meta input,.ci-meta select{width:100%;padding:7px 10px;border:1px solid #e2e1de;border-radius:6px;font-size:13px;color:#1e293b;background:#fff}
@@ -43,6 +43,7 @@
 .ssheet .ac-list div:hover{background:#eef2ff}
 .ssheet .ac-list div:last-child{border-bottom:none}
 .ssheet .ac-list div.ac-highlight{background:#dbeafe}
+@media (max-width:640px){.ci-meta{grid-template-columns:1fr}.content{padding:16px 12px}}
 #csv_preview_modal table th{background:#f3f4f6;padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db}
 #csv_preview_modal table td{padding:5px 10px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#1e293b}
 #csv_preview_modal table tr:last-child td{border-bottom:none}

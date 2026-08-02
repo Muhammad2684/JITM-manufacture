@@ -25,11 +25,11 @@
 .ssheet td{padding:0;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
 .ssheet td:last-child{border-right:none}
 .ssheet tr:last-child td{border-bottom:none}
-.ssheet .cell{width:100%;border:none;padding:6px 8px;font-size:13px;color:#1e293b;background:transparent;outline:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.ssheet .cell{width:100%;border:none;padding:6px 8px;font-size:12px;color:#1e293b;background:transparent;outline:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
 .ssheet .cell:focus{background:#eef2ff;box-shadow:inset 0 0 0 2px #3b4fe2;position:relative;z-index:1}
 .ssheet .cell.num{text-align:right}
 .ssheet .cell.ro{background:#f9fafb;color:#6b7280}
-.ssheet .total-cell{padding:6px 8px;font-weight:600;font-size:13px;color:#1e293b;text-align:right}
+.ssheet .total-cell{padding:6px 8px;font-weight:600;font-size:12px;color:#1e293b;text-align:right}
 .ssheet .del-cell{padding:2px 4px;text-align:center}
 .ssheet .del-cell button{background:none;border:none;color:#9ca3af;cursor:pointer;font-size:14px;padding:4px}
 .ssheet .del-cell button:hover{color:#dc2626}
@@ -38,15 +38,14 @@
 .ci-footer .gt{margin-left:auto;font-size:16px;font-weight:700;color:#1e293b}
 .ssheet .item-wrap{position:relative;display:flex;align-items:center;gap:6px}
 .ssheet .item-wrap .cell{width:auto;flex:1;min-width:0}
-.ssheet .cell-static{padding:6px 8px;font-size:12px;color:#6b7280;text-align:right}
+.ssheet .cell-static{padding:6px 8px;font-size:12px;color:#1e293b;text-align:right}
 .ssheet th.sku-col,.ssheet td.sku-col{position:sticky;left:0;z-index:2}
 .ssheet th.lpcol,.ssheet td.lpcol{position:sticky;left:12%;z-index:2}
 .ssheet th.spcol,.ssheet td.spcol{position:sticky;left:21%;z-index:2}
 .ssheet th.sku-col,.ssheet th.lpcol,.ssheet th.spcol{background:#f3f4f6}
 .ssheet td.sku-col,.ssheet td.lpcol,.ssheet td.spcol{background:#fff}
-.ssheet td.sku-col .cell-static,.ssheet td.lpcol .cell-static{color:#1e293b}
 .ssheet .sp-in{width:100%;border:none;padding:6px 8px;font-size:12px;color:#1e293b;background:transparent;outline:none;text-align:right;font-family:inherit;box-sizing:border-box}
-.ssheet .sp-in:focus{background:#eef2ff}
+.ssheet .sp-in:focus{background:#eef2ff;box-shadow:inset 0 0 0 2px #3b4fe2}
 .ssheet .ac-list{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:4px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .ssheet .ac-list div{padding:6px 8px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6}
 .ssheet .ac-list div:hover{background:#eef2ff}
@@ -236,11 +235,11 @@ function addRow(data) {
     html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
     html += '<td class="sku-col"><div class="cell-static" id="sk-'+rowId+'"></div></td>';
     html += '<td class="lpcol"><div class="cell-static" id="lp-'+rowId+'"></div></td>';
-    html += '<td class="spcol"><input type="number" min="0" step="0.01" class="sp-in" id="sp-'+rowId+'" onchange="spEdit('+rowId+',this)"></td>';
+    html += '<td class="spcol"><input type="number" min="0" step="0.01" class="sp-in" id="sp-'+rowId+'" onchange="spEdit('+rowId+',this)" onkeydown="cellTab(event,'+rowId+',\'.qty\')"></td>';
     html += '<td class="text-right"><div class="cell-static" id="stk-'+rowId+'">&mdash;</div></td>';
     html += '<td class="text-right"><div class="cell-static" id="avg-'+rowId+'">&mdash;</div></td>';
-    html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
-    html += '<td><input class="cell num up" value="'+up.toFixed(2)+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
+    html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()" onkeydown="cellTab(event,'+rowId+',\'.up\')"></td>';
+    html += '<td><input class="cell num up" value="'+up.toFixed(2)+'" oninput="calcRow(this)" onfocus="this.select()" onkeydown="upTab(event,'+rowId+')"></td>';
     html += '<td><div class="total-cell" id="rt-'+rowId+'">Rs '+total.toFixed(2)+'</div></td>';
     html += '<td class="del-cell"><button onclick="delRow(this)">&times;</button></td>';
     html += '</tr>';
@@ -307,9 +306,8 @@ function acKeydown(e, inp, rid) {
     } else if (e.key === 'Tab') {
         e.preventDefault();
         acSelect(rid);
-        var tr = document.getElementById('rr-'+rid);
-        var qty = tr.querySelector('.qty');
-        if (qty) qty.focus();
+        var sp = document.getElementById('sp-'+rid);
+        if (sp) sp.focus();
     } else if (e.key === 'Enter') {
         e.preventDefault();
         acSelect(rid);
@@ -326,6 +324,26 @@ function acKeydown(e, inp, rid) {
     }
 }
 
+function cellTab(e, rid, sel) {
+    if (e.key !== 'Tab' || e.shiftKey) return;
+    e.preventDefault();
+    var el = document.getElementById('rr-'+rid).querySelector(sel);
+    if (el) el.focus();
+}
+function upTab(e, rid) {
+    if (e.key !== 'Tab' || e.shiftKey) return;
+    e.preventDefault();
+    var tr = document.getElementById('rr-'+rid);
+    var nextTr = tr.nextElementSibling;
+    if (!nextTr) {
+        addRow();
+        nextTr = tr.nextElementSibling;
+    }
+    if (nextTr) {
+        var ni = nextTr.querySelector('.item-wrap .cell');
+        if (ni) ni.focus();
+    }
+}
 function acHighlight(items, idx) {
     for (var i = 0; i < items.length; i++) {
         if (i === idx) items[i].classList.add('ac-highlight');

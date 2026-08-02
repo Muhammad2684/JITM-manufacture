@@ -56,7 +56,7 @@
                 <div><label>Return No.</label><input type="text" id="return_no" placeholder="e.g. RET-001" required></div>
             </div>
             <div class="ci-entity">
-                <div style="margin-bottom:12px"><label>Supplier</label><input type="text" placeholder="Search supplier..." style="width:100%;box-sizing:border-box;margin-bottom:6px" oninput="filterSup('supplier_id',this.value)" onkeydown="supSearchKey('supplier_id',event)"><select id="supplier_id"><option value="">-- Select Supplier --</option></select></div>
+                <div style="margin-bottom:12px"><label>Supplier</label><select id="supplier_id" onkeydown="supType('supplier_id',event)"><option value="">-- Select Supplier --</option></select></div>
                 <div><label>Reason / Description</label><input type="text" id="description" placeholder="Reason for return (optional)"></div>
             </div>
             <div class="ssheet">
@@ -138,29 +138,30 @@ function loadSuppliers() {
         document.getElementById('supplier_id').innerHTML='<option value="">-- Select Supplier --</option>'+suppliers.map(function(s){return '<option value="'+s.id+'">'+s.name+' — Rs '+parseFloat(s.balance||0).toFixed(2)+'</option>';}).join('');
     });
 }
-function filterSup(selId, val) {
-    var q = (val || '').toLowerCase().trim();
+var supBuf = {}, supTimer = {};
+function supType(selId, e) {
+    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+    clearTimeout(supTimer[selId]);
+    supBuf[selId] = (supBuf[selId] || '') + e.key.toLowerCase();
+    var q = supBuf[selId];
     var sel = document.getElementById(selId);
-    var first = null;
+    var old = sel.value, picked = null;
     for (var i = 0; i < sel.options.length; i++) {
         var o = sel.options[i];
         if (!o.value) continue;
-        var show = !q || o.textContent.toLowerCase().indexOf(q) !== -1;
+        var show = o.textContent.toLowerCase().indexOf(q) !== -1;
         o.style.display = show ? '' : 'none';
-        if (show && !first) first = o;
+        if (show && !picked) picked = o;
     }
-    var target = q ? (first ? first.value : '') : '';
-    if (sel.value !== target) {
-        sel.value = target;
-        sel.dispatchEvent(new Event('change'));
+    if (picked) {
+        sel.value = picked.value;
+        if (sel.value !== old) sel.dispatchEvent(new Event('change'));
     }
-}
-function supSearchKey(selId, e) {
-    if (e.key === 'Enter' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        var sel = document.getElementById(selId);
-        if (sel.showPicker) sel.showPicker();
-    }
+    supTimer[selId] = setTimeout(function() {
+        supBuf[selId] = '';
+        for (var j = 0; j < sel.options.length; j++) sel.options[j].style.display = '';
+    }, 800);
+    e.preventDefault();
 }
 function loadProducts() {
     fetch('/api/products?per_page=100000').then(function(r){return r.json();}).then(function(d){products=d.items||d;});

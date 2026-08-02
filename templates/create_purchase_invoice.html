@@ -202,7 +202,6 @@ function pickSup(id) {
     document.getElementById('supplier_search').value = s.name;
     supClose();
     showSupBalance(s);
-    loadProducts(s.id);
     var db = document.getElementById('due_by');
     if (parseInt(s.due_days || 0) > 0 && !db.value) {
         db.value = s.due_days;

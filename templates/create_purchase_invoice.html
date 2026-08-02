@@ -19,7 +19,7 @@
 .ci-entity select:focus,.ci-entity input:focus{outline:none;border-color:#3b4fe2}
 .ssheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;margin-bottom:16px;overflow-x:auto}
 
-.ssheet table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ssheet table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:980px}
 .ssheet th{background:#f3f4f6;padding:6px 8px;text-align:left;font-size:10px;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #d1d5db;border-right:1px solid #e5e7eb}
 .ssheet th:last-child{border-right:none}
 .ssheet td{padding:0;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
@@ -40,9 +40,11 @@
 .ssheet .item-wrap .cell{width:auto;flex:1;min-width:0}
 .ssheet .cell-static{padding:6px 8px;font-size:12px;color:#6b7280;text-align:right}
 .ssheet th.sku-col,.ssheet td.sku-col{position:sticky;left:0;z-index:2}
-.ssheet th.sku-col{background:#f3f4f6}
-.ssheet td.sku-col{background:#fff}
-.ssheet td.sku-col .cell-static{color:#1e293b}
+.ssheet th.lpcol,.ssheet td.lpcol{position:sticky;left:12%;z-index:2}
+.ssheet th.spcol,.ssheet td.spcol{position:sticky;left:21%;z-index:2}
+.ssheet th.sku-col,.ssheet th.lpcol,.ssheet th.spcol{background:#f3f4f6}
+.ssheet td.sku-col,.ssheet td.lpcol,.ssheet td.spcol{background:#fff}
+.ssheet td.sku-col .cell-static,.ssheet td.lpcol .cell-static,.ssheet td.spcol .cell-static{color:#1e293b}
 .ssheet .ac-list{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:4px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .ssheet .ac-list div{padding:6px 8px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6}
 .ssheet .ac-list div:hover{background:#eef2ff}
@@ -75,7 +77,7 @@
             </div>
             <div class="ssheet">
                 <table>
-                    <thead><tr><th style="width:22%">Item</th><th style="width:14%" class="sku-col">SKU</th><th style="width:7%" class="text-right">Stock</th><th style="width:9%" class="text-right">Avg Cost</th><th style="width:10%" class="text-right">Qty</th><th style="width:14%" class="text-right">Unit Price</th><th style="width:15%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
+                    <thead><tr><th style="width:20%">Item</th><th style="width:12%" class="sku-col">SKU</th><th style="width:9%" class="lpcol">LP.Cost</th><th style="width:10%" class="spcol">Sale Price</th><th style="width:7%" class="text-right">Stock</th><th style="width:9%" class="text-right">Avg Cost</th><th style="width:9%" class="text-right">Qty</th><th style="width:12%" class="text-right">Unit Price</th><th style="width:12%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
                     <tbody id="items_tb"></tbody>
                 </table>
                 <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button></div>
@@ -229,6 +231,8 @@ function addRow(data) {
     var html = '<tr id="rr-'+rowId+'"' + (pid ? ' data-pid="'+pid+'"' : '') + '>';
     html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
     html += '<td class="sku-col"><div class="cell-static" id="sk-'+rowId+'"></div></td>';
+    html += '<td class="lpcol"><div class="cell-static" id="lp-'+rowId+'"></div></td>';
+    html += '<td class="spcol"><div class="cell-static" id="sp-'+rowId+'"></div></td>';
     html += '<td class="text-right"><div class="cell-static" id="stk-'+rowId+'">&mdash;</div></td>';
     html += '<td class="text-right"><div class="cell-static" id="avg-'+rowId+'">&mdash;</div></td>';
     html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
@@ -244,9 +248,13 @@ function onItemInput(inp, rid) {
     var skuEl = document.getElementById('sk-'+rid);
     if (skuEl) skuEl.textContent = '';
     var stkEl = document.getElementById('stk-'+rid);
-    if (stkEl) stkEl.textContent = '&mdash;';
+    if (stkEl) stkEl.textContent = '—';
     var avgEl = document.getElementById('avg-'+rid);
-    if (avgEl) avgEl.textContent = '&mdash;';
+    if (avgEl) avgEl.textContent = '—';
+    var lpEl = document.getElementById('lp-'+rid);
+    if (lpEl) lpEl.textContent = '—';
+    var spEl = document.getElementById('sp-'+rid);
+    if (spEl) spEl.textContent = '—';
     acShow(inp, rid);
     if (!isLastRow(inp)) return;
     if (inp.value.trim() !== '') {
@@ -459,6 +467,10 @@ function saveProduct(e) {
                 if (stkEl) stkEl.textContent = '0';
                 var avgEl = document.getElementById('avg-'+createTargetRid);
                 if (avgEl) avgEl.textContent = 'Rs ' + (parseFloat(data.cost_price) || 0).toFixed(2);
+                var lpEl = document.getElementById('lp-'+createTargetRid);
+                if (lpEl) lpEl.textContent = '—';
+                var spEl = document.getElementById('sp-'+createTargetRid);
+                if (spEl) spEl.textContent = 'Rs ' + (parseFloat(data.base_price) || 0).toFixed(2);
                 tr.querySelector('.up').value = parseFloat(data.cost_price).toFixed(2);
                 var inp = tr.querySelector('.item-wrap .cell');
                 inp.value = data.name + (data.size ? ' ['+data.size+']' : '');
@@ -494,10 +506,14 @@ function acPick(rid, pid, name, price) {
 function setItemStats(rid, pid) {
     var stkEl = document.getElementById('stk-'+rid);
     var avgEl = document.getElementById('avg-'+rid);
-    if (!stkEl && !avgEl) return;
+    var lpEl = document.getElementById('lp-'+rid);
+    var spEl = document.getElementById('sp-'+rid);
+    if (!stkEl && !avgEl && !lpEl && !spEl) return;
     var p = pid ? products.find(function(x){ return x.id === pid; }) : null;
-    if (stkEl) stkEl.textContent = p ? (p.total_stock != null ? p.total_stock : '&mdash;') : '&mdash;';
-    if (avgEl) avgEl.textContent = p && p.cost_price != null ? 'Rs ' + p.cost_price.toFixed(2) : '&mdash;';
+    if (stkEl) stkEl.textContent = p ? (p.total_stock != null ? p.total_stock : '—') : '—';
+    if (avgEl) avgEl.textContent = p && p.cost_price != null ? 'Rs ' + p.cost_price.toFixed(2) : '—';
+    if (lpEl) lpEl.textContent = p && p.last_purchased_cost != null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '—';
+    if (spEl) spEl.textContent = p && p.base_price != null ? 'Rs ' + p.base_price.toFixed(2) : '—';
 }
 function refreshItemStats() {
     document.querySelectorAll('#items_tb tr[data-pid]').forEach(function(tr){

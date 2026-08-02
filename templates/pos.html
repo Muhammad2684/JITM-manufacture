@@ -126,7 +126,7 @@
                         <div class="search" style="margin-bottom:-3px;position:relative">
                             <div style="display:flex;gap:6px"><input id="s"
                                     placeholder="Search name, SKU, or scan barcode..." autofocus style="flex:1"><button
-                                    class="btn btn-sm btn-p" id="scBtn" onclick="toggleScanner()">Scanner On</button>
+                                    tabindex="-1" class="btn btn-sm btn-p" id="scBtn" onclick="toggleScanner()">Scanner On</button>
                             </div>
                             <div class="pg" id="prods"></div>
                         </div>
@@ -253,43 +253,44 @@
         document.getElementById('discAmt').addEventListener('input', calc);
 
         function focusSelect(el) { el.focus(); el.showPicker(); }
-        document.getElementById('cPhone').addEventListener('keydown', function(e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('am-credit').focus(); return; } document.getElementById('cName').focus(); });
-        document.getElementById('cName').addEventListener('keydown', function(e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('cPhone').focus(); return; } if (document.getElementById('cPhone').value.trim() && this.value.trim()) document.getElementById('s').focus(); else document.getElementById('walkIn').focus(); });
-        document.getElementById('walkIn').addEventListener('keydown', function(e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('cName').focus(); return; } document.getElementById('s').focus(); });
-        document.getElementById('s').addEventListener('keydown', function(e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('walkIn').focus(); return; } var sel = document.querySelector('#cart select'); if (sel) { focusSelect(sel); } else document.getElementById('am-cash').focus(); });
+        var navIds = ['s', 'discPct', 'discAmt', 'am-cash', 'am-jb', 'am-ahd', 'am-z', 'am-credit', 'chg', 'completeBtn'];
         var amtIds = ['am-cash', 'am-jb', 'am-ahd', 'am-z', 'am-credit'];
-        amtIds.forEach(function (id, i) { document.getElementById(id).addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById(i ? amtIds[i - 1] : 'discAmt').focus(); } else { document.getElementById(i < amtIds.length - 1 ? amtIds[i + 1] : 'chg').focus(); } }); });
+        function lastCartEl(tr) { var a = tr.querySelectorAll('select,input'); return a[a.length - 1]; }
+        function navNext() { var sel = document.querySelector('#cart select'); if (sel) { focusSelect(sel); return; } document.getElementById('discPct').focus(); }
+        function navPrevToCart() { var rows = document.querySelectorAll('#cart tbody tr'); if (rows.length) { lastCartEl(rows[rows.length - 1]).focus(); return; } document.getElementById('s').focus(); }
+        document.getElementById('cName').addEventListener('keydown', function (e) { if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); document.getElementById('s').focus(); } });
+        document.getElementById('s').addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('completeBtn').focus(); return; } navNext(); });
+        document.getElementById('discPct').addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { navPrevToCart(); return; } document.getElementById('discAmt').focus(); });
         document.getElementById('discAmt').addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('discPct').focus(); return; } document.getElementById('am-cash').focus(); });
-        document.getElementById('discPct').addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { var rows = document.querySelectorAll('#cart select'); if (rows.length) focusSelect(rows[rows.length - 1]); else document.getElementById('s').focus(); return; } document.getElementById('discAmt').focus(); });
-        document.getElementById('cart').addEventListener('keydown', function(e) {
+        amtIds.forEach(function (id, i) { document.getElementById(id).addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById(i ? amtIds[i - 1] : 'discAmt').focus(); } else { document.getElementById(i < amtIds.length - 1 ? amtIds[i + 1] : 'chg').focus(); } }); });
+        document.getElementById('chg').addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('am-credit').focus(); return; } document.getElementById('completeBtn').focus(); });
+        document.getElementById('completeBtn').addEventListener('keydown', function (e) { if (e.key !== 'Tab') return; e.preventDefault(); if (e.shiftKey) { document.getElementById('chg').focus(); return; } document.getElementById('s').focus(); });
+        document.getElementById('cart').addEventListener('keydown', function (e) {
             if (e.key !== 'Tab') return;
             var tr = e.target.closest('tr');
             if (!tr) return;
             e.preventDefault();
+            var els = Array.prototype.slice.call(tr.querySelectorAll('select,input'));
             if (e.shiftKey) {
-                if (e.target.tagName === 'INPUT') { var sel = tr.querySelector('select'); if (sel) { sel.focus(); return; } }
+                var i = els.indexOf(e.target) - 1;
+                if (i >= 0) { els[i].focus(); return; }
                 var prev = tr.previousElementSibling;
-                if (prev) { var ps = prev.querySelector('select'); if (ps) { focusSelect(ps); return; } }
+                if (prev) { lastCartEl(prev).focus(); return; }
                 document.getElementById('s').focus();
                 return;
             }
-            if (e.target.tagName === 'SELECT') {
-                var disc = tr.querySelector('input[type="number"]');
-                if (disc) { disc.focus(); return; }
-            } else if (e.target.tagName === 'INPUT') {
-                var nxt = tr.nextElementSibling;
-                if (nxt) { var ns = nxt.querySelector('select'); if (ns) { focusSelect(ns); return; } }
-                document.getElementById('discPct').focus();
-            }
+            var j = els.indexOf(e.target) + 1;
+            if (j < els.length) { els[j].focus(); return; }
+            var nxt = tr.nextElementSibling;
+            if (nxt) { var nf = nxt.querySelector('select'); if (nf) { focusSelect(nf); return; } }
+            document.getElementById('discPct').focus();
         });
-        var navIds = ['cPhone', 'cName', 'walkIn', 's', 'scBtn', 'discPct', 'discAmt', 'am-cash', 'am-jb', 'am-ahd', 'am-z', 'am-credit', 'chg', 'completeBtn', 'modeBtn', 'clearBtn', 'notes'];
-        function lastCartEl(tr) { var a = tr.querySelectorAll('select,input,button'); return a[a.length - 1]; }
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
             var id = e.target.id, tr = e.target.closest('tr');
             if (tr && tr.closest('#cart')) {
                 e.preventDefault();
-                var els = Array.prototype.slice.call(tr.querySelectorAll('select,input,button')), i = els.indexOf(e.target);
+                var els = Array.prototype.slice.call(tr.querySelectorAll('select,input')), i = els.indexOf(e.target);
                 if (e.key === 'ArrowDown') {
                     var nx = els[i + 1];
                     if (nx) { nx.focus(); return; }
@@ -301,26 +302,19 @@
                     if (pv) { pv.focus(); return; }
                     var pr = tr.previousElementSibling;
                     if (pr) { lastCartEl(pr).focus(); return; }
-                    document.getElementById('scBtn').focus();
+                    document.getElementById('s').focus();
                 }
                 return;
             }
             if (id === 's') {
                 if (document.querySelectorAll('#prods .pd-item').length) return;
                 e.preventDefault();
-                if (e.key === 'ArrowDown') { document.getElementById('scBtn').focus(); } else { document.getElementById('walkIn').focus(); }
-                return;
-            }
-            if (id === 'scBtn') {
-                e.preventDefault();
-                if (e.key === 'ArrowDown') { var f = document.querySelector('#cart select'); if (f) { f.focus(); return; } document.getElementById('discPct').focus(); } else { document.getElementById('s').focus(); }
+                if (e.key === 'ArrowDown') { navNext(); } else { document.getElementById('completeBtn').focus(); }
                 return;
             }
             if (id === 'discPct' && e.key === 'ArrowUp') {
                 e.preventDefault();
-                var rows = document.querySelectorAll('#cart tbody tr');
-                if (rows.length) { lastCartEl(rows[rows.length - 1]).focus(); return; }
-                document.getElementById('scBtn').focus();
+                navPrevToCart();
                 return;
             }
             var idx = navIds.indexOf(id);

@@ -44,7 +44,9 @@
 .ssheet th.spcol,.ssheet td.spcol{position:sticky;left:21%;z-index:2}
 .ssheet th.sku-col,.ssheet th.lpcol,.ssheet th.spcol{background:#f3f4f6}
 .ssheet td.sku-col,.ssheet td.lpcol,.ssheet td.spcol{background:#fff}
-.ssheet td.sku-col .cell-static,.ssheet td.lpcol .cell-static,.ssheet td.spcol .cell-static{color:#1e293b}
+.ssheet td.sku-col .cell-static,.ssheet td.lpcol .cell-static{color:#1e293b}
+.ssheet .sp-in{width:100%;border:none;padding:6px 8px;font-size:12px;color:#1e293b;background:transparent;outline:none;text-align:right;font-family:inherit;box-sizing:border-box}
+.ssheet .sp-in:focus{background:#eef2ff}
 .ssheet .ac-list{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:4px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.08)}
 .ssheet .ac-list div{padding:6px 8px;font-size:12px;cursor:pointer;border-bottom:1px solid #f3f4f6}
 .ssheet .ac-list div:hover{background:#eef2ff}
@@ -234,7 +236,7 @@ function addRow(data) {
     html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
     html += '<td class="sku-col"><div class="cell-static" id="sk-'+rowId+'"></div></td>';
     html += '<td class="lpcol"><div class="cell-static" id="lp-'+rowId+'"></div></td>';
-    html += '<td class="spcol"><div class="cell-static" id="sp-'+rowId+'"></div></td>';
+    html += '<td class="spcol"><input type="number" min="0" step="0.01" class="sp-in" id="sp-'+rowId+'" onchange="spEdit('+rowId+',this)"></td>';
     html += '<td class="text-right"><div class="cell-static" id="stk-'+rowId+'">&mdash;</div></td>';
     html += '<td class="text-right"><div class="cell-static" id="avg-'+rowId+'">&mdash;</div></td>';
     html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()"></td>';
@@ -256,7 +258,7 @@ function onItemInput(inp, rid) {
     var lpEl = document.getElementById('lp-'+rid);
     if (lpEl) lpEl.textContent = '—';
     var spEl = document.getElementById('sp-'+rid);
-    if (spEl) spEl.textContent = '—';
+    if (spEl) { spEl.value = ''; spEl.dataset.o = ''; }
     acShow(inp, rid);
     if (!isLastRow(inp)) return;
     if (inp.value.trim() !== '') {
@@ -472,7 +474,7 @@ function saveProduct(e) {
                 var lpEl = document.getElementById('lp-'+createTargetRid);
                 if (lpEl) lpEl.textContent = '—';
                 var spEl = document.getElementById('sp-'+createTargetRid);
-                if (spEl) spEl.textContent = 'Rs ' + (parseFloat(data.base_price) || 0).toFixed(2);
+                if (spEl) { spEl.value = parseFloat(data.base_price) || 0; spEl.dataset.o = String(parseFloat(data.base_price) || 0); }
                 tr.querySelector('.up').value = parseFloat(data.cost_price).toFixed(2);
                 var inp = tr.querySelector('.item-wrap .cell');
                 inp.value = data.name + (data.size ? ' ['+data.size+']' : '');
@@ -515,11 +517,34 @@ function setItemStats(rid, pid) {
     if (stkEl) stkEl.textContent = p ? (p.total_stock != null ? p.total_stock : '—') : '—';
     if (avgEl) avgEl.textContent = p && p.cost_price != null ? 'Rs ' + p.cost_price.toFixed(2) : '—';
     if (lpEl) lpEl.textContent = p && p.last_purchased_cost != null ? 'Rs ' + p.last_purchased_cost.toFixed(2) : '—';
-    if (spEl) spEl.textContent = p && p.base_price != null ? 'Rs ' + p.base_price.toFixed(2) : '—';
+    if (spEl) {
+        spEl.value = p && p.base_price != null ? p.base_price.toFixed(2) : '';
+        spEl.dataset.o = p && p.base_price != null ? String(p.base_price) : '';
+    }
 }
 function refreshItemStats() {
     document.querySelectorAll('#items_tb tr[data-pid]').forEach(function(tr){
         setItemStats(parseInt(tr.id.replace('rr-','')), parseInt(tr.dataset.pid));
+    });
+}
+function spEdit(rid, el) {
+    var tr = document.getElementById('rr-'+rid);
+    if (!tr) return;
+    var pid = parseInt(tr.dataset.pid);
+    var v = parseFloat(el.value);
+    if (!pid || isNaN(v) || v < 0) { el.value = el.dataset.o || ''; return; }
+    if (el.dataset.o !== '' && v === parseFloat(el.dataset.o)) return;
+    fetch('/api/products/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [pid], fields: { base_price: v } })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (d.error) { alert(d.error); el.value = el.dataset.o || ''; return; }
+        el.dataset.o = String(v);
+        var p = products.find(function(x){ return x.id === pid; });
+        if (p) p.base_price = v;
     });
 }
 function setSkuTag(rid, pid) {

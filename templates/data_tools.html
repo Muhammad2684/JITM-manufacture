@@ -103,7 +103,8 @@
                     '<td><input type="checkbox" class="entity-cb" value="' + e.id + '"></td>' +
                     '<td><strong>' + e.label + '</strong></td>' +
                     '<td style="color:#6b7280">' + e.count + '</td>' +
-                    '<td><button class="btn btn-xs btn-d" onclick="confirmClear(\'' + e.id + '\')">Clear</button></td>' +
+                    '<td><button class="btn btn-xs btn-ghost" onclick="confirmClear(\'' + e.id + '\')">Clear</button></td>' +
+                    '<td><button class="btn btn-xs btn-ghost" onclick="downloadTemplate(\'' + e.id + '\')">CSV</button></td>' +
                     '<td><button class="btn btn-xs btn-p" onclick="showReplace(\'' + e.id + '\')" style="background:#dc2626">Replace</button></td>' +
                     '</tr>';
             }
@@ -129,6 +130,10 @@
 
         function setStatus(msg) {
             document.getElementById('status').textContent = msg;
+        }
+
+        function downloadTemplate(eid) {
+            window.location.href = '/api/data/template/' + eid;
         }
 
         function confirmClear(eid) {

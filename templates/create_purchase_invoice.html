@@ -82,7 +82,7 @@
                     <thead><tr><th style="width:20%">Item</th><th style="width:12%" class="sku-col">SKU</th><th style="width:9%" class="lpcol">LP.Cost</th><th style="width:7%" class="text-right">Stock</th><th style="width:9%" class="text-right">Avg Cost</th><th style="width:10%" class="text-right">Sale Price</th><th style="width:9%" class="text-right">Qty</th><th style="width:12%" class="text-right">Unit Price</th><th style="width:12%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
                     <tbody id="items_tb"></tbody>
                 </table>
-                <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button></div>
+                <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button><button class="btn btn-sm" onclick="downloadSampleCSV()">Sample CSV</button></div>
             </div>
             <div class="ci-footer">
                 <button class="btn btn-p" onclick="submitInvoice()">Create</button>
@@ -607,6 +607,16 @@ function calcGrand() {
     document.getElementById('grand_total').textContent = 'Rs '+gt.toFixed(2);
 }
 var csvData = null;
+
+function downloadSampleCSV() {
+    var csv = 'Item,Qty,Unit Price\nBodysuit 3-Pack,5,150.00\nONS-001,10,\n';
+    var blob = new Blob([csv], {type: 'text/csv'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'purchase_invoice_sample.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
 
 function triggerCSVUpload() {
     document.getElementById('csv_file').value = '';

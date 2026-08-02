@@ -84,11 +84,12 @@
                 <label>Invoice No.</label>
                 <input id="pin" required>
                 <label>Issue Date</label>
-                <input id="pid" type="date">
+                <input id="pid" type="date" onchange="recalcDueDate('pid','pdd','pddb')">
                 <label>Due Date</label>
                 <input id="pdd" type="date">
+                <input id="pddb" type="number" min="0" placeholder="Due by (days)" oninput="recalcDueDate('pid','pdd','pddb')">
                 <label>Supplier</label>
-                <select id="pis">
+                <select id="pis" onchange="applySupDueDays('pis','pddb')">
                     <option value="">-- Select --</option>
                 </select>
                 <label>Invoice Amount (Rs)</label>
@@ -115,11 +116,12 @@
                 <label>Invoice No.</label>
                 <input id="ein" required>
                 <label>Issue Date</label>
-                <input id="eid" type="date">
+                <input id="eid" type="date" onchange="recalcDueDate('eid','edd','eddb')">
                 <label>Due Date</label>
                 <input id="edd" type="date">
+                <input id="eddb" type="number" min="0" placeholder="Due by (days)" oninput="recalcDueDate('eid','edd','eddb')">
                 <label>Supplier</label>
-                <select id="eis">
+                <select id="eis" onchange="applySupDueDays('eis','eddb')">
                     <option value="">-- Select --</option>
                 </select>
                 <label>Invoice Amount (Rs)</label>
@@ -314,6 +316,27 @@
                 });
         }
         
+        function recalcDueDate(issueId, dueId, byId) {
+            var days = document.getElementById(byId).value;
+            var iv = document.getElementById(issueId).value;
+            if (!days || !iv) return;
+            var d = new Date(iv + 'T00:00:00');
+            d.setDate(d.getDate() + parseInt(days));
+            var fmt = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            document.getElementById(dueId).value = fmt;
+        }
+        
+        function applySupDueDays(selId, byId) {
+            var sup = suppliers.find(function(s) { return String(s.id) === document.getElementById(selId).value; });
+            var db = document.getElementById(byId);
+            if (sup && parseInt(sup.due_days || 0) > 0 && !db.value) {
+                db.value = sup.due_days;
+                var pairs = { pis: ['pid', 'pdd', 'pddb'], eis: ['eid', 'edd', 'eddb'] };
+                var p = pairs[selId];
+                if (p) recalcDueDate(p[0], p[1], p[2]);
+            }
+        }
+        
         function calcBalance() {
             var amt = parseFloat(document.getElementById('pia').value) || 0;
             document.getElementById('pbd').value = amt.toFixed(2);
@@ -329,6 +352,7 @@
             document.getElementById('pin').value = '';
             document.getElementById('pid').value = new Date().toISOString().slice(0, 10);
             document.getElementById('pdd').value = '';
+            document.getElementById('pddb').value = '';
             document.getElementById('pia').value = '0';
             document.getElementById('pbd').value = '0.00';
             document.getElementById('pst').value = 'Unpaid';

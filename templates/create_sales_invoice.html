@@ -54,7 +54,7 @@
     <div class="content">
         <div class="ci-wrap">
             <div class="ci-meta">
-                <div><label>Sale date</label><input type="date" id="sale_date"></div>
+                <div><label>Sale date</label><input type="date" id="sale_date" onchange="recalcDueDate('sale_date','due_date','due_by')"></div>
                 <div><label>Receipt No.</label><input type="text" id="receipt_no" placeholder="(auto-generated)" readonly style="background:#f9fafb;color:#6b7280"></div>
             </div>
             <div class="ci-entity">
@@ -63,7 +63,7 @@
                     <div><label>Payment Method</label><select id="payment_method" onchange="toggleDueDate()"><option value="cash">Cash</option><option value="card">Card</option><option value="credit">Credit</option></select></div>
                     <div id="account_wrap"><label>Receive to Account</label><select id="account_id"><option value="">-- Select Account --</option></select></div>
                     <div><label>Notes</label><input type="text" id="notes" placeholder="Optional notes"></div>
-                    <div id="due_date_wrap" style="display:none"><label>Due Date</label><input type="date" id="due_date"></div>
+                    <div id="due_date_wrap" style="display:none"><label>Due Date</label><input type="date" id="due_date"><input type="number" id="due_by" min="0" placeholder="Due by (days)" style="margin-top:6px;width:100%" oninput="recalcDueDate('sale_date','due_date','due_by')"></div>
                 </div>
             </div>
             <div class="ssheet">
@@ -155,6 +155,16 @@ function toggleDueDate() {
     var pm = document.getElementById('payment_method').value;
     document.getElementById('due_date_wrap').style.display = pm === 'credit' ? '' : 'none';
     document.getElementById('account_wrap').style.display = pm === 'credit' ? 'none' : '';
+}
+
+function recalcDueDate(issueId, dueId, byId) {
+    var days = document.getElementById(byId).value;
+    var iv = document.getElementById(issueId).value;
+    if (!days || !iv) return;
+    var d = new Date(iv + 'T00:00:00');
+    d.setDate(d.getDate() + parseInt(days));
+    var fmt = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    document.getElementById(dueId).value = fmt;
 }
 
 function loadAccounts() {

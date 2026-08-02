@@ -53,8 +53,8 @@
     <div class="content">
         <div class="ci-wrap">
             <div class="ci-meta">
-                <div><label>Issue date</label><input type="date" id="issue_date"></div>
-                <div><label>Due date</label><input type="date" id="due_date"></div>
+                <div><label>Issue date</label><input type="date" id="issue_date" onchange="recalcDueDate('issue_date','due_date','due_by')"></div>
+                <div><label>Due date</label><input type="date" id="due_date"><input type="number" id="due_by" min="0" placeholder="Due by (days)" style="margin-top:6px;width:100%" oninput="recalcDueDate('issue_date','due_date','due_by')"></div>
                 <div><label>Invoice No.</label><input type="text" id="invoice_no" placeholder="e.g. INV-001" required></div>
             </div>
             <div class="ci-entity">
@@ -147,6 +147,15 @@ function loadSuppliers() {
         }
     });
 }
+function recalcDueDate(issueId, dueId, byId) {
+    var days = document.getElementById(byId).value;
+    var iv = document.getElementById(issueId).value;
+    if (!days || !iv) return;
+    var d = new Date(iv + 'T00:00:00');
+    d.setDate(d.getDate() + parseInt(days));
+    var fmt = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    document.getElementById(dueId).value = fmt;
+}
 function loadProducts(supplierId) {
     var url = '/api/products?per_page=100000';
     if (supplierId) url += '&supplier_id=' + supplierId;
@@ -154,6 +163,12 @@ function loadProducts(supplierId) {
 }
 document.getElementById('supplier_id').addEventListener('change', function() {
     loadProducts(this.value || null);
+    var sup = suppliers.find(function(s){ return String(s.id) === this; }, this.value);
+    var db = document.getElementById('due_by');
+    if (sup && parseInt(sup.due_days || 0) > 0 && !db.value) {
+        db.value = sup.due_days;
+        recalcDueDate('issue_date', 'due_date', 'due_by');
+    }
 });
 
 function isLastRow(el) {

@@ -149,7 +149,7 @@
                                 <input id="cPhone" placeholder="Phone number..." style="flex:1" oninput="findCust()">
                                 <label
                                     style="font-size:11px;color:#6b7280;white-space:nowrap;display:flex;align-items:center;gap:4px;cursor:pointer">
-                                    <input type="checkbox" id="walkIn" onchange="toggleWalkIn()"> Walk In
+                                    <input type="checkbox" id="walkIn" checked onchange="toggleWalkIn()"> Walk In
                                 </label>
                             </div>
                             <input id="cName" placeholder="Customer name...">
@@ -232,7 +232,8 @@
         </div>
     </div>
     <script>
-        var cart = [], isR = false, selC = null, walkIn = false, allP = [], hlIdx = -1, scMode = true, staffList = [], lastStaff = null, scanning = false;
+        var cart = [], isR = false, selC = null, walkIn = true, allP = [], hlIdx = -1, scMode = true, staffList = [], lastStaff = null, scanning = false;
+        toggleWalkIn();
 
         document.getElementById('s').addEventListener('input', function (e) {
             if (e.target.value.length >= 1) search(); else closeDropdown();
@@ -342,8 +343,8 @@
         function setStaff(i, v) { if (cart[i]) { cart[i].staff = v ? parseInt(v) : null; lastStaff = cart[i].staff; } }
         function setDisc(i, v) { if (cart[i]) { cart[i].disc = parseFloat(v) || 0; renderC(); } }
         function clearCart() {
-            if (!cart.length) return; if (!confirm('Clear?')) return; cart = []; isR = false; selC = null; walkIn = false;
-            document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false; document.getElementById('notes').value = '';
+            if (!cart.length) return; if (!confirm('Clear?')) return; cart = []; isR = false; selC = null;
+            document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('walkIn').checked = true; toggleWalkIn(); document.getElementById('notes').value = '';
             document.getElementById('discPct').value = ''; document.getElementById('discAmt').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-jb').value = ''; document.getElementById('am-ahd').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
             updateModeButton(); renderC(); search();
         }
@@ -453,7 +454,7 @@
             })
                 .then(r => r.json()).then(d => {
                     if (d.error) { f(d.error); btn.disabled = false; btn.textContent = 'Charge Rs 0.00'; return; }
-                    showR(d); if (autoPrint) { cl('rm'); setTimeout(printReceiptModal, 100); } cart = []; isR = false; selC = null; walkIn = false; document.getElementById('sc').innerHTML = ''; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('cName').disabled = false; document.getElementById('cPhone').disabled = false; document.getElementById('walkIn').checked = false;
+                    showR(d); if (autoPrint) { cl('rm'); setTimeout(printReceiptModal, 100); } cart = []; isR = false; selC = null; document.getElementById('cPhone').value = ''; document.getElementById('cName').value = ''; document.getElementById('cName').readOnly = false; document.getElementById('walkIn').checked = true; toggleWalkIn();
                     document.getElementById('notes').value = ''; document.getElementById('discPct').value = ''; document.getElementById('discAmt').value = ''; document.getElementById('am-cash').value = ''; document.getElementById('am-jb').value = ''; document.getElementById('am-ahd').value = ''; document.getElementById('am-z').value = ''; document.getElementById('am-credit').value = ''; document.getElementById('appliedTotal').textContent = '0.00'; document.getElementById('totDisp').textContent = '0.00'; document.getElementById('splitStatus').textContent = 'Enter amounts'; document.getElementById('splitStatus').style.color = '#6b7280'; document.getElementById('splitStatus').style.background = 'transparent';
                     updateModeButton(); renderC(); btn.disabled = false; document.getElementById('s').value = ''; closeDropdown(); document.getElementById('s').focus();
                 })

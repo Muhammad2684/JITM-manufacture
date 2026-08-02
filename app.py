@@ -142,6 +142,7 @@ def render_sidebar(active_page):
                     user_permissions = []
     
     menu_items = [
+        {'url': '/', 'label': 'Home'},
         {'url': '/dashboard', 'label': 'Dashboard', 'permission': 'dashboard'},
         {'url': '/pos', 'label': 'POS', 'permission': 'pos'},
         {'label': 'Purchase', 'permission': 'purchase', 'subs': [
@@ -178,8 +179,8 @@ def render_sidebar(active_page):
         ]},
     ]
     
-    # Filter menu items based on permissions
-    filtered_items = [item for item in menu_items if item.get('permission') in user_permissions]
+    # Filter menu items based on permissions (items without a permission are always shown)
+    filtered_items = [item for item in menu_items if item.get('permission') is None or item.get('permission') in user_permissions]
     
     return render_template('sidebar.html', items=filtered_items, active=active_page, name=user_name, role=user_role)
 
@@ -245,7 +246,7 @@ def home():
     return render_template('home.html',
         role=user_role,
         name=session.get('name'),
-        sidebar=render_sidebar('/home'),
+        sidebar=render_sidebar('/'),
         pages=visible
     )
 

@@ -25,6 +25,14 @@ def dashboard():
             'SELECT COUNT(DISTINCT v.id) as count FROM variants v JOIN products p ON p.id=v.product_id WHERE v.stock <= p.low_stock'
         ).fetchone()
 
+        low_raw_materials = db.execute(
+            'SELECT COUNT(*) as count FROM raw_materials WHERE stock <= low_stock'
+        ).fetchone()
+
+        low_raw_material_items = db.execute(
+            'SELECT name, unit, stock, low_stock FROM raw_materials WHERE stock <= low_stock ORDER BY stock'
+        ).fetchall()
+
         total_customers = db.execute('SELECT COUNT(*) as count FROM customers').fetchone()
         total_products = db.execute('SELECT COUNT(*) as count FROM products').fetchone()
         total_staff = db.execute('SELECT COUNT(*) as count FROM users WHERE active=1').fetchone()
@@ -51,6 +59,8 @@ def dashboard():
                       'returns': today_returns['total']},
             'month': {'sales': month_sales['count'], 'revenue': month_sales['total']},
             'low_stock': low_stock['count'],
+            'low_raw_materials': low_raw_materials['count'],
+            'low_raw_material_items': [dict(r) for r in low_raw_material_items],
             'customers': total_customers['count'],
             'products': total_products['count'],
             'staff': total_staff['count'],

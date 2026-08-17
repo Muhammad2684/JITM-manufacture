@@ -239,6 +239,7 @@ def home():
         {'url': '/suppliers', 'label': 'Purchases', 'icon': '📦', 'desc': 'Suppliers, invoices & returns', 'permission': 'purchase'},
         {'url': '/customers', 'label': 'Sales', 'icon': '🧾', 'desc': 'Customers, invoices & receipts', 'permission': 'sales'},
         {'url': '/inventory', 'label': 'Inventory', 'icon': '📋', 'desc': 'Products, categories & barcodes', 'permission': 'inventory'},
+        {'url': '/manufacturing/raw-materials', 'label': 'Manufacturing', 'icon': '🏭', 'desc': 'Raw materials & production orders', 'permission': 'inventory'},
         {'url': '/accounts', 'label': 'Accounts', 'icon': '💰', 'desc': 'Cash & bank accounts', 'permission': 'accounts'},
         {'url': '/staff', 'label': 'Staff', 'icon': '👥', 'desc': 'User accounts management', 'permission': 'staff'},
         {'url': '/payroll', 'label': 'Payroll', 'icon': '💳', 'desc': 'Employee salaries & commission', 'permission': 'payroll'},

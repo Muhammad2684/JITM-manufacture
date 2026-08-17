@@ -36,6 +36,13 @@
                 </div>
                 <div class="card-body" id="chart"></div>
             </div>
+            <div class="card mt-2" id="lowMatCard" style="display:none">
+                <div class="card-header">
+                    <h3>Low Raw Materials</h3>
+                    <a href="/manufacturing/raw-materials" style="font-size:12px;color:#3b4fe2;text-decoration:none">Manage &rarr;</a>
+                </div>
+                <div class="card-body" id="lowMat"></div>
+            </div>
         </div>
     </div>
     <script>
@@ -62,6 +69,11 @@
                         <div class="val">${d.low_stock}</div>
                         <div class="lbl">Low Stock Items</div>
                         <div class="sub">Need reorder</div>
+                    </div>
+                    <div class="stat" onclick="showLowMaterials()" style="cursor:pointer">
+                        <div class="val">${d.low_raw_materials}</div>
+                        <div class="lbl">Low Raw Materials</div>
+                        <div class="sub">Click for details</div>
                     </div>
                     <div class="stat">
                         <div class="val">${d.customers}</div>
@@ -90,7 +102,26 @@
                 } else {
                     document.getElementById('chart').innerHTML = '<div class="empty">No data</div>';
                 }
+
+                window._lowMaterials = d.low_raw_material_items || [];
+                renderLowMaterials();
+                if (window._lowMaterials.length) document.getElementById('lowMatCard').style.display = '';
             });
+
+            function renderLowMaterials() {
+                const el = document.getElementById('lowMat');
+                if (!window._lowMaterials.length) {
+                    el.innerHTML = '<div class="empty">All raw materials well-stocked</div>';
+                    return;
+                }
+                el.innerHTML = '<table><tr><th>Material</th><th class="text-right">Stock</th><th class="text-right">Low at</th><th>Unit</th></tr>' +
+                    window._lowMaterials.map(m => '<tr><td>' + m.name + '</td><td class="text-right"><span class="bdg bdg-err">' + m.stock + '</span></td><td class="text-right">' + m.low_stock + '</td><td>' + (m.unit || '-') + '</td></tr>').join('') +
+                    '</table>';
+            }
+            function showLowMaterials() {
+                const card = document.getElementById('lowMatCard');
+                card.style.display = card.style.display === 'none' ? '' : 'none';
+            }
     </script>
 </body>
 </html>

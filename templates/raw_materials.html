@@ -125,7 +125,7 @@
             const page = l.slice(start, start + perPage);
             document.getElementById('tb').innerHTML = page.map((m, i) => {
                 const low = m.is_low ? '<span class="bdg bdg-err" title="Low stock">LOW</span> ' : '';
-                return '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600">' + low + '<a href="/ledger/raw_material/' + m.id + '" style="text-decoration:none;color:inherit">' + m.name + '</a></td>' + (m.unit || '-') + '</td><td class="text-right">' + m.stock + '</td><td class="text-right">Rs ' + m.cost_per_unit.toFixed(2) + '</td><td class="text-right">Rs ' + m.stock_value.toFixed(2) + '</td>' +
+                return '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600">' + low + '<a href="/ledger/raw_material/' + m.id + '" style="text-decoration:none;color:inherit">' + m.name + '</a></td><td style="font-size:12px;color:#6b7280">' + (m.unit || '-') + '</td><td class="text-right">' + m.stock + '</td><td class="text-right">Rs ' + m.cost_per_unit.toFixed(2) + '</td><td class="text-right">Rs ' + m.stock_value.toFixed(2) + '</td>' +
                 '<td>' + (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + m.id + ')">Edit</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + m.id + ',\'' + m.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>';
             }).join('');
             var totStock = 0, totValue = 0;

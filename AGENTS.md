@@ -90,6 +90,11 @@ python3 app.py
 ```
 
 ## Git Workflow
+This repo is the **JITM manufacturing edition** (POS base + manufacturing module).
+- `origin` = `github.com/Muhammad2684/JITM-manufacture` (pushed via tokenized URL, credential embedded in remote URL)
+- `pos` remote = `github.com/Muhammad2684/jitm-pos` (base POS edition; `main` ends at `4f00002`; combined history preserved on `backup-full-history`)
+- Railway deployment should source from JITM-manufacture, not jitm-pos
+
 After every successfully completed feature, run:
 ```bash
 git add -A && git commit -m "<brief description of feature>" && git push

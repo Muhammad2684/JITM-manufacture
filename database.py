@@ -23,6 +23,8 @@ Tables:
 - settings: System configuration key-value pairs
 - raw_materials: Raw materials inventory for manufacturing
 - bom: Bill of materials (raw materials required per finished product)
+- recipe_profiles: Reusable recipe templates (not tied to a variant)
+- recipe_profile_items: Materials in a recipe profile
 - production_orders: Production orders to manufacture finished goods
 - production_order_items: Line items for each production order
 """
@@ -365,6 +367,21 @@ def init_db():
                 variant_id INTEGER NOT NULL REFERENCES variants(id) ON DELETE CASCADE,
                 raw_material_id INTEGER NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
                 qty_per_unit REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS recipe_profiles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS recipe_profile_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id INTEGER NOT NULL REFERENCES recipe_profiles(id) ON DELETE CASCADE,
+                raw_material_id INTEGER NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
+                qty_required REAL NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
 

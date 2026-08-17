@@ -165,6 +165,167 @@ def delete_bom(bid):
         return jsonify({'ok': True})
 
 
+@mfg_bp.route('/recipe-profiles')
+@login_required
+def list_recipe_profiles():
+    q = request.args.get('q', '')
+    with get_db() as db:
+        base = ('SELECT rp.*, (SELECT COUNT(*) FROM recipe_profile_items rpi WHERE rpi.profile_id=rp.id) as material_count '
+                'FROM recipe_profiles rp ')
+        if q:
+            rows = db.execute(
+                base + 'WHERE rp.name LIKE ? OR rp.description LIKE ? ORDER BY rp.name',
+                (f'%{q}%', f'%{q}%')
+            ).fetchall()
+        else:
+            rows = db.execute(base + 'ORDER BY rp.name').fetchall()
+        return jsonify([dict(r) for r in rows])
+
+
+@mfg_bp.route('/recipe-profiles', methods=['POST'])
+@login_required
+@manager_required
+def add_recipe_profile():
+    d = request.get_json() or {}
+    name = (d.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    with get_db() as db:
+        cur = db.execute(
+            'INSERT INTO recipe_profiles (name, description) VALUES (?,?)',
+            (name, (d.get('description') or '').strip())
+        )
+        return jsonify({'ok': True, 'id': cur.lastrowid})
+
+
+@mfg_bp.route('/recipe-profiles/<int:pid>', methods=['PUT'])
+@login_required
+@manager_required
+def update_recipe_profile(pid):
+    d = request.get_json() or {}
+    name = (d.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    with get_db() as db:
+        db.execute('UPDATE recipe_profiles SET name=?, description=? WHERE id=?',
+                   (name, (d.get('description') or '').strip(), pid))
+        return jsonify({'ok': True})
+
+
+@mfg_bp.route('/recipe-profiles/<int:pid>', methods=['DELETE'])
+@login_required
+@manager_required
+def delete_recipe_profile(pid):
+    with get_db() as db:
+        db.execute('DELETE FROM recipe_profiles WHERE id=?', (pid,))
+        return jsonify({'ok': True})
+
+
+@mfg_bp.route('/recipe-profiles/<int:pid>/items')
+@login_required
+def list_recipe_profile_items(pid):
+    with get_db() as db:
+        rows = db.execute(
+            'SELECT rpi.*, r.name as material_name, r.unit, r.cost_per_unit, r.stock as material_stock '
+            'FROM recipe_profile_items rpi JOIN raw_materials r ON r.id=rpi.raw_material_id '
+            'WHERE rpi.profile_id=? ORDER BY rpi.id', (pid,)
+        ).fetchall()
+    items = []
+    for r in rows:
+        item = dict(r)
+        item['line_cost'] = round((r['qty_required'] or 0) * (r['cost_per_unit'] or 0), 2)
+        items.append(item)
+    return jsonify(items)
+
+
+@mfg_bp.route('/recipe-profiles/<int:pid>/items', methods=['POST'])
+@login_required
+@manager_required
+def add_recipe_profile_item(pid):
+    d = request.get_json() or {}
+    raw_material_id = d.get('raw_material_id')
+    if not raw_material_id:
+        return jsonify({'error': 'Raw material is required'}), 400
+    try:
+        qty_required = float(d.get('qty_required', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid quantity'}), 400
+    with get_db() as db:
+        rm = db.execute('SELECT id FROM raw_materials WHERE id=?', (raw_material_id,)).fetchone()
+        if not rm:
+            return jsonify({'error': 'Raw material not found'}), 400
+        cur = db.execute(
+            'INSERT INTO recipe_profile_items (profile_id, raw_material_id, qty_required) VALUES (?,?,?)',
+            (pid, raw_material_id, qty_required)
+        )
+        return jsonify({'ok': True, 'id': cur.lastrowid})
+
+
+@mfg_bp.route('/recipe-profiles/<int:pid>/items/<int:item_id>', methods=['PUT'])
+@login_required
+@manager_required
+def update_recipe_profile_item(pid, item_id):
+    d = request.get_json() or {}
+    try:
+        qty_required = float(d.get('qty_required', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid quantity'}), 400
+    with get_db() as db:
+        db.execute('UPDATE recipe_profile_items SET qty_required=? WHERE id=? AND profile_id=?',
+                   (qty_required, item_id, pid))
+        return jsonify({'ok': True})
+
+
+@mfg_bp.route('/recipe-profiles/<int:pid>/items/<int:item_id>', methods=['DELETE'])
+@login_required
+@manager_required
+def delete_recipe_profile_item(pid, item_id):
+    with get_db() as db:
+        db.execute('DELETE FROM recipe_profile_items WHERE id=? AND profile_id=?', (item_id, pid))
+        return jsonify({'ok': True})
+
+
+@mfg_bp.route('/recipe-profiles/<int:pid>/apply', methods=['POST'])
+@login_required
+@manager_required
+def apply_recipe_profile(pid):
+    """Copy profile items into bom for each variant. Existing bom rows for the
+    same material are overwritten (idempotent apply)."""
+    d = request.get_json() or {}
+    variant_ids = d.get('variant_ids') or []
+    if not variant_ids:
+        return jsonify({'error': 'Select at least one product'}), 400
+    with get_db() as db:
+        profile = db.execute('SELECT * FROM recipe_profiles WHERE id=?', (pid,)).fetchone()
+        if not profile:
+            return jsonify({'error': 'Profile not found'}), 404
+        items = db.execute(
+            'SELECT * FROM recipe_profile_items WHERE profile_id=?', (pid,)
+        ).fetchall()
+        if not items:
+            return jsonify({'error': 'Profile has no materials'}), 400
+        applied = 0
+        for vid in variant_ids:
+            v = db.execute('SELECT id FROM variants WHERE id=?', (vid,)).fetchone()
+            if not v:
+                return jsonify({'error': 'Variant not found: ' + str(vid)}), 400
+            for it in items:
+                existing = db.execute(
+                    'SELECT id FROM bom WHERE variant_id=? AND raw_material_id=?',
+                    (vid, it['raw_material_id'])
+                ).fetchone()
+                if existing:
+                    db.execute('UPDATE bom SET qty_per_unit=? WHERE id=?',
+                               (it['qty_required'], existing['id']))
+                else:
+                    db.execute(
+                        'INSERT INTO bom (variant_id, raw_material_id, qty_per_unit) VALUES (?,?,?)',
+                        (vid, it['raw_material_id'], it['qty_required'])
+                    )
+            applied += 1
+        return jsonify({'ok': True, 'applied_variants': applied})
+
+
 def material_cost_per_unit(db, variant_id):
     """Estimated raw material cost to make 1 unit, from the current BOM."""
     row = db.execute(

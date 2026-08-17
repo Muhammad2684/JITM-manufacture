@@ -446,7 +446,8 @@ def complete_production_order(oid):
         if not items:
             return jsonify({'error': 'Order has no items'}), 400
 
-        # Validate material availability for every line before touching anything
+        # Validate material availability for every line; report all shortages
+        allow_negative = bool((request.get_json(silent=True) or {}).get('allow_negative'))
         needs = {}
         mat_names = {}
         for it in items:
@@ -458,11 +459,23 @@ def complete_production_order(oid):
                 req = round((b['qty_per_unit'] or 0) * qty, 4)
                 needs[b['raw_material_id']] = needs.get(b['raw_material_id'], 0) + req
                 mat_names[b['raw_material_id']] = b['name']
+        shortages = []
         for rmid, req in needs.items():
             rm = db.execute('SELECT stock FROM raw_materials WHERE id=?', (rmid,)).fetchone()
             have = (rm['stock'] or 0) if rm else 0
             if have < req:
-                return jsonify({'error': f'Not enough {mat_names.get(rmid, "material")} in stock (need {req}, have {have})'}), 400
+                shortages.append({
+                    'name': mat_names.get(rmid, 'material'),
+                    'need': round(req, 4),
+                    'have': round(have, 4),
+                    'short': round(req - have, 4)
+                })
+        if shortages and not allow_negative:
+            return jsonify({
+                'error': 'Not enough raw materials in stock',
+                'shortages': shortages,
+                'confirm_required': True
+            }), 400
 
         try:
             db.execute('BEGIN IMMEDIATE')

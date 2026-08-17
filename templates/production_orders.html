@@ -74,7 +74,7 @@
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
-        var all = [], sortIdx = -1, sortDir = 1, prodOptions = [], prodLoaded = false, lines = [], action = null, actionId = null, currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
+        var all = [], sortIdx = -1, sortDir = 1, prodOptions = [], prodLoaded = false, lines = [], action = null, actionId = null, currentPage = 1, totalPages = 1, perPage = 50, showAll = false, allowNegative = false;
         load();
         loadProducts();
         function load() {
@@ -219,15 +219,24 @@
             const btn = document.getElementById('dBtn');
             btn.disabled = true;
             const url = action == 'complete' ? '/api/production-orders/' + actionId + '/complete' : '/api/production-orders/' + actionId;
-            const opts = { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'cancelled' }) };
-            fetch(url, opts).then(r => r.json()).then(d => {
+            const body = action == 'cancel' ? { status: 'cancelled' } : { allow_negative: allowNegative };
+            fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json()).then(d => {
                 btn.disabled = false;
                 if (d.error) {
+                    if (action == 'complete' && d.shortages && !allowNegative) {
+                        const lines = d.shortages.map(s => '• ' + s.name + ': need ' + s.need + ', have ' + s.have + ' (short ' + s.short + ')').join('\n');
+                        if (confirm('Raw materials will go into NEGATIVE stock:\n\n' + lines + '\n\nProceed with production anyway?')) {
+                            allowNegative = true;
+                            doAction();
+                        }
+                        return;
+                    }
                     const e = document.getElementById('dErr');
                     e.textContent = d.error;
                     e.style.display = '';
                     return;
                 }
+                allowNegative = false;
                 cl('dm'); load();
             });
         }

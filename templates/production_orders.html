@@ -43,17 +43,19 @@
     <div class="modal" id="pm">
         <div class="mc" style="max-width:560px"><button class="mx" onclick="cl('pm')">&times;</button>
             <h2>New Production Order</h2>
-            <div class="form-row">
-                <div><label>Product / Variant</label><select id="poProd"></select></div>
-                <div><label>Quantity</label><input id="poQty" type="number" step="0.01" value="1"></div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
-                <button type="button" class="btn btn-sm btn-p" onclick="addLine()">+ Add Line</button>
-                <span style="font-size:12px;color:#6b7280">Raw material stock is deducted and finished goods added on <strong>Complete</strong>.</span>
-            </div>
-            <div id="poLines"></div>
-            <label>Notes</label><input id="poNotes">
-            <button class="btn btn-p" onclick="saveOrder()" style="margin-top:8px">Create Order</button>
+            <form onsubmit="saveOrder(event)">
+                <div class="form-row">
+                    <div><label>Product / Variant</label><select id="poProd"></select></div>
+                    <div><label>Quantity</label><input id="poQty" type="number" step="0.01" min="0.01" value="1" onkeydown="if(event.key==='Enter'){event.preventDefault();addLine();}"></div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
+                    <button type="button" class="btn btn-sm btn-p" onclick="addLine()">+ Add Line</button>
+                    <span style="font-size:12px;color:#6b7280">Raw material stock is deducted and finished goods added on <strong>Complete</strong>.</span>
+                </div>
+                <div id="poLines"></div>
+                <label>Notes</label><input id="poNotes">
+                <button class="btn btn-p" type="submit" style="margin-top:8px">Create Order</button>
+            </form>
         </div>
     </div>
     <div class="modal" id="dm">
@@ -70,16 +72,20 @@
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
-        var all = [], sortIdx = -1, sortDir = 1, prodOptions = [], lines = [], action = null, actionId = null;
+        var all = [], sortIdx = -1, sortDir = 1, prodOptions = [], prodLoaded = false, lines = [], action = null, actionId = null;
         load();
+        loadProducts();
         function load() {
             const q = document.getElementById('s').value;
             fetch('/api/production-orders?q=' + encodeURIComponent(q)).then(r => r.json()).then(d => { all = d; render(all); });
+        }
+        function loadProducts() {
+            if (prodLoaded) return;
             fetch('/api/products/search?q=').then(r => r.json()).then(d => {
-                prodOptions = d;
+                prodOptions = d; prodLoaded = true;
                 const sel = document.getElementById('poProd');
-                sel.innerHTML = '<option value="">-- Select product --</option>' + prodOptions.map(p => '<option value="' + p.vid + '">' + p.name.replace(/"/g, '&quot;') + (p.size || p.color ? ' (' + [p.size, p.color].filter(Boolean).join(' / ') + ')' : '') + ' — ' + p.sku + '</option>').join('');
-            });
+                sel.innerHTML = '<option value="">-- Select product --</option>' + prodOptions.map(p => '<option value="' + p.vid + '">' + p.name.replace(/"/g, '&quot;') + (p.size || p.color ? ' (' + [p.size, p.color].filter(Boolean).join(' / ') + ')' : '') + ' &mdash; ' + p.sku + ' (stock: ' + p.stock + ')</option>').join('');
+            }).catch(() => {});
         }
         function sortCol(i) {
             if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
@@ -106,10 +112,11 @@
         function render(l) {
             document.getElementById('tb').innerHTML = l.map((o, i) => {
                 const prods = (o.items || []).map(x => x.product_name + ' <span style="color:#6b7280">&times;' + x.quantity + '</span>').join('<br>');
+                const tc = +o.total_cost || 0;
                 const actions = o.status == 'pending' && (ROLE == 'manager' || ROLE == 'owner')
                     ? '<button class="btn btn-xs btn-p" onclick="confirmComplete(' + o.id + ')">Complete</button> <button class="btn btn-xs btn-d" onclick="confirmCancel(' + o.id + ',\'' + o.order_no.replace(/'/g, "\\'") + '\')">Cancel</button>'
-                    : '<span style="color:#9ca3af;font-size:12px">' + (o.status == 'completed' ? 'Cost: Rs ' + o.total_cost.toFixed(2) : '&ndash;') + '</span>';
-                return '<tr><td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td><td style="font-weight:600">' + o.order_no + '</td><td>' + statusBadge(o.status) + '</td><td style="font-size:12px">' + (prods || '-') + '</td><td class="text-right">' + o.total_qty + '</td><td class="text-right">Rs ' + o.total_cost.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (o.created_at || '').slice(0, 16) + '</td><td style="font-size:12px;color:#6b7280">' + ((o.completed_at || '').slice(0, 16) || '-') + '</td><td>' + actions + '</td></tr>';
+                    : '<span style="color:#9ca3af;font-size:12px">' + (o.status == 'completed' ? 'Cost: Rs ' + tc.toFixed(2) : '&ndash;') + '</span>';
+                return '<tr><td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td><td style="font-weight:600">' + o.order_no + '</td><td>' + statusBadge(o.status) + '</td><td style="font-size:12px">' + (prods || '-') + '</td><td class="text-right">' + (+o.total_qty || 0) + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (o.created_at || '').slice(0, 16) + '</td><td style="font-size:12px;color:#6b7280">' + ((o.completed_at || '').slice(0, 16) || '-') + '</td><td>' + actions + '</td></tr>';
             }).join('');
             var totQty = 0, totCost = 0;
             l.forEach(function (o) { totQty += o.total_qty || 0; totCost += o.total_cost || 0; });
@@ -120,6 +127,8 @@
             renderLines();
             document.getElementById('poNotes').value = '';
             document.getElementById('poQty').value = '1';
+            document.getElementById('poProd').value = '';
+            loadProducts();
             document.getElementById('pm').classList.add('show');
         }
         function addLine() {
@@ -127,9 +136,16 @@
             const qty = parseFloat(document.getElementById('poQty').value);
             if (!vid) { alert('Select a product'); return; }
             if (isNaN(qty) || qty <= 0) { alert('Enter a valid quantity'); return; }
-            const p = prodOptions.find(x => x.vid == vid);
-            lines.push({ variant_id: vid, quantity: qty, name: p.name, sku: p.sku, size: p.size, color: p.color });
+            const p = prodOptions.find(x => String(x.vid) === String(vid));
+            if (!p) { alert('Product not found — refresh the page'); return; }
+            const existing = lines.find(l => String(l.variant_id) === String(vid));
+            if (existing) {
+                existing.quantity = existing.quantity + qty;
+            } else {
+                lines.push({ variant_id: vid, quantity: qty, name: p.name, sku: p.sku, size: p.size, color: p.color });
+            }
             renderLines();
+            document.getElementById('poQty').value = '1';
         }
         function renderLines() {
             document.getElementById('poLines').innerHTML = lines.length ? lines.map((l, i) =>
@@ -137,13 +153,17 @@
             ).join('') : '<div class="empty" style="font-size:12px;padding:8px">No lines yet — add a product above</div>';
         }
         function removeLine(i) { lines.splice(i, 1); renderLines(); }
-        function saveOrder() {
+        function saveOrder(e) {
+            if (e) e.preventDefault();
             if (!lines.length) { alert('Add at least one line'); return; }
+            const btn = document.querySelector('#pm button[type=submit]');
+            btn.disabled = true; btn.textContent = 'Creating...';
             fetch('/api/production-orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: lines, notes: document.getElementById('poNotes').value }) })
                 .then(r => r.json()).then(d => {
+                    btn.disabled = false; btn.textContent = 'Create Order';
                     if (d.error) { alert(d.error); return; }
                     cl('pm'); load();
-                });
+                }).catch(() => { btn.disabled = false; btn.textContent = 'Create Order'; });
         }
         function confirmComplete(id) {
             action = 'complete'; actionId = id;

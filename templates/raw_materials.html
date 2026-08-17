@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>JITM · Raw Materials</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Raw Materials</h2>
+            <div class="actions">
+                {% if role == 'manager' or role == 'owner' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ New Material</button>{% endif %}
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="search"><input id="s" placeholder="Search materials..." oninput="load()"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Material <span id="si1"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Unit <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" class="text-right" style="cursor:pointer;user-select:none">Stock <span id="si3"></span></th>
+                            <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Cost per Unit <span id="si4"></span></th>
+                            <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Stock Value <span id="si5"></span></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tb"></tbody>
+                    <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="pm">
+        <div class="mc"><button class="mx" onclick="cl('pm')">&times;</button>
+            <h2 id="ft">Raw Material</h2>
+            <form onsubmit="save(event)">
+                <label>Name</label><input id="pn" required>
+                <div class="form-row">
+                    <div><label>Unit</label><input id="pu" placeholder="e.g. meter, kg, piece"></div>
+                    <div><label>Stock</label><input id="ps" type="number" step="0.01" value="0"></div>
+                </div>
+                <div class="form-row">
+                    <div><label>Cost per Unit (Rs)</label><input id="pc" type="number" step="0.01" value="0"></div>
+                    <div><label>Low Stock Alert</label><input id="pl" type="number" step="0.01" value="0"></div>
+                </div>
+                <button class="btn btn-p" type="submit" style="margin-top:8px">Save</button>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="dm">
+        <div class="mc" style="max-width:450px"><button class="mx" onclick="cl('dm')">&times;</button>
+            <h3>Delete Material</h3>
+            <p id="dmsg" style="font-size:14px;color:#374151"></p>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn" onclick="cl('dm')">Cancel</button>
+                <button class="btn btn-p" onclick="doDelete()" style="background:#dc2626">Delete</button>
+            </div>
+        </div>
+    </div>
+    <script type="application/json" id="sv">{{role|tojson}}</script>
+    <script>
+        var ROLE = JSON.parse(document.getElementById('sv').textContent);
+        var editing = null, deleteId = null, all = [], sortIdx = -1, sortDir = 1;
+        load();
+        function load() {
+            const q = document.getElementById('s').value;
+            fetch('/api/raw-materials?q=' + encodeURIComponent(q)).then(r => r.json()).then(d => {
+                all = d; render(all);
+            });
+        }
+        function sortCol(i) {
+            if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
+            for (let j = 0; j < 6; j++) document.getElementById('si' + j).textContent = '';
+            document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
+            const vals = [
+                () => 0,
+                m => (m.name || '').toLowerCase(),
+                m => (m.unit || '').toLowerCase(),
+                m => m.stock || 0,
+                m => m.cost_per_unit || 0,
+                m => m.stock_value || 0,
+            ];
+            all.sort((a, b) => { const va = vals[i](a), vb = vals[i](b); return va < vb ? -sortDir : va > vb ? sortDir : 0; });
+            render(all);
+        }
+        function render(l) {
+            document.getElementById('tb').innerHTML = l.map((m, i) => {
+                const low = m.is_low ? '<span class="bdg bdg-err" title="Low stock">LOW</span> ' : '';
+                return '<tr><td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td><td style="font-weight:600">' + low + m.name + '</td><td style="font-size:12px;color:#6b7280">' + (m.unit || '-') + '</td><td class="text-right">' + m.stock + '</td><td class="text-right">Rs ' + m.cost_per_unit.toFixed(2) + '</td><td class="text-right">Rs ' + m.stock_value.toFixed(2) + '</td>' +
+                '<td>' + (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs btn-ghost" onclick="edit(' + m.id + ')">Edit</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + m.id + ',\'' + m.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '') + '</td></tr>';
+            }).join('');
+            var totStock = 0, totValue = 0;
+            l.forEach(function (m) { totStock += m.stock || 0; totValue += m.stock_value || 0; });
+            document.getElementById('tf').innerHTML = '<tr><td colspan="3" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">' + totStock + '</td><td></td><td class="text-right" style="padding:6px 8px">Rs ' + totValue.toFixed(2) + '</td><td></td></tr>';
+        }
+        function showAdd() {
+            editing = null; document.getElementById('ft').textContent = 'New Material';
+            document.getElementById('pn').value = ''; document.getElementById('pu').value = '';
+            document.getElementById('ps').value = '0'; document.getElementById('pc').value = '0'; document.getElementById('pl').value = '0';
+            document.getElementById('pm').classList.add('show');
+        }
+        function edit(id) {
+            const m = all.find(x => x.id === id); if (!m) return; editing = id;
+            document.getElementById('ft').textContent = 'Edit ' + m.name;
+            document.getElementById('pn').value = m.name; document.getElementById('pu').value = m.unit || '';
+            document.getElementById('ps').value = m.stock; document.getElementById('pc').value = m.cost_per_unit;
+            document.getElementById('pl').value = m.low_stock;
+            document.getElementById('pm').classList.add('show');
+        }
+        function save(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('pn').value,
+                unit: document.getElementById('pu').value,
+                stock: document.getElementById('ps').value || 0,
+                cost_per_unit: document.getElementById('pc').value || 0,
+                low_stock: document.getElementById('pl').value || 0
+            };
+            const url = editing ? '/api/raw-materials/' + editing : '/api/raw-materials';
+            fetch(url, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json()).then(d => { if (d.error) { alert(d.error); return; } cl('pm'); load(); });
+        }
+        function confirmDelete(id, name) {
+            deleteId = id;
+            document.getElementById('dmsg').innerHTML = 'Are you sure you want to delete <strong>' + name + '</strong>?';
+            document.getElementById('dm').classList.add('show');
+        }
+        function doDelete() {
+            fetch('/api/raw-materials/' + deleteId, { method: 'DELETE' }).then(r => r.json().catch(() => ({ error: 'Server error (status ' + r.status + ')' }))).then(d => {
+                if (d.error) { alert(d.error); return; }
+                cl('dm'); load();
+            });
+        }
+        function cl(id) { document.getElementById(id).classList.remove('show'); }
+    </script>
+</body>
+
+</html>

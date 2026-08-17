@@ -36,6 +36,7 @@ from routes.categories import cat_bp
 from routes.sizes import sizes_bp
 from routes.purchase_invoices import pi_bp
 from routes.purchase_returns import pr_bp
+from routes.manufacturing import mfg_bp
 
 ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
         'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
@@ -110,6 +111,7 @@ app.register_blueprint(cat_bp)
 app.register_blueprint(sizes_bp)
 app.register_blueprint(pi_bp)
 app.register_blueprint(pr_bp)
+app.register_blueprint(mfg_bp)
 app.register_blueprint(acc_bp)
 app.register_blueprint(txn_bp)
 app.register_blueprint(ledger_bp)
@@ -162,6 +164,9 @@ def render_sidebar(active_page):
             {'url': '/inventory/categories', 'label': 'Categories'},
             {'url': '/inventory/commission-classes', 'label': 'Commission Class'},
             {'url': '/inventory/barcode', 'label': 'Barcode Generator'},
+        ]},
+        {'label': 'Manufacturing', 'permission': 'inventory', 'subs': [
+            {'url': '/manufacturing/raw-materials', 'label': 'Raw Materials'},
         ]},
         {'label': 'Cash And Bank Accounts', 'permission': 'accounts', 'subs': [
             {'url': '/accounts', 'label': 'All Accounts'},
@@ -777,6 +782,14 @@ def inventory_categories():
 def inventory_commission_classes():
     """Display the commission classes management page."""
     return render_page('commission_classes.html', '/inventory/commission-classes')
+
+
+@app.route('/manufacturing/raw-materials', strict_slashes=False)
+@login_required
+@permission_required('inventory')
+def manufacturing_raw_materials():
+    """Display the raw materials list."""
+    return render_page('raw_materials.html', '/manufacturing/raw-materials')
 
 
 @app.route('/inventory/barcode', strict_slashes=False)

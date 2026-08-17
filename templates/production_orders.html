@@ -19,6 +19,7 @@
         </div>
         <div class="content">
             <div class="search"><input id="s" placeholder="Search orders..." oninput="load()"></div>
+            <div class="pagination" id="pagination-top"></div>
             <div class="table-wrap">
                 <table>
                     <thead>
@@ -38,6 +39,7 @@
                     <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
         </div>
     </div>
     <div class="modal" id="pm">
@@ -72,12 +74,37 @@
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
-        var all = [], sortIdx = -1, sortDir = 1, prodOptions = [], prodLoaded = false, lines = [], action = null, actionId = null;
+        var all = [], sortIdx = -1, sortDir = 1, prodOptions = [], prodLoaded = false, lines = [], action = null, actionId = null, currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
         load();
         loadProducts();
         function load() {
+            currentPage = 1;
             const q = document.getElementById('s').value;
             fetch('/api/production-orders?q=' + encodeURIComponent(q)).then(r => r.json()).then(d => { all = d; render(all); });
+        }
+        function toggleShowAll() {
+            showAll = !showAll;
+            currentPage = 1;
+            render(all);
+        }
+        function goToPage(p) {
+            p = parseInt(p);
+            if (p >= 1 && p <= totalPages) { currentPage = p; render(all); }
+        }
+        function renderPagination() {
+            var html = '';
+            if (totalPages > 1) {
+                html += '<button class="btn btn-sm" onclick="goToPage(1)"' + (currentPage <= 1 ? ' disabled' : '') + '>« First</button>';
+                html += '<button class="btn btn-sm" onclick="goToPage(' + (currentPage - 1) + ')"' + (currentPage <= 1 ? ' disabled' : '') + '>← Prev</button>';
+                html += '<input type="number" id="pg" value="' + currentPage + '" min="1" max="' + totalPages + '" onchange="goToPage(this.value)" style="width:50px;text-align:center;padding:2px 4px;font-size:13px;border:1px solid #ddd;border-radius:4px">';
+                html += '<span style="margin:0 4px;color:#6b7280;font-size:13px">/ ' + totalPages + '</span>';
+                html += '<button class="btn btn-sm" onclick="goToPage(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
+                html += '<button class="btn btn-sm" onclick="goToPage(' + totalPages + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Last »</button>';
+            }
+            html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
+            document.getElementById('pagination').innerHTML = html;
+            var t = document.getElementById('pagination-top');
+            if (t) t.innerHTML = html;
         }
         function loadProducts() {
             if (prodLoaded) return;
@@ -110,17 +137,22 @@
             return '<span class="bdg bdg-warn">Pending</span>';
         }
         function render(l) {
-            document.getElementById('tb').innerHTML = l.map((o, i) => {
+            totalPages = Math.max(1, Math.ceil(l.length / perPage));
+            if (currentPage > totalPages) currentPage = totalPages;
+            const start = (currentPage - 1) * perPage;
+            const page = l.slice(start, start + perPage);
+            document.getElementById('tb').innerHTML = page.map((o, i) => {
                 const prods = (o.items || []).map(x => x.product_name + ' <span style="color:#6b7280">&times;' + x.quantity + '</span>').join('<br>');
                 const tc = +o.total_cost || 0;
                 const actions = o.status == 'pending' && (ROLE == 'manager' || ROLE == 'owner')
                     ? '<button class="btn btn-xs btn-p" onclick="confirmComplete(' + o.id + ')">Complete</button> <button class="btn btn-xs btn-d" onclick="confirmCancel(' + o.id + ',\'' + o.order_no.replace(/'/g, "\\'") + '\')">Cancel</button>'
                     : '<span style="color:#9ca3af;font-size:12px">' + (o.status == 'completed' ? 'Cost: Rs ' + tc.toFixed(2) : '&ndash;') + '</span>';
-                return '<tr><td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td><td style="font-weight:600">' + o.order_no + '</td><td>' + statusBadge(o.status) + '</td><td style="font-size:12px">' + (prods || '-') + '</td><td class="text-right">' + (+o.total_qty || 0) + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (o.created_at || '').slice(0, 16) + '</td><td style="font-size:12px;color:#6b7280">' + ((o.completed_at || '').slice(0, 16) || '-') + '</td><td>' + actions + '</td></tr>';
+                return '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600">' + o.order_no + '</td><td>' + statusBadge(o.status) + '</td><td style="font-size:12px">' + (prods || '-') + '</td><td class="text-right">' + (+o.total_qty || 0) + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (o.created_at || '').slice(0, 16) + '</td><td style="font-size:12px;color:#6b7280">' + ((o.completed_at || '').slice(0, 16) || '-') + '</td><td>' + actions + '</td></tr>';
             }).join('');
             var totQty = 0, totCost = 0;
             l.forEach(function (o) { totQty += o.total_qty || 0; totCost += o.total_cost || 0; });
             document.getElementById('tf').innerHTML = '<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">' + totQty + '</td><td class="text-right" style="padding:6px 8px">Rs ' + totCost.toFixed(2) + '</td><td></td><td></td><td></td></tr>';
+            renderPagination();
         }
         function showCreate() {
             lines = [];

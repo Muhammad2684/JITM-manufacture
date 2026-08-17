@@ -21,6 +21,10 @@ Tables:
 - categories: Product categories
 - sizes: Available product sizes
 - settings: System configuration key-value pairs
+- raw_materials: Raw materials inventory for manufacturing
+- bom: Bill of materials (raw materials required per finished product)
+- production_orders: Production orders to manufacture finished goods
+- production_order_items: Line items for each production order
 """
 
 import json
@@ -344,6 +348,45 @@ def init_db():
                 status TEXT NOT NULL DEFAULT 'present',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
                 UNIQUE(employee_id, date)
+            );
+
+            CREATE TABLE IF NOT EXISTS raw_materials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                unit TEXT DEFAULT '',
+                stock REAL NOT NULL DEFAULT 0,
+                cost_per_unit REAL NOT NULL DEFAULT 0,
+                low_stock REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS bom (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                raw_material_id INTEGER NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
+                qty_per_unit REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS production_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_no TEXT UNIQUE NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                total_cost REAL NOT NULL DEFAULT 0,
+                notes TEXT DEFAULT '',
+                created_by INTEGER REFERENCES users(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                completed_at TEXT DEFAULT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS production_order_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                production_order_id INTEGER NOT NULL REFERENCES production_orders(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES products(id),
+                variant_id INTEGER REFERENCES variants(id),
+                quantity REAL NOT NULL DEFAULT 1,
+                unit_cost REAL NOT NULL DEFAULT 0,
+                total REAL NOT NULL DEFAULT 0
             );
         ''')
 

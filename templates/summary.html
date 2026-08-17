@@ -355,6 +355,7 @@
                         let type = '';
                         if (a.label === 'Cash / Bank') type = 'cash_bank';
                         else if (a.label === 'Inventory Value') type = 'inventory';
+                        else if (a.label === 'Raw Materials Value') type = 'raw_materials';
                         else if (a.label === 'Customer Receivables') type = 'customer_receivables';
                         return activeRow(a.label, a.amount, type);
                     }).join('');
@@ -430,6 +431,7 @@
             const redirects = {
                 'cash_bank': '/accounts',
                 'inventory': '/inventory',
+                'raw_materials': '/manufacturing/raw-materials',
                 'customer_receivables': '/customers',
                 'supplier_payables': '/suppliers'
             };

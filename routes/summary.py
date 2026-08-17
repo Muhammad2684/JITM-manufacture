@@ -23,6 +23,10 @@ def summary():
                 'FROM variants v JOIN products p ON p.id=v.product_id'
             ).fetchone()
 
+            raw_material_value = db.execute(
+                'SELECT COALESCE(SUM(stock * cost_per_unit),0) as total FROM raw_materials'
+            ).fetchone()
+
             customer_credit = db.execute(
                 'SELECT COALESCE(SUM(credit),0) as total FROM customers'
             ).fetchone()
@@ -35,7 +39,7 @@ def summary():
                 'SELECT COALESCE(SUM(balance),0) as total FROM accounts'
             ).fetchone()
 
-            total_assets = account_balance['total'] + inventory_value['total'] + customer_credit['total']
+            total_assets = account_balance['total'] + inventory_value['total'] + raw_material_value['total'] + customer_credit['total']
             total_liabilities = supplier_balance['total']
             equity = total_assets - total_liabilities
 
@@ -43,6 +47,7 @@ def summary():
                 'assets': [
                     {'label': 'Cash / Bank', 'amount': round(account_balance['total'], 2)},
                     {'label': 'Inventory Value', 'amount': round(inventory_value['total'], 2)},
+                    {'label': 'Raw Materials Value', 'amount': round(raw_material_value['total'], 2)},
                     {'label': 'Customer Receivables', 'amount': round(customer_credit['total'], 2)},
                 ],
                 'total_assets': round(total_assets, 2),
@@ -196,6 +201,20 @@ def summary_details(detail_type):
                 ]
             })
         
+        elif detail_type == 'raw_materials':
+            rows = db.execute(
+                'SELECT name, unit, stock, cost_per_unit, (stock * cost_per_unit) as value '
+                'FROM raw_materials WHERE stock > 0 ORDER BY name'
+            ).fetchall()
+            return jsonify({
+                'title': 'Raw Materials Value',
+                'columns': ['Material', 'Unit', 'Stock', 'Cost per Unit', 'Value'],
+                'rows': [
+                    [r['name'], r['unit'] or '-', str(r['stock']), f"Rs {r['cost_per_unit']:.2f}", f"Rs {r['value']:.2f}"]
+                    for r in rows
+                ]
+            })
+
         elif detail_type == 'customer_receivables':
             rows = db.execute(
                 'SELECT name, phone, credit FROM customers WHERE credit > 0 ORDER BY credit DESC'

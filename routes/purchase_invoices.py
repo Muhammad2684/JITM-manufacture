@@ -55,6 +55,49 @@ def auto_link_product(db, item):
     return product_row['id'] if product_row else None
 
 
+def update_raw_material_avg_cost(db, raw_material_id):
+    """Recalculate the weighted average cost for a raw material based on restock history."""
+    total_row = db.execute(
+        'SELECT COALESCE(SUM(qty_added * cost),0) as total_cost, COALESCE(SUM(qty_added),0) as total_qty '
+        'FROM restock_log WHERE raw_material_id=? AND cost > 0',
+        (raw_material_id,)
+    ).fetchone()
+    if total_row and total_row['total_qty'] > 0:
+        average_cost = round(total_row['total_cost'] / total_row['total_qty'], 2)
+        db.execute('UPDATE raw_materials SET cost_per_unit=? WHERE id=?', (average_cost, raw_material_id))
+
+
+def apply_raw_material_stock_change(db, raw_material_id, quantity, cost, reference_note, staff_name):
+    """Apply a stock change for a raw material: update stock, log the change, and recalc avg cost."""
+    material = db.execute(
+        'SELECT stock FROM raw_materials WHERE id=?', (raw_material_id,)
+    ).fetchone()
+    if not material:
+        return
+    old_stock = float(material['stock'] or 0)
+    new_stock = old_stock + quantity
+    db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_stock, raw_material_id))
+    db.execute(
+        'INSERT INTO restock_log (variant_id, raw_material_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?,?)',
+        (None, raw_material_id, old_stock, new_stock, float(quantity), float(cost), reference_note, staff_name)
+    )
+    update_raw_material_avg_cost(db, raw_material_id)
+
+
+def auto_link_raw_material(db, item):
+    """Resolve raw_material_id by exact name match (case-insensitive) when not explicitly set."""
+    if item.get('raw_material_id'):
+        return item['raw_material_id']
+    material_name = (item.get('item') or '').strip()
+    if not material_name:
+        return None
+    material_row = db.execute(
+        'SELECT id FROM raw_materials WHERE LOWER(TRIM(name)) = LOWER(?)',
+        (material_name,)
+    ).fetchone()
+    return material_row['id'] if material_row else None
+
+
 @pi_bp.route('/purchase-invoices')
 @login_required
 def list_purchase_invoices():
@@ -142,14 +185,25 @@ def create_purchase_invoice():
             reference = 'PI #' + request_data['invoice_no']
             
             for item in request_data.get('items', []):
-                product_id = auto_link_product(db, item)
+                item_type = item.get('item_type', 'product') or 'product'
+                product_id = None
+                raw_material_id = None
+                if item_type == 'raw_material':
+                    raw_material_id = auto_link_raw_material(db, item)
+                else:
+                    product_id = auto_link_product(db, item)
                 db.execute(
-                    'INSERT INTO purchase_invoice_items (invoice_id, line_number, item, product_id, qty, unit_price, total) VALUES (?,?,?,?,?,?,?)',
+                    'INSERT INTO purchase_invoice_items (invoice_id, line_number, item, product_id, raw_material_id, item_type, qty, unit_price, total) VALUES (?,?,?,?,?,?,?,?,?)',
                     (invoice_id, int(item.get('line_number', 0)), item.get('item', ''),
-                     product_id, float(item.get('qty', 1)),
+                     product_id, raw_material_id, item_type, float(item.get('qty', 1)),
                      float(item.get('unit_price', 0)), float(item.get('total', 0)))
                 )
-                if product_id:
+                if item_type == 'raw_material':
+                    if raw_material_id:
+                        quantity = float(item.get('qty', 1))
+                        cost = float(item.get('unit_price', 0))
+                        apply_raw_material_stock_change(db, raw_material_id, quantity, cost, reference, staff_member)
+                elif product_id:
                     quantity = float(item.get('qty', 1))
                     cost = float(item.get('unit_price', 0))
                     apply_stock_change(db, product_id, int(quantity), cost, reference, staff_member)
@@ -185,47 +239,91 @@ def update_purchase_invoice(invoice_id):
             staff_member = session.get('name', '')
             reference = 'PI #' + (request_data.get('invoice_no') or old_invoice['invoice_no'])
             
-            old_by_pid = {}
+            old_by_key = {}
             for item in old_items:
-                if item['product_id']:
-                    old_by_pid[item['product_id']] = dict(item)
+                key = None
+                if (item.get('item_type') or 'product') == 'raw_material':
+                    if item.get('raw_material_id'):
+                        key = 'r:' + str(item['raw_material_id'])
+                elif item['product_id']:
+                    key = 'p:' + str(item['product_id'])
+                if key:
+                    old_by_key[key] = dict(item)
             
-            matched_pids = set()
+            matched_keys = set()
             
             for item in request_data.get('items', []):
-                product_id = auto_link_product(db, item)
-                if not product_id:
-                    continue
-                
-                new_qty = int(float(item.get('qty', 1)))
-                new_cost = float(item.get('unit_price', 0))
-                
-                if product_id in old_by_pid:
-                    matched_pids.add(product_id)
-                    old_item = old_by_pid[product_id]
-                    old_qty = int(old_item['qty'])
-                    old_cost = float(old_item['unit_price'] or 0)
+                item_type = item.get('item_type', 'product') or 'product'
+                if item_type == 'raw_material':
+                    raw_material_id = auto_link_raw_material(db, item)
+                    if not raw_material_id:
+                        continue
+                    key = 'r:' + str(raw_material_id)
+                    new_qty = float(item.get('qty', 1))
+                    new_cost = float(item.get('unit_price', 0))
                     
-                    if old_qty != new_qty or old_cost != new_cost:
-                        variant = find_default_variant(db, product_id)
-                        if variant:
+                    if key in old_by_key:
+                        matched_keys.add(key)
+                        old_item = old_by_key[key]
+                        old_qty = float(old_item['qty'])
+                        old_cost = float(old_item['unit_price'] or 0)
+                        
+                        if old_qty != new_qty or old_cost != new_cost:
                             row = db.execute(
-                                'SELECT id FROM restock_log WHERE variant_id=? AND note=? AND qty_added>0 ORDER BY id DESC LIMIT 1',
-                                (variant['id'], reference)
+                                'SELECT id FROM restock_log WHERE raw_material_id=? AND note=? AND qty_added>0 ORDER BY id DESC LIMIT 1',
+                                (raw_material_id, reference)
                             ).fetchone()
                             if row:
                                 db.execute('UPDATE restock_log SET qty_added=?, cost=? WHERE id=?',
                                            (new_qty, new_cost, row['id']))
                             delta = new_qty - old_qty
                             if delta != 0:
-                                db.execute('UPDATE variants SET stock=stock+? WHERE id=?', (delta, variant['id']))
-                            update_weighted_avg_cost(db, product_id)
+                                db.execute('UPDATE raw_materials SET stock=stock+? WHERE id=?', (delta, raw_material_id))
+                            update_raw_material_avg_cost(db, raw_material_id)
+                    else:
+                        apply_raw_material_stock_change(db, raw_material_id, new_qty, new_cost, reference, staff_member)
                 else:
-                    apply_stock_change(db, product_id, new_qty, new_cost, reference, staff_member)
+                    product_id = auto_link_product(db, item)
+                    if not product_id:
+                        continue
+                    key = 'p:' + str(product_id)
+                    new_qty = int(float(item.get('qty', 1)))
+                    new_cost = float(item.get('unit_price', 0))
+                    
+                    if key in old_by_key:
+                        matched_keys.add(key)
+                        old_item = old_by_key[key]
+                        old_qty = int(old_item['qty'])
+                        old_cost = float(old_item['unit_price'] or 0)
+                        
+                        if old_qty != new_qty or old_cost != new_cost:
+                            variant = find_default_variant(db, product_id)
+                            if variant:
+                                row = db.execute(
+                                    'SELECT id FROM restock_log WHERE variant_id=? AND note=? AND qty_added>0 ORDER BY id DESC LIMIT 1',
+                                    (variant['id'], reference)
+                                ).fetchone()
+                                if row:
+                                    db.execute('UPDATE restock_log SET qty_added=?, cost=? WHERE id=?',
+                                               (new_qty, new_cost, row['id']))
+                                delta = new_qty - old_qty
+                                if delta != 0:
+                                    db.execute('UPDATE variants SET stock=stock+? WHERE id=?', (delta, variant['id']))
+                                update_weighted_avg_cost(db, product_id)
+                    else:
+                        apply_stock_change(db, product_id, new_qty, new_cost, reference, staff_member)
             
             for old_item in old_items:
-                if old_item['product_id'] and old_item['product_id'] not in matched_pids:
-                    apply_stock_change(db, old_item['product_id'], -int(old_item['qty']), float(old_item['unit_price'] or 0), reference + ' (removed)', staff_member)
+                old_key = None
+                if (old_item.get('item_type') or 'product') == 'raw_material':
+                    if old_item.get('raw_material_id'):
+                        old_key = 'r:' + str(old_item['raw_material_id'])
+                        if old_key not in matched_keys:
+                            apply_raw_material_stock_change(db, old_item['raw_material_id'], -float(old_item['qty']), float(old_item['unit_price'] or 0), reference + ' (removed)', staff_member)
+                elif old_item['product_id']:
+                    old_key = 'p:' + str(old_item['product_id'])
+                    if old_key not in matched_keys:
+                        apply_stock_change(db, old_item['product_id'], -int(old_item['qty']), float(old_item['unit_price'] or 0), reference + ' (removed)', staff_member)
             
             db.execute(
                 'UPDATE purchase_invoices SET invoice_no=?, issue_date=?, due_date=?, supplier_id=?, description=?, invoice_amount=?, balance_due=?, status=? WHERE id=?',
@@ -238,11 +336,17 @@ def update_purchase_invoice(invoice_id):
             db.execute('DELETE FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,))
             
             for item in request_data.get('items', []):
-                product_id = auto_link_product(db, item)
+                item_type = item.get('item_type', 'product') or 'product'
+                product_id = None
+                raw_material_id = None
+                if item_type == 'raw_material':
+                    raw_material_id = auto_link_raw_material(db, item)
+                else:
+                    product_id = auto_link_product(db, item)
                 db.execute(
-                    'INSERT INTO purchase_invoice_items (invoice_id, line_number, item, product_id, qty, unit_price, total) VALUES (?,?,?,?,?,?,?)',
+                    'INSERT INTO purchase_invoice_items (invoice_id, line_number, item, product_id, raw_material_id, item_type, qty, unit_price, total) VALUES (?,?,?,?,?,?,?,?,?)',
                     (invoice_id, int(item.get('line_number', 0)), item.get('item', ''),
-                     product_id, float(item.get('qty', 1)),
+                     product_id, raw_material_id, item_type, float(item.get('qty', 1)),
                      float(item.get('unit_price', 0)), float(item.get('total', 0)))
                 )
             
@@ -277,15 +381,18 @@ def delete_purchase_invoice(invoice_id):
         invoice = db.execute('SELECT invoice_no, balance_due, supplier_id FROM purchase_invoices WHERE id=?', (invoice_id,)).fetchone()
         if invoice:
             invoice_items = db.execute(
-                'SELECT product_id, qty, unit_price FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,)
+                'SELECT product_id, raw_material_id, item_type, qty, unit_price FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,)
             ).fetchall()
             staff_member = session.get('name', '')
             reference = 'DEL #' + invoice['invoice_no']
             
             for item in invoice_items:
-                product_id = item['product_id']
-                if product_id:
-                    apply_stock_change(db, product_id, -int(item['qty']), float(item['unit_price'] or 0), reference, staff_member)
+                if (item['item_type'] or 'product') == 'raw_material':
+                    raw_material_id = item['raw_material_id']
+                    if raw_material_id:
+                        apply_raw_material_stock_change(db, raw_material_id, -float(item['qty']), float(item['unit_price'] or 0), reference, staff_member)
+                elif item['product_id']:
+                    apply_stock_change(db, item['product_id'], -int(item['qty']), float(item['unit_price'] or 0), reference, staff_member)
         
         db.execute('DELETE FROM purchase_invoice_items WHERE invoice_id=?', (invoice_id,))
         db.execute('DELETE FROM purchase_invoices WHERE id=?', (invoice_id,))

@@ -114,6 +114,16 @@
                         <div></div>
                     </div>
                 </div>
+                <div style="text-align:center;margin-top:4px"><button type="button" class="btn btn-sm btn-ghost" onclick="toggleBom()" id="bomBtn" style="display:none">+ Manufacturing</button></div>
+                <div id="bomSection" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #e2e1de">
+                    <p style="font-size:12px;color:#6b7280;margin:0 0 8px">Recipe (Bill of Materials) for the default variant &mdash; raw materials consumed to make 1 unit.</p>
+                    <div class="form-row">
+                        <div><label>Raw Material</label><select id="brm"></select></div>
+                        <div><label>Qty per Unit</label><input id="bqty" type="number" step="0.01" value="0"></div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-p" onclick="addBom()" style="margin-bottom:6px">+ Add Material</button>
+                    <div id="bomList"></div>
+                </div>
                 <button class="btn btn-p" type="submit" style="margin-top:8px">Save</button>
             </form>
         </div>
@@ -215,6 +225,7 @@
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
         var editing = null, avId = null, svId = null, all = [], sortIdx = -1, sortDir = 1, catList = [], ccList = [], sizeList = [], supList = [], currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
         var selectMode = false, selectedIds = new Set();
+        var bomVid = null, rmList = [], bomRows = [];
         load();
         function load(page) {
             const q = document.getElementById('s').value;
@@ -357,6 +368,50 @@
             el.style.display = el.style.display === 'none' ? '' : 'none';
             btn.textContent = el.style.display === 'none' ? '+ Extras' : '- Extras';
         }
+        function toggleBom() {
+            const el = document.getElementById('bomSection');
+            const btn = document.getElementById('bomBtn');
+            if (el.style.display === 'none') {
+                loadBom();
+                el.style.display = '';
+                btn.textContent = '- Manufacturing';
+            } else {
+                el.style.display = 'none';
+                btn.textContent = '+ Manufacturing';
+            }
+        }
+        function loadBom() {
+            if (!bomVid) return;
+            fetch('/api/raw-materials').then(r => r.json()).then(d => {
+                rmList = d;
+                const sel = document.getElementById('brm');
+                sel.innerHTML = '<option value="">-- Select material --</option>' + rmList.map(m => '<option value="' + m.id + '">' + m.name.replace(/"/g, '&quot;') + '</option>').join('');
+            });
+            fetch('/api/bom?variant_id=' + bomVid).then(r => r.json()).then(d => { bomRows = d; renderBom(); });
+        }
+        function renderBom() {
+            const el = document.getElementById('bomList');
+            if (!bomRows.length) { el.innerHTML = '<div class="empty" style="font-size:12px;padding:8px">No materials in recipe</div>'; return; }
+            let totalCost = 0;
+            bomRows.forEach(r => { totalCost += r.line_cost || 0; });
+            el.innerHTML = bomRows.map(r => '<div style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:12px"><span style="flex:1">' + r.material_name + ' <span style="color:#6b7280">(' + (r.unit || '-') + ')</span></span><span style="width:70px;text-align:right">' + r.qty_per_unit + '/unit</span><span style="width:80px;text-align:right">Rs ' + r.line_cost.toFixed(2) + '</span><button class="btn btn-xs btn-d" onclick="delBom(' + r.id + ')">Remove</button></div>').join('') +
+                '<div style="display:flex;gap:6px;align-items:center;padding:4px 0;font-size:12px;font-weight:600;border-top:1px solid #e2e1de"><span style="flex:1">Material Cost / Unit</span><span style="width:70px;text-align:right"></span><span style="width:80px;text-align:right">Rs ' + totalCost.toFixed(2) + '</span></div>';
+        }
+        function addBom() {
+            const rm = document.getElementById('brm').value;
+            const qty = parseFloat(document.getElementById('bqty').value);
+            if (!rm) { alert('Select a raw material'); return; }
+            if (isNaN(qty) || qty <= 0) { alert('Enter a valid quantity'); return; }
+            fetch('/api/bom', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ variant_id: bomVid, raw_material_id: rm, qty_per_unit: qty }) })
+                .then(r => r.json()).then(d => {
+                    if (d.error) { alert(d.error); return; }
+                    document.getElementById('bqty').value = '0';
+                    loadBom();
+                });
+        }
+        function delBom(id) {
+            fetch('/api/bom/' + id, { method: 'DELETE' }).then(r => r.json()).then(() => loadBom());
+        }
         function autoPrice() {
             var cost = parseFloat(document.getElementById('pc').value) || 0;
             var markup = parseFloat(document.getElementById('pmu').value) || 0;
@@ -377,6 +432,8 @@
             populateSuppliers(); document.getElementById('psup').value = '';
             document.getElementById('pbrand').value = ''; document.getElementById('pmake').value = ''; document.getElementById('pcolor').value = '';
             document.getElementById('extras').style.display = 'none'; document.getElementById('extBtn').textContent = '+ Extras';
+            document.getElementById('bomBtn').style.display = 'none';
+            document.getElementById('bomSection').style.display = 'none'; document.getElementById('bomBtn').textContent = '+ Manufacturing';
             document.getElementById('pm').classList.add('show');
         }
         function populateSuppliers() {
@@ -435,6 +492,9 @@
             document.getElementById('pbrand').value = p.brand || '';
             document.getElementById('pmake').value = p.make || '';
             document.getElementById('pcolor').value = p.color || '';
+            bomVid = (p.variants && p.variants[0]) ? p.variants[0].id : null;
+            document.getElementById('bomBtn').style.display = bomVid ? '' : 'none';
+            document.getElementById('bomSection').style.display = 'none'; document.getElementById('bomBtn').textContent = '+ Manufacturing';
             document.getElementById('pm').classList.add('show');
         }
         function save(e) {

@@ -362,7 +362,7 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS bom (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                variant_id INTEGER NOT NULL REFERENCES variants(id) ON DELETE CASCADE,
                 raw_material_id INTEGER NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
                 qty_per_unit REAL NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
@@ -679,6 +679,25 @@ def init_db():
 
         try:
             db.execute('CREATE INDEX IF NOT EXISTS idx_restock_log_variant_id ON restock_log(variant_id)')
+        except Exception:
+            pass
+
+        # Migrate bom to variant_id (table introduced with manufacturing feature)
+        try:
+            cols = [r['name'] for r in db.execute('PRAGMA table_info(bom)').fetchall()]
+            if 'variant_id' not in cols:
+                cnt = db.execute('SELECT COUNT(*) FROM bom').fetchone()[0]
+                if cnt == 0:
+                    db.execute('DROP TABLE bom')
+                    db.execute('''CREATE TABLE bom (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        variant_id INTEGER NOT NULL REFERENCES variants(id) ON DELETE CASCADE,
+                        raw_material_id INTEGER NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
+                        qty_per_unit REAL NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                    )''')
+                else:
+                    db.execute('ALTER TABLE bom ADD COLUMN variant_id INTEGER DEFAULT NULL')
         except Exception:
             pass
 

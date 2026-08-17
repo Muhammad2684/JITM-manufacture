@@ -861,7 +861,8 @@ def ledger_page(entity_type, entity_id):
         'customer': 'sales',
         'supplier': 'purchase',
         'account': 'accounts',
-        'product': 'inventory'
+        'product': 'inventory',
+        'raw_material': 'inventory'
     }
     required_permission = permission_map.get(entity_type, 'dashboard')
     

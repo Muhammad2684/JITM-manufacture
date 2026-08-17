@@ -489,6 +489,11 @@ def complete_production_order(oid):
                     req = round((b['qty_per_unit'] or 0) * qty, 4)
                     new_stock = round((rm['stock'] or 0) - req, 4)
                     db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_stock, rm['id']))
+                    db.execute(
+                        'INSERT INTO restock_log (variant_id, raw_material_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?,?)',
+                        (None, rm['id'], rm['stock'] or 0, new_stock, -req, rm['cost_per_unit'] or 0,
+                         f'Production Order #{po["order_no"]}', session.get('name', ''))
+                    )
                     unit_cost += (b['qty_per_unit'] or 0) * (rm['cost_per_unit'] or 0)
                 unit_cost = round(unit_cost, 2)
                 v = db.execute('SELECT stock, product_id FROM variants WHERE id=?', (vid,)).fetchone()

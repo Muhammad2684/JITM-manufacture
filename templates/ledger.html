@@ -29,6 +29,7 @@
         .bdg-purchase { background: #fff3cd; color: #856404; }
         .bdg-restock { background: #d4edda; color: #155724; }
         .bdg-purchase_return { background: #fce4ec; color: #880e4f; }
+        .bdg-production { background: #e2e3f9; color: #3730a3; }
         .bdg-transfer_in { background: #d4edda; color: #155724; }
         .bdg-transfer_out { background: #f8d7da; color: #721c24; }
         .bdg-opening { background: #e2e3e5; color: #383d41; }
@@ -89,7 +90,7 @@
                             <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Date <span id="si1"></span></th>
                             <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Description <span id="si2"></span></th>
                             <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Reference <span id="si3"></span></th>
-                            {% if entity_type == 'product' %}
+                            {% if entity_type == 'product' or entity_type == 'raw_material' %}
                                 <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Qty <span id="si4"></span></th>
                                 <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Debit <span id="si5"></span></th>
                                 <th onclick="sortCol(6)" class="text-right" style="cursor:pointer;user-select:none">Credit <span id="si6"></span></th>
@@ -115,6 +116,7 @@
     <script>
         var list = [], sortIdx = -1, sortDir = 1;
         var entityType = '{{entity_type}}', entityId = parseInt('{{entity_id}}', 10);
+        var isStock = entityType === 'product' || entityType === 'raw_material';
         var currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
         
         function load(page) {
@@ -125,11 +127,13 @@
                 .then(r => r.json())
                 .then(d => {
                     document.getElementById('ename').textContent = d.entity.name || d.entity.id;
-                    var typeLabel = { customer: 'Customer', supplier: 'Supplier', account: 'Account', product: 'Product' }[entityType] || entityType;
+                    var typeLabel = { customer: 'Customer', supplier: 'Supplier', account: 'Account', product: 'Product', raw_material: 'Raw Material' }[entityType] || entityType;
                     document.getElementById('etype_badge').innerHTML = '<span class="bdg">' + typeLabel + '</span>';
                     
                     var bal = 0;
-                    if (entityType === 'product') {
+                    if (entityType === 'raw_material') {
+                        document.getElementById('ebal').innerHTML = 'Stock: <strong>' + d.entity.stock + ' ' + (d.entity.unit || '') + '</strong> &middot; Value: <strong>Rs ' + (d.entity.stock * d.entity.cost_per_unit).toFixed(2) + '</strong>';
+                    } else if (entityType === 'product') {
                         // Use the final balance from entries (historical cost basis)
                         bal = d.entries.length > 0 ? d.entries[d.entries.length - 1].balance : 0;
                         document.getElementById('ebal').textContent = 'Rs ' + bal.toFixed(2);
@@ -181,7 +185,7 @@
         function render(l) {
             document.getElementById('tb').innerHTML = l.map(function(e, i) {
                 var tClass = 'bdg-' + e.type;
-                var qtyCol = '{{ entity_type }}' === 'product' ? '<td class="text-right">' + (e.qty || '') + '</td>' : '';
+                var qtyCol = isStock ? '<td class="text-right">' + (e.qty || '') + '</td>' : '';
                 
                 return '<tr>' +
                     '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + i + 1) + '</td>' +
@@ -198,7 +202,7 @@
             var totD = 0, totC = 0;
             l.forEach(function(e) { totD += e.debit || 0; totC += e.credit || 0; });
             
-            var cols = '{{ entity_type }}' === 'product' ? 5 : 4;
+            var cols = isStock ? 5 : 4;
             document.getElementById('tf').innerHTML = 
                 '<tr>' +
                 '<td colspan="' + cols + '" class="text-right" style="padding:6px 8px">Total</td>' +
@@ -211,7 +215,7 @@
         function sortCol(i) {
             if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
             
-            var colCount = '{{ entity_type }}' === 'product' ? 8 : 7;
+            var colCount = isStock ? 8 : 7;
             for (let j = 0; j < colCount; j++) document.getElementById('si' + j).textContent = '';
             document.getElementById('si' + i).textContent = sortDir === 1 ? ' ▲' : ' ▼';
             
@@ -222,7 +226,7 @@
                 function(e) { return (e.reference || '').toLowerCase(); },
             ];
             
-            if ('{{ entity_type }}' === 'product') {
+            if (isStock) {
                 vals.push(function(e) { return e.qty || 0; });
                 vals.push(function(e) { return e.debit || 0; });
                 vals.push(function(e) { return e.credit || 0; });

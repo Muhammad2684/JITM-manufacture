@@ -43,8 +43,14 @@ def get_ledger():
             variants = db.execute('SELECT stock FROM variants WHERE product_id=?', (entity_id,)).fetchall()
             entity['total_stock'] = sum(v['stock'] for v in variants)
             entries = get_product_entries(db, entity_id, entity)
+        elif entity_type == 'raw_material':
+            entity = db.execute('SELECT * FROM raw_materials WHERE id=?', (entity_id,)).fetchone()
+            if not entity:
+                return jsonify({'error': 'not found'}), 404
+            entity = dict(entity)
+            entries = get_raw_material_entries(db, entity_id, entity)
         else:
-            return jsonify({'error': 'invalid type, use customer/supplier/account/product'}), 400
+            return jsonify({'error': 'invalid type, use customer/supplier/account/product/raw_material'}), 400
 
     # Paginate entries
     total = len(entries)
@@ -360,6 +366,77 @@ def get_account_entries(db, account_id, entity):
             'debit': opening if opening > 0 else 0,
             'credit': -opening if opening < 0 else 0,
             'balance': opening,
+            'type': 'opening'
+        })
+
+    balance = 0
+    for e in entries:
+        balance += e['debit'] - e['credit']
+        e['balance'] = round(balance, 2)
+
+    return entries
+
+
+def get_raw_material_entries(db, raw_material_id, entity):
+    """Ledger for a raw material: purchases, reversals, and production usage from restock_log."""
+    entries = []
+
+    rows = db.execute(
+        'SELECT qty_added, cost, note, staff_name, created_at FROM restock_log '
+        'WHERE raw_material_id=? ORDER BY created_at, id',
+        (raw_material_id,)
+    ).fetchall()
+    for r in rows:
+        r = dict(r)
+        note = r['note'] or ''
+        qty_added = float(r['qty_added'] or 0)
+        value = abs(qty_added) * float(r['cost'] or 0)
+
+        if note.startswith('PI #'):
+            desc = 'Purchase'
+            etype = 'purchase'
+        elif note.startswith('DEL #'):
+            desc = 'Purchase Reversed'
+            etype = 'purchase_return'
+        elif note.startswith('Production Order'):
+            desc = 'Production Usage'
+            etype = 'production'
+        else:
+            desc = 'Stock Change'
+            etype = 'purchase_return' if qty_added < 0 else 'purchase'
+        if ' (removed)' in note:
+            desc = 'Line Removed'
+            etype = 'purchase_return'
+
+        entries.append({
+            'date': (r['created_at'] or '')[:10],
+            'description': desc,
+            'reference': note,
+            'qty': abs(qty_added),
+            'debit': value if qty_added > 0 else 0,
+            'credit': value if qty_added < 0 else 0,
+            'type': etype
+        })
+
+    entries.sort(key=lambda e: e['date'])
+
+    # Reverse compute opening balance so the ledger closes at current stock value
+    current_stock = float(entity.get('stock') or 0)
+    current_cost = float(entity.get('cost_per_unit') or 0)
+    current_value = current_stock * current_cost
+    total_change = sum((e['debit'] - e['credit']) for e in entries)
+    opening_value = round(current_value - total_change, 2)
+    opening_qty = round(current_stock - sum(e['qty'] * (1 if e['debit'] > 0 else -1) for e in entries), 4)
+
+    if opening_value != 0 or entries:
+        entries.insert(0, {
+            'date': '',
+            'description': 'Opening Balance',
+            'reference': '',
+            'qty': abs(opening_qty),
+            'debit': opening_value if opening_value > 0 else 0,
+            'credit': -opening_value if opening_value < 0 else 0,
+            'balance': opening_value,
             'type': 'opening'
         })
 

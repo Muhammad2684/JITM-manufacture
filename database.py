@@ -718,6 +718,44 @@ def init_db():
         except Exception:
             pass
 
+        # Allow purchase invoice items to reference raw materials (manufacturing)
+        try:
+            db.execute('ALTER TABLE purchase_invoice_items ADD COLUMN item_type TEXT DEFAULT \'product\'')
+        except Exception:
+            pass
+
+        try:
+            db.execute('ALTER TABLE purchase_invoice_items ADD COLUMN raw_material_id INTEGER DEFAULT NULL')
+        except Exception:
+            pass
+
+        # Rebuild restock_log to also track raw materials: nullable variant_id,
+        # raw_material_id column, and REAL stock columns (raw materials use kg/m).
+        try:
+            cols = [r['name'] for r in db.execute('PRAGMA table_info(restock_log)').fetchall()]
+            if 'raw_material_id' not in cols:
+                db.execute('''CREATE TABLE restock_log_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    variant_id INTEGER REFERENCES variants(id),
+                    raw_material_id INTEGER REFERENCES raw_materials(id),
+                    old_stock REAL NOT NULL,
+                    new_stock REAL NOT NULL,
+                    qty_added REAL NOT NULL,
+                    cost REAL DEFAULT 0,
+                    note TEXT DEFAULT '',
+                    staff_name TEXT DEFAULT '',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                )''')
+                db.execute('''INSERT INTO restock_log_new
+                    (id, variant_id, old_stock, new_stock, qty_added, cost, note, staff_name, created_at)
+                    SELECT id, variant_id, old_stock, new_stock, qty_added, cost, note, staff_name, created_at
+                    FROM restock_log''')
+                db.execute('DROP TABLE restock_log')
+                db.execute('ALTER TABLE restock_log_new RENAME TO restock_log')
+                db.execute('CREATE INDEX IF NOT EXISTS idx_restock_log_variant_id ON restock_log(variant_id)')
+        except Exception:
+            pass
+
         hashed_admin = generate_password_hash('admin123')
         hashed_staff = generate_password_hash('staff123')
         db.execute(

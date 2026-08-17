@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>JITM · Recipes (BOM)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Recipes (Bill of Materials)</h2>
+            <div class="actions">
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="search"><input id="s" placeholder="Search products..." oninput="load()"></div>
+            <p style="font-size:12px;color:#6b7280;margin:0 0 8px">Each recipe defines what raw materials a product needs to make 1 unit. Click <strong>Edit</strong> to add or change materials.</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Product <span id="si1"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">SKU <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" style="cursor:pointer;user-select:none">Recipe (per unit) <span id="si3"></span></th>
+                            <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Material Cost/Unit <span id="si4"></span></th>
+                            <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Can Make (stock) <span id="si5"></span></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tb"></tbody>
+                    <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="em">
+        <div class="mc" style="max-width:560px"><button class="mx" onclick="cl('em')">&times;</button>
+            <h2 id="emTitle">Recipe</h2>
+            <p style="font-size:12px;color:#6b7280;margin:0 0 8px">Quantities are per unit of the finished product.</p>
+            <div class="form-row">
+                <div><label>Raw Material</label><select id="brm"></select></div>
+                <div><label>Qty per Unit</label><input id="bqty" type="number" step="0.01" min="0.01" value="1"></div>
+            </div>
+            <button type="button" class="btn btn-sm btn-p" onclick="addBom()" style="margin-bottom:6px">+ Add Material</button>
+            <div id="bomRows"></div>
+        </div>
+    </div>
+    <script type="application/json" id="sv">{{role|tojson}}</script>
+    <script>
+        var ROLE = JSON.parse(document.getElementById('sv').textContent);
+        var all = [], sortIdx = -1, sortDir = 1, bomAll = [], rmList = [], editVid = null, prodMap = {};
+        load();
+        function load() {
+            fetch('/api/products/search?q=' + encodeURIComponent(document.getElementById('s').value)).then(r => r.json()).then(d => { all = d; render(all); });
+            fetch('/api/bom').then(r => r.json()).then(d => { bomAll = d; render(all); });
+            fetch('/api/raw-materials').then(r => r.json()).then(d => { rmList = d; });
+        }
+        function sortCol(i) {
+            if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
+            for (let j = 0; j < 6; j++) document.getElementById('si' + j).textContent = '';
+            document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
+            const vals = [
+                () => 0,
+                p => (p.name || '').toLowerCase(),
+                p => (p.sku || '').toLowerCase(),
+                p => recipeText(p.vid).toLowerCase(),
+                p => recipeCost(p.vid),
+                p => canMake(p.vid),
+            ];
+            all.sort((a, b) => { const va = vals[i](a), vb = vals[i](b); return va < vb ? -sortDir : va > vb ? sortDir : 0; });
+            render(all);
+        }
+        function rowsForVid(vid) { return bomAll.filter(b => String(b.variant_id) === String(vid)); }
+        function recipeCost(vid) {
+            return rowsForVid(vid).reduce((s, b) => s + (+b.line_cost || 0), 0);
+        }
+        function canMake(vid) {
+            const rows = rowsForVid(vid);
+            if (!rows.length) return 0;
+            let min = Infinity;
+            rows.forEach(b => {
+                const q = +b.qty_per_unit || 0;
+                if (q > 0) min = Math.min(min, Math.floor((+b.material_stock || 0) / q));
+            });
+            return min === Infinity ? 0 : min;
+        }
+        function recipeText(vid) {
+            const rows = rowsForVid(vid);
+            if (!rows.length) return '';
+            return rows.map(b => b.material_name + ' \u00d7' + b.qty_per_unit + (b.unit ? ' ' + b.unit : '')).join(', ');
+        }
+        function render(l) {
+            document.getElementById('tb').innerHTML = l.map((p, i) => {
+                const rows = rowsForVid(p.vid);
+                const rc = recipeCost(p.vid);
+                const cm = canMake(p.vid);
+                const recipe = rows.length
+                    ? rows.map(b => '<div style="font-size:12px">' + b.material_name + ' <span style="color:#6b7280">\u00d7 ' + b.qty_per_unit + (b.unit ? ' ' + b.unit : '') + '</span></div>').join('')
+                    : '<span style="color:#9ca3af;font-size:12px">No recipe</span>';
+                const makes = rows.length
+                    ? (cm > 0 ? cm + ' units' : '<span class="bdg bdg-err" title="Not enough raw material stock">0</span>')
+                    : '<span style="color:#d1d5db">&ndash;</span>';
+                return '<tr><td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td><td style="font-weight:600">' + p.name + (p.size || p.color ? ' <span style="color:#6b7280;font-weight:400;font-size:12px">(' + [p.size, p.color].filter(Boolean).join(' / ') + ')</span>' : '') + '</td><td>' + p.sku + '</td><td>' + recipe + '</td><td class="text-right">' + (rows.length ? 'Rs ' + rc.toFixed(2) : '<span style="color:#d1d5db">&ndash;</span>') + '</td><td class="text-right">' + makes + '</td>' +
+                '<td><button class="btn btn-xs btn-ghost" onclick="edit(' + p.vid + ',\'' + p.name.replace(/'/g, "\\'") + '\')">Edit</button></td></tr>';
+            }).join('');
+            const withRecipe = l.filter(p => rowsForVid(p.vid).length);
+            const totCost = withRecipe.reduce((s, p) => s + recipeCost(p.vid), 0);
+            document.getElementById('tf').innerHTML = '<tr><td colspan="4" class="text-right" style="padding:6px 8px">' + withRecipe.length + ' product' + (withRecipe.length === 1 ? '' : 's') + ' with recipe &mdash; Total Mat. Cost</td><td class="text-right" style="padding:6px 8px">Rs ' + totCost.toFixed(2) + '</td><td></td><td></td></tr>';
+        }
+        function edit(vid, name) {
+            editVid = vid;
+            document.getElementById('emTitle').textContent = 'Recipe — ' + name;
+            document.getElementById('bqty').value = '1';
+            const sel = document.getElementById('brm');
+            sel.innerHTML = '<option value="">-- Select material --</option>' + rmList.map(m => '<option value="' + m.id + '">' + m.name.replace(/"/g, '&quot;') + (m.unit ? ' (' + m.unit + ')' : '') + ' &mdash; stock ' + m.stock + '</option>').join('');
+            renderBomRows();
+            document.getElementById('em').classList.add('show');
+        }
+        function renderBomRows() {
+            const rows = rowsForVid(editVid);
+            const el = document.getElementById('bomRows');
+            if (!rows.length) { el.innerHTML = '<div class="empty" style="font-size:12px;padding:8px">No materials in this recipe yet</div>'; return; }
+            let total = 0;
+            rows.forEach(b => { total += +b.line_cost || 0; });
+            el.innerHTML = rows.map(b => {
+                const can = b.qty_per_unit > 0 ? Math.floor((+b.material_stock || 0) / b.qty_per_unit) : 0;
+                return '<div style="display:flex;gap:6px;align-items:center;padding:5px 0;font-size:12px;border-bottom:1px solid #f0efec">' +
+                    '<span style="flex:1;font-weight:600">' + b.material_name + ' <span style="color:#6b7280;font-weight:400">(' + (b.unit || '-') + ')</span></span>' +
+                    '<span style="color:#6b7280">qty</span><input type="number" step="0.01" min="0" value="' + b.qty_per_unit + '" style="width:70px;text-align:right" onchange="saveBomQty(' + b.id + ', this.value)">' +
+                    '<span style="width:75px;text-align:right">Rs ' + (+b.line_cost || 0).toFixed(2) + '</span>' +
+                    '<span style="width:60px;text-align:right;color:#6b7280">' + (b.qty_per_unit > 0 ? can + 'x' : '-') + '</span>' +
+                    '<button class="btn btn-xs btn-d" onclick="delBom(' + b.id + ')">Remove</button></div>';
+            }).join('') +
+            '<div style="display:flex;gap:6px;align-items:center;padding:5px 0;font-size:12px;font-weight:600"><span style="flex:1">Material Cost / Unit</span><span style="color:#6b7280;font-weight:400;font-size:11px">can make from stock</span><span style="width:70px"></span><span style="width:75px;text-align:right">Rs ' + total.toFixed(2) + '</span><span style="width:60px;text-align:right">' + canMake(editVid) + ' units</span></div>';
+        }
+        function addBom() {
+            const rmid = document.getElementById('brm').value;
+            const qty = parseFloat(document.getElementById('bqty').value);
+            if (!rmid) { alert('Select a raw material'); return; }
+            if (isNaN(qty) || qty <= 0) { alert('Enter a valid quantity'); return; }
+            fetch('/api/bom', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ variant_id: editVid, raw_material_id: rmid, qty_per_unit: qty }) })
+                .then(r => r.json()).then(d => {
+                    if (d.error) { alert(d.error); return; }
+                    document.getElementById('bqty').value = '1';
+                    return fetch('/api/bom');
+                }).then(r => r && r.json()).then(d => { if (d) { bomAll = d; renderBomRows(); render(all); } });
+        }
+        function saveBomQty(id, val) {
+            const qty = parseFloat(val);
+            if (isNaN(qty) || qty < 0) { renderBomRows(); return; }
+            fetch('/api/bom/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qty_per_unit: qty }) })
+                .then(r => r.json()).then(d => fetch('/api/bom')).then(r => r.json()).then(d => { bomAll = d; renderBomRows(); render(all); });
+        }
+        function delBom(id) {
+            fetch('/api/bom/' + id, { method: 'DELETE' }).then(r => r.json()).then(() => fetch('/api/bom')).then(r => r.json()).then(d => { bomAll = d; renderBomRows(); render(all); });
+        }
+        function cl(id) { document.getElementById(id).classList.remove('show'); }
+    </script>
+</body>
+
+</html>

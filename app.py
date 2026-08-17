@@ -167,6 +167,7 @@ def render_sidebar(active_page):
         ]},
         {'label': 'Manufacturing', 'permission': 'inventory', 'subs': [
             {'url': '/manufacturing/raw-materials', 'label': 'Raw Materials'},
+            {'url': '/manufacturing/bom', 'label': 'Recipes (BOM)'},
             {'url': '/manufacturing/production-orders', 'label': 'Production Orders'},
         ]},
         {'label': 'Cash And Bank Accounts', 'permission': 'accounts', 'subs': [
@@ -792,6 +793,14 @@ def inventory_commission_classes():
 def manufacturing_raw_materials():
     """Display the raw materials list."""
     return render_page('raw_materials.html', '/manufacturing/raw-materials')
+
+
+@app.route('/manufacturing/bom', strict_slashes=False)
+@login_required
+@permission_required('inventory')
+def manufacturing_bom():
+    """Display the bills of materials (recipes) page."""
+    return render_page('bom.html', '/manufacturing/bom')
 
 
 @app.route('/manufacturing/production-orders', strict_slashes=False)

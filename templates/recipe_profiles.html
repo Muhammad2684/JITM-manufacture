@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>JITM · Recipe Profiles</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Recipe Profiles</h2>
+            <div class="actions">
+                {% if role == 'manager' or role == 'owner' %}<button class="btn btn-p btn-sm" onclick="showAdd()">+ New Profile</button>{% endif %}
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <div class="search"><input id="s" placeholder="Search profiles..." oninput="load()"></div>
+            <p style="font-size:12px;color:#6b7280;margin:0 0 8px">Profiles are reusable recipe templates. Applying one copies its materials into a product's recipe, which you can then tweak per product.</p>
+            <div class="pagination" id="pagination-top"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Name <span id="si1"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Description <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" class="text-right" style="cursor:pointer;user-select:none">Materials <span id="si3"></span></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tb"></tbody>
+                    <tfoot id="tf" style="font-weight:600;font-size:13px;border-top:2px solid #d1d5db"></tfoot>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+    <div class="modal" id="pm">
+        <div class="mc" style="max-width:460px"><button class="mx" onclick="cl('pm')">&times;</button>
+            <h2 id="ft">Recipe Profile</h2>
+            <form onsubmit="save(event)">
+                <label>Name</label><input id="pn" required>
+                <label>Description</label><textarea id="pd" rows="2" style="width:100%;padding:8px;border:1px solid #e2e1de;border-radius:6px;font-family:inherit"></textarea>
+                <button class="btn btn-p" type="submit" style="margin-top:8px">Save</button>
+            </form>
+        </div>
+    </div>
+    <div class="modal" id="em">
+        <div class="mc" style="max-width:600px"><button class="mx" onclick="cl('em')">&times;</button>
+            <h2 id="emTitle">Profile</h2>
+            <p id="emDesc" style="font-size:12px;color:#6b7280;margin:0 0 8px"></p>
+            <div class="form-row">
+                <div><label>Raw Material</label><select id="brm"></select></div>
+                <div><label>Qty</label><input id="bqty" type="number" step="0.01" min="0.01" value="1"></div>
+            </div>
+            <button type="button" class="btn btn-sm btn-p" onclick="addItem()" style="margin-bottom:6px">+ Add Material</button>
+            <div id="bomRows"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+                <button class="btn btn-p" onclick="showApply()">Apply to Products...</button>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="am">
+        <div class="mc" style="max-width:560px"><button class="mx" onclick="cl('am')">&times;</button>
+            <h2>Apply Profile to Products</h2>
+            <p style="font-size:12px;color:#6b7280;margin:0 0 8px">Copies this profile's materials into each selected product's recipe. Existing quantities for the same materials are overwritten.</p>
+            <div class="search"><input id="amS" placeholder="Search products..." oninput="renderApplyList()"></div>
+            <div style="display:flex;gap:8px;align-items:center;margin:6px 0">
+                <button type="button" class="btn btn-sm" onclick="toggleAll()" id="amToggle">Select All</button>
+                <span style="font-size:12px;color:#6b7280"><span id="amCount">0</span> selected</span>
+            </div>
+            <div id="amList" style="max-height:320px;overflow-y:auto;border:1px solid #e2e1de;border-radius:6px;padding:4px"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+                <button class="btn" onclick="cl('am')">Cancel</button>
+                <button class="btn btn-p" id="amBtn" onclick="doApply()">Apply</button>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="dm">
+        <div class="mc" style="max-width:450px"><button class="mx" onclick="cl('dm')">&times;</button>
+            <h3>Delete Profile</h3>
+            <p id="dmsg" style="font-size:14px;color:#374151"></p>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                <button class="btn" onclick="cl('dm')">Cancel</button>
+                <button class="btn btn-p" onclick="doDelete()" style="background:#dc2626">Delete</button>
+            </div>
+        </div>
+    </div>
+    <script type="application/json" id="sv">{{role|tojson}}</script>
+    <script>
+        var ROLE = JSON.parse(document.getElementById('sv').textContent);
+        var all = [], sortIdx = -1, sortDir = 1, currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
+        var editing = null, deleteId = null, editPid = null, rmList = [], prodList = [], selected = new Set();
+        load();
+        function load() {
+            currentPage = 1;
+            const q = document.getElementById('s').value;
+            fetch('/api/recipe-profiles?q=' + encodeURIComponent(q)).then(r => r.json()).then(d => { all = d; render(all); });
+            fetch('/api/raw-materials').then(r => r.json()).then(d => { rmList = d; });
+        }
+        function toggleShowAll() { showAll = !showAll; currentPage = 1; render(all); }
+        function goToPage(p) {
+            p = parseInt(p);
+            if (p >= 1 && p <= totalPages) { currentPage = p; render(all); }
+        }
+        function renderPagination() {
+            var html = '';
+            if (totalPages > 1) {
+                html += '<button class="btn btn-sm" onclick="goToPage(1)"' + (currentPage <= 1 ? ' disabled' : '') + '>« First</button>';
+                html += '<button class="btn btn-sm" onclick="goToPage(' + (currentPage - 1) + ')"' + (currentPage <= 1 ? ' disabled' : '') + '>← Prev</button>';
+                html += '<input type="number" id="pg" value="' + currentPage + '" min="1" max="' + totalPages + '" onchange="goToPage(this.value)" style="width:50px;text-align:center;padding:2px 4px;font-size:13px;border:1px solid #ddd;border-radius:4px">';
+                html += '<span style="margin:0 4px;color:#6b7280;font-size:13px">/ ' + totalPages + '</span>';
+                html += '<button class="btn btn-sm" onclick="goToPage(' + (currentPage + 1) + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next →</button>';
+                html += '<button class="btn btn-sm" onclick="goToPage(' + totalPages + ')"' + (currentPage >= totalPages ? ' disabled' : '') + '>Last »</button>';
+            }
+            html += ' <button class="btn btn-sm" onclick="toggleShowAll()">' + (showAll ? 'Paginated' : 'Show All') + '</button>';
+            document.getElementById('pagination').innerHTML = html;
+            var t = document.getElementById('pagination-top');
+            if (t) t.innerHTML = html;
+        }
+        function sortCol(i) {
+            if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
+            for (let j = 0; j < 4; j++) document.getElementById('si' + j).textContent = '';
+            document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
+            const vals = [
+                () => 0,
+                p => (p.name || '').toLowerCase(),
+                p => (p.description || '').toLowerCase(),
+                p => p.material_count || 0,
+            ];
+            all.sort((a, b) => { const va = vals[i](a), vb = vals[i](b); return va < vb ? -sortDir : va > vb ? sortDir : 0; });
+            render(all);
+        }
+        function render(l) {
+            totalPages = Math.max(1, Math.ceil(l.length / perPage));
+            if (currentPage > totalPages) currentPage = totalPages;
+            const start = (currentPage - 1) * perPage;
+            const page = l.slice(start, start + perPage);
+            document.getElementById('tb').innerHTML = page.map((p, i) =>
+                '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600">' + p.name + '</td><td style="font-size:12px;color:#6b7280">' + (p.description || '-') + '</td><td class="text-right">' + (p.material_count || 0) + '</td>' +
+                '<td>' + (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs btn-ghost" onclick="view(' + p.id + ')">View</button> <button class="btn btn-xs" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '<button class="btn btn-xs btn-ghost" onclick="view(' + p.id + ')">View</button>') + '</td></tr>'
+            ).join('');
+            var tot = 0;
+            l.forEach(function (p) { tot += p.material_count || 0; });
+            document.getElementById('tf').innerHTML = '<tr><td colspan="3" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">' + tot + ' material rows</td><td></td></tr>';
+            renderPagination();
+        }
+        function showAdd() {
+            editing = null; document.getElementById('ft').textContent = 'New Recipe Profile';
+            document.getElementById('pn').value = ''; document.getElementById('pd').value = '';
+            document.getElementById('pm').classList.add('show');
+        }
+        function edit(id) {
+            const p = all.find(x => x.id === id); if (!p) return; editing = id;
+            document.getElementById('ft').textContent = 'Edit ' + p.name;
+            document.getElementById('pn').value = p.name; document.getElementById('pd').value = p.description || '';
+            document.getElementById('pm').classList.add('show');
+        }
+        function save(e) {
+            e.preventDefault();
+            const data = { name: document.getElementById('pn').value, description: document.getElementById('pd').value };
+            const url = editing ? '/api/recipe-profiles/' + editing : '/api/recipe-profiles';
+            fetch(url, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json()).then(d => { if (d.error) { alert(d.error); return; } cl('pm'); load(); });
+        }
+        function view(id) {
+            editPid = id;
+            const p = all.find(x => x.id === id);
+            document.getElementById('emTitle').textContent = p ? p.name : 'Profile';
+            document.getElementById('emDesc').textContent = p && p.description ? p.description : '';
+            const sel = document.getElementById('brm');
+            sel.innerHTML = '<option value="">-- Select material --</option>' + rmList.map(m => '<option value="' + m.id + '">' + m.name.replace(/"/g, '&quot;') + (m.unit ? ' (' + m.unit + ')' : '') + ' &mdash; stock ' + m.stock + '</option>').join('');
+            loadProfileItems();
+            document.getElementById('em').classList.add('show');
+        }
+        function loadProfileItems() {
+            fetch('/api/recipe-profiles/' + editPid + '/items').then(r => r.json()).then(d => renderItems(d));
+        }
+        function renderItems(rows) {
+            const el = document.getElementById('bomRows');
+            if (!rows.length) { el.innerHTML = '<div class="empty" style="font-size:12px;padding:8px">No materials in this profile yet</div>'; return; }
+            let total = 0;
+            rows.forEach(b => { total += +b.line_cost || 0; });
+            el.innerHTML = rows.map(b =>
+                '<div style="display:flex;gap:6px;align-items:center;padding:5px 0;font-size:12px;border-bottom:1px solid #f0efec">' +
+                '<span style="flex:1;font-weight:600">' + b.material_name + ' <span style="color:#6b7280;font-weight:400">(' + (b.unit || '-') + ')</span></span>' +
+                '<span style="color:#6b7280">qty</span><input type="number" step="0.01" min="0" value="' + b.qty_required + '" style="width:70px;text-align:right" onchange="saveItemQty(' + b.id + ', this.value)">' +
+                '<span style="width:75px;text-align:right">Rs ' + (+b.line_cost || 0).toFixed(2) + '</span>' +
+                '<button class="btn btn-xs btn-d" onclick="delItem(' + b.id + ')">Remove</button></div>'
+            ).join('') +
+            '<div style="display:flex;gap:6px;align-items:center;padding:5px 0;font-size:12px;font-weight:600"><span style="flex:1">Material Cost / Unit</span><span style="color:#6b7280;font-weight:400;font-size:11px">from current material costs</span><span style="width:70px"></span><span style="width:75px;text-align:right">Rs ' + total.toFixed(2) + '</span></div>';
+        }
+        function addItem() {
+            const rmid = document.getElementById('brm').value;
+            const qty = parseFloat(document.getElementById('bqty').value);
+            if (!rmid) { alert('Select a raw material'); return; }
+            if (isNaN(qty) || qty <= 0) { alert('Enter a valid quantity'); return; }
+            fetch('/api/recipe-profiles/' + editPid + '/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw_material_id: rmid, qty_required: qty }) })
+                .then(r => r.json()).then(d => { if (d.error) { alert(d.error); return; } document.getElementById('bqty').value = '1'; loadProfileItems(); });
+        }
+        function saveItemQty(id, val) {
+            const qty = parseFloat(val);
+            if (isNaN(qty) || qty < 0) { loadProfileItems(); return; }
+            fetch('/api/recipe-profiles/' + editPid + '/items/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qty_required: qty }) }).then(r => r.json()).then(() => loadProfileItems());
+        }
+        function delItem(id) {
+            fetch('/api/recipe-profiles/' + editPid + '/items/' + id, { method: 'DELETE' }).then(r => r.json()).then(() => loadProfileItems());
+        }
+        function showApply() {
+            selected.clear();
+            document.getElementById('amS').value = '';
+            fetch('/api/products/search?q=').then(r => r.json()).then(d => { prodList = d; renderApplyList(); });
+            updateApplyCount();
+            document.getElementById('am').classList.add('show');
+        }
+        function renderApplyList() {
+            const q = document.getElementById('amS').value.toLowerCase();
+            const list = prodList.filter(p => (p.name + ' ' + p.sku).toLowerCase().includes(q));
+            document.getElementById('amList').innerHTML = list.length
+                ? list.map(p => '<label style="display:flex;gap:8px;align-items:center;padding:6px 8px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0efec;font-weight:400;text-transform:none;color:#374151">' +
+                    '<input type="checkbox" style="margin:0" value="' + p.vid + '"' + (selected.has(p.vid) ? ' checked' : '') + ' onchange="toggleSel(' + p.vid + ', this.checked)"> ' +
+                    p.name + (p.size || p.color ? ' (' + [p.size, p.color].filter(Boolean).join(' / ') + ')' : '') + ' <span style="color:#9ca3af">' + p.sku + '</span></label>'
+                ).join('')
+                : '<div class="empty" style="padding:12px;font-size:12px">No products match</div>';
+        }
+        function toggleSel(vid, on) {
+            if (on) { selected.add(vid); } else { selected.delete(vid); }
+            updateApplyCount();
+        }
+        function updateApplyCount() {
+            document.getElementById('amCount').textContent = selected.size;
+            document.getElementById('amToggle').textContent = selected.size === prodList.length && prodList.length ? 'Deselect All' : 'Select All';
+        }
+        function toggleAll() {
+            const allSelected = prodList.length && selected.size === prodList.length;
+            if (allSelected) { selected.clear(); } else { prodList.forEach(p => selected.add(p.vid)); }
+            renderApplyList();
+            updateApplyCount();
+        }
+        function doApply() {
+            const ids = Array.from(selected);
+            if (!ids.length) { alert('Select at least one product'); return; }
+            const btn = document.getElementById('amBtn');
+            btn.disabled = true; btn.textContent = 'Applying...';
+            fetch('/api/recipe-profiles/' + editPid + '/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ variant_ids: ids }) })
+                .then(r => r.json()).then(d => {
+                    btn.disabled = false; btn.textContent = 'Apply';
+                    if (d.error) { alert(d.error); return; }
+                    cl('am');
+                    alert('Applied profile to ' + d.applied_variants + ' product' + (d.applied_variants === 1 ? '' : 's'));
+                }).catch(() => { btn.disabled = false; btn.textContent = 'Apply'; });
+        }
+        function confirmDelete(id, name) {
+            deleteId = id;
+            document.getElementById('dmsg').innerHTML = 'Delete profile <strong>' + name + '</strong>? Existing product recipes copied from it are kept.';
+            document.getElementById('dm').classList.add('show');
+        }
+        function doDelete() {
+            fetch('/api/recipe-profiles/' + deleteId, { method: 'DELETE' }).then(r => r.json()).then(() => { cl('dm'); load(); });
+        }
+        function cl(id) { document.getElementById(id).classList.remove('show'); }
+    </script>
+</body>
+
+</html>

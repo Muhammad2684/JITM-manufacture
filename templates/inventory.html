@@ -122,6 +122,10 @@
                         <div><label>Qty per Unit</label><input id="bqty" type="number" step="0.01" value="0"></div>
                     </div>
                     <button type="button" class="btn btn-sm btn-p" onclick="addBom()" style="margin-bottom:6px">+ Add Material</button>
+                    <div class="form-row" style="margin-top:4px">
+                        <div><label>Recipe Profile</label><select id="bpSel"><option value="">-- Select profile --</option></select></div>
+                        <div style="display:flex;align-items:flex-end"><button type="button" class="btn btn-sm btn-ghost" onclick="applyProfile()">Apply Profile</button></div>
+                    </div>
                     <div id="bomList"></div>
                 </div>
                 <button class="btn btn-p" type="submit" style="margin-top:8px">Save</button>
@@ -388,6 +392,20 @@
                 sel.innerHTML = '<option value="">-- Select material --</option>' + rmList.map(m => '<option value="' + m.id + '">' + m.name.replace(/"/g, '&quot;') + '</option>').join('');
             });
             fetch('/api/bom?variant_id=' + bomVid).then(r => r.json()).then(d => { bomRows = d; renderBom(); });
+            fetch('/api/recipe-profiles').then(r => r.json()).then(d => {
+                const sel = document.getElementById('bpSel');
+                if (!d || !d.length) { sel.innerHTML = '<option value="">-- No profiles --</option>'; return; }
+                sel.innerHTML = '<option value="">-- Select profile --</option>' + d.map(p => '<option value="' + p.id + '">' + p.name.replace(/"/g, '&quot;') + '</option>').join('');
+            });
+        }
+        function applyProfile() {
+            const pid = document.getElementById('bpSel').value;
+            if (!pid) { alert('Select a recipe profile'); return; }
+            fetch('/api/recipe-profiles/' + pid + '/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ variant_ids: [bomVid] }) })
+                .then(r => r.json()).then(d => {
+                    if (d.error) { alert(d.error); return; }
+                    loadBom();
+                });
         }
         function renderBom() {
             const el = document.getElementById('bomList');

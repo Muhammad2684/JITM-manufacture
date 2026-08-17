@@ -168,6 +168,7 @@ def render_sidebar(active_page):
         {'label': 'Manufacturing', 'permission': 'inventory', 'subs': [
             {'url': '/manufacturing/raw-materials', 'label': 'Raw Materials'},
             {'url': '/manufacturing/bom', 'label': 'Recipes (BOM)'},
+            {'url': '/manufacturing/recipe-profiles', 'label': 'Recipe Profiles'},
             {'url': '/manufacturing/production-orders', 'label': 'Production Orders'},
         ]},
         {'label': 'Cash And Bank Accounts', 'permission': 'accounts', 'subs': [
@@ -801,6 +802,14 @@ def manufacturing_raw_materials():
 def manufacturing_bom():
     """Display the bills of materials (recipes) page."""
     return render_page('bom.html', '/manufacturing/bom')
+
+
+@app.route('/manufacturing/recipe-profiles', strict_slashes=False)
+@login_required
+@permission_required('inventory')
+def manufacturing_recipe_profiles():
+    """Display the recipe profiles page."""
+    return render_page('recipe_profiles.html', '/manufacturing/recipe-profiles')
 
 
 @app.route('/manufacturing/production-orders', strict_slashes=False)

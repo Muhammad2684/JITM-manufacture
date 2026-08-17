@@ -55,33 +55,25 @@ def auto_link_product(db, item):
     return product_row['id'] if product_row else None
 
 
-def update_raw_material_avg_cost(db, raw_material_id):
-    """Recalculate the weighted average cost for a raw material based on restock history."""
-    total_row = db.execute(
-        'SELECT COALESCE(SUM(qty_added * cost),0) as total_cost, COALESCE(SUM(qty_added),0) as total_qty '
-        'FROM restock_log WHERE raw_material_id=? AND cost > 0',
-        (raw_material_id,)
-    ).fetchone()
-    if total_row and total_row['total_qty'] > 0:
-        average_cost = round(total_row['total_cost'] / total_row['total_qty'], 2)
-        db.execute('UPDATE raw_materials SET cost_per_unit=? WHERE id=?', (average_cost, raw_material_id))
-
-
 def apply_raw_material_stock_change(db, raw_material_id, quantity, cost, reference_note, staff_name):
-    """Apply a stock change for a raw material: update stock, log the change, and recalc avg cost."""
+    """Apply a stock change for a raw material: update stock and weighted avg cost, and log."""
     material = db.execute(
-        'SELECT stock FROM raw_materials WHERE id=?', (raw_material_id,)
+        'SELECT stock, cost_per_unit FROM raw_materials WHERE id=?', (raw_material_id,)
     ).fetchone()
     if not material:
         return
     old_stock = float(material['stock'] or 0)
+    old_cost = float(material['cost_per_unit'] or 0)
     new_stock = old_stock + quantity
-    db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_stock, raw_material_id))
+    if new_stock > 0:
+        new_cost = round((old_stock * old_cost + float(quantity) * float(cost)) / new_stock, 2)
+    else:
+        new_cost = 0
+    db.execute('UPDATE raw_materials SET stock=?, cost_per_unit=? WHERE id=?', (new_stock, new_cost, raw_material_id))
     db.execute(
         'INSERT INTO restock_log (variant_id, raw_material_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?,?)',
         (None, raw_material_id, old_stock, new_stock, float(quantity), float(cost), reference_note, staff_name)
     )
-    update_raw_material_avg_cost(db, raw_material_id)
 
 
 def auto_link_raw_material(db, item):
@@ -241,6 +233,7 @@ def update_purchase_invoice(invoice_id):
             
             old_by_key = {}
             for item in old_items:
+                item = dict(item)
                 key = None
                 if (item.get('item_type') or 'product') == 'raw_material':
                     if item.get('raw_material_id'):
@@ -276,10 +269,21 @@ def update_purchase_invoice(invoice_id):
                             if row:
                                 db.execute('UPDATE restock_log SET qty_added=?, cost=? WHERE id=?',
                                            (new_qty, new_cost, row['id']))
-                            delta = new_qty - old_qty
-                            if delta != 0:
-                                db.execute('UPDATE raw_materials SET stock=stock+? WHERE id=?', (delta, raw_material_id))
-                            update_raw_material_avg_cost(db, raw_material_id)
+                            material = db.execute(
+                                'SELECT stock, cost_per_unit FROM raw_materials WHERE id=?', (raw_material_id,)
+                            ).fetchone()
+                            if material:
+                                old_stock = float(material['stock'] or 0)
+                                cur_cost = float(material['cost_per_unit'] or 0)
+                                delta = new_qty - old_qty
+                                new_stock = old_stock + delta
+                                if new_stock > 0:
+                                    new_cost = round((old_stock * cur_cost - old_qty * old_cost + new_qty * new_cost) / new_stock, 2)
+                                else:
+                                    new_cost = 0
+                                if delta != 0:
+                                    db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_stock, raw_material_id))
+                                db.execute('UPDATE raw_materials SET cost_per_unit=? WHERE id=?', (new_cost, raw_material_id))
                     else:
                         apply_raw_material_stock_change(db, raw_material_id, new_qty, new_cost, reference, staff_member)
                 else:
@@ -314,6 +318,7 @@ def update_purchase_invoice(invoice_id):
                         apply_stock_change(db, product_id, new_qty, new_cost, reference, staff_member)
             
             for old_item in old_items:
+                old_item = dict(old_item)
                 old_key = None
                 if (old_item.get('item_type') or 'product') == 'raw_material':
                     if old_item.get('raw_material_id'):

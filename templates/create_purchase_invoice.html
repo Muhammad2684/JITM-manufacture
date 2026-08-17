@@ -82,7 +82,10 @@
                     <thead><tr><th style="width:20%">Item</th><th style="width:12%" class="sku-col">SKU</th><th style="width:9%" class="lpcol">LP.Cost</th><th style="width:7%" class="text-right">Stock</th><th style="width:9%" class="text-right">Avg Cost</th><th style="width:10%" class="text-right">Sale Price</th><th style="width:9%" class="text-right">Qty</th><th style="width:12%" class="text-right">Unit Price</th><th style="width:12%" class="text-right">Total</th><th style="width:30px"></th></tr></thead>
                     <tbody id="items_tb"></tbody>
                 </table>
-                <div class="ssheet-foot"><button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" onclick="triggerCSVUpload()">Upload CSV</button><button class="btn btn-sm" onclick="downloadSampleCSV()">Sample CSV</button></div>
+                <div class="ssheet-foot">
+                    <select id="stype" onchange="setSheetType(this.value)" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:#fff"><option value="product">Products</option><option value="raw_material">Raw Materials</option></select>
+                    <button class="btn btn-sm" onclick="addRow()">+ Add Row</button><button class="btn btn-sm" id="csvBtn" onclick="triggerCSVUpload()">Upload CSV</button><button class="btn btn-sm" id="sampleBtn" onclick="downloadSampleCSV()">Sample CSV</button>
+                </div>
             </div>
             <div class="ci-footer">
                 <button class="btn btn-p" onclick="submitInvoice()">Create</button>
@@ -148,7 +151,24 @@
     </div>
 </div>
 <script>
-var products = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [], sizeList = [], oldInvoiceAmount = 0, oldBalanceDue = 0;
+var products = [], materials = [], suppliers = [], rowId = 0, acHighlightIdx = -1, editId = null, createTargetRid = null, catList = [], ccList = [], sizeList = [], oldInvoiceAmount = 0, oldBalanceDue = 0, sheetMode = 'product';
+
+function setSheetType(t, force) {
+    var rows = document.querySelectorAll('#items_tb tr');
+    if (!force && sheetMode !== t && rows.length && !confirm('Switching item type will clear the item list. Continue?')) {
+        document.getElementById('stype').value = sheetMode;
+        return;
+    }
+    sheetMode = t;
+    document.getElementById('csvBtn').style.display = sheetMode === 'raw_material' ? 'none' : '';
+    document.getElementById('sampleBtn').style.display = sheetMode === 'raw_material' ? 'none' : '';
+    if (!force && rows.length) {
+        document.getElementById('items_tb').innerHTML = '';
+        rowId = 0;
+    }
+    if (!document.querySelectorAll('#items_tb tr').length) addRow();
+    calcGrand();
+}
 
 function loadSuppliers() {
     fetch('/api/suppliers?per_page=100000').then(r=>r.json()).then(d=>{
@@ -233,24 +253,30 @@ function isLastRow(el) {
 
 function addRow(data) {
     rowId++;
+    var isMat = sheetMode === 'raw_material';
     var name = data ? data.item : '';
     var qty = data ? data.qty : 1;
     var up = data ? data.unit_price : 0;
     var total = data ? data.total : 0;
     var pid = data ? (data.pid || null) : null;
-    var html = '<tr id="rr-'+rowId+'"' + (pid ? ' data-pid="'+pid+'"' : '') + '>';
-    html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type item name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
+    var rmid = data ? (data.rmid || null) : null;
+    var html = '<tr id="rr-'+rowId+'"' + (pid ? ' data-pid="'+pid+'"' : '') + (rmid ? ' data-rmid="'+rmid+'"' : '') + '>';
+    html += '<td class="item-wrap"><input class="cell" id="in-'+rowId+'" placeholder="Type ' + (isMat ? 'material' : 'item') + ' name..." oninput="onItemInput(this,'+rowId+')" onkeydown="acKeydown(event,this,'+rowId+')" onblur="setTimeout(function(){acHide('+rowId+')},200)" value="'+name.replace(/"/g,'&quot;')+'"><div class="ac-list" id="ac-'+rowId+'"></div></td>';
     html += '<td class="sku-col"><div class="cell-static" id="sk-'+rowId+'"></div></td>';
     html += '<td class="lpcol"><div class="cell-static" id="lp-'+rowId+'"></div></td>';
     html += '<td class="text-right"><div class="cell-static" id="stk-'+rowId+'">&mdash;</div></td>';
     html += '<td class="text-right"><div class="cell-static" id="avg-'+rowId+'">&mdash;</div></td>';
-    html += '<td class="spcol"><input type="number" min="0" step="0.01" class="sp-in" id="sp-'+rowId+'" onchange="spEdit('+rowId+',this)" onkeydown="cellTab(event,'+rowId+',\'.qty\')"></td>';
+    html += '<td class="spcol"><input type="number" min="0" step="0.01" class="sp-in" id="sp-'+rowId+'"' + (isMat ? ' disabled' : '') + ' onchange="spEdit('+rowId+',this)" onkeydown="cellTab(event,'+rowId+',\'.qty\')"></td>';
     html += '<td><input class="cell num qty" value="'+qty+'" oninput="calcRow(this)" onfocus="this.select()" onkeydown="cellTab(event,'+rowId+',\'.up\')"></td>';
     html += '<td><input class="cell num up" value="'+up.toFixed(2)+'" oninput="calcRow(this)" onfocus="this.select()" onkeydown="upTab(event,'+rowId+')"></td>';
     html += '<td><div class="total-cell" id="rt-'+rowId+'">Rs '+total.toFixed(2)+'</div></td>';
     html += '<td class="del-cell"><button onclick="delRow(this)">&times;</button></td>';
     html += '</tr>';
     document.getElementById('items_tb').insertAdjacentHTML('beforeend', html);
+    if (isMat && rmid) {
+        var m = materials.find(function(x){ return x.id === rmid; }) || null;
+        if (m) setMatStats(rowId, m);
+    }
     calcGrand();
 }
 
@@ -281,6 +307,20 @@ function acShow(inp, rid) {
     var q = inp.value.toLowerCase();
     var list = document.getElementById('ac-'+rid);
     if (!q) { list.style.display = 'none'; return; }
+    if (sheetMode === 'raw_material') {
+        var mm = materials.filter(function(m){return (m.name||'').toLowerCase().includes(q)||(m.unit||'').toLowerCase().includes(q);});
+        if (!mm.length) {
+            list.innerHTML = '<div style="color:#6b7280;font-size:11px;padding:6px 8px">No material match &mdash; create it on the <a href="/manufacturing/raw-materials" style="color:#3b4fe2">Raw Materials</a> page first</div>';
+            list.style.display = 'block'; acHighlightIdx = -1; return;
+        }
+        list.innerHTML = mm.map(function(m){
+            var esc = m.name.replace(/'/g,"\\'");
+            return '<div onmousedown="acPickMat('+rid+','+m.id+',\''+esc+'\','+(m.cost_per_unit||0)+')" data-rmid="'+m.id+'" data-name="'+esc+'" data-cost="'+(m.cost_per_unit||0)+'">'+m.name+' <span style="color:#9ca3af;font-size:10px">'+(m.unit||'')+' &middot; stock '+ (m.stock != null ? m.stock : '0') +'</span></div>';
+        }).join('');
+        acHighlightIdx = -1;
+        list.style.display = 'block';
+        return;
+    }
     var matches = products.filter(function(p){return (p.name||'').toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q);});
     if (!matches.length) {
         list.innerHTML = '<div data-action="create" data-name="'+inp.value.replace(/'/g,"\\'")+'" onmousedown="acCreate('+rid+',\''+inp.value.replace(/'/g,"\\'")+'\')"><span style="color:#3b4fe2;font-weight:600">+ Create</span> \''+inp.value+'\'</div>';
@@ -366,9 +406,56 @@ function acSelect(rid) {
     var el = items[idx];
     if (el.dataset.action === 'create') {
         acCreate(rid, el.dataset.name);
+    } else if (el.dataset.rmid) {
+        acPickMat(rid, parseInt(el.dataset.rmid), el.dataset.name, parseFloat(el.dataset.cost));
     } else {
         acPick(rid, parseInt(el.dataset.pid), el.dataset.name, parseFloat(el.dataset.price));
     }
+}
+
+function setMatStats(rid, m) {
+    var skuEl = document.getElementById('sk-'+rid);
+    var lpEl = document.getElementById('lp-'+rid);
+    var stkEl = document.getElementById('stk-'+rid);
+    var avgEl = document.getElementById('avg-'+rid);
+    var spEl = document.getElementById('sp-'+rid);
+    if (!m) return;
+    if (skuEl) skuEl.textContent = m.unit || '';
+    if (lpEl) lpEl.textContent = m.cost_per_unit != null ? 'Rs ' + m.cost_per_unit.toFixed(2) : '—';
+    if (stkEl) stkEl.textContent = m.stock != null ? m.stock : '—';
+    if (avgEl) avgEl.textContent = m.cost_per_unit != null ? 'Rs ' + m.cost_per_unit.toFixed(2) : '—';
+    if (spEl) { spEl.value = ''; spEl.dataset.o = ''; spEl.disabled = true; }
+}
+
+function acPickMat(rid, rmid, name, cost) {
+    var m = materials.find(function(x){ return x.id === rmid; }) || null;
+    document.getElementById('in-'+rid).value = name;
+    setMatStats(rid, m);
+    document.getElementById('ac-'+rid).style.display = 'none';
+    acHighlightIdx = -1;
+    var tr = document.getElementById('rr-'+rid);
+    tr.dataset.rmid = rmid;
+    delete tr.dataset.pid;
+    tr.querySelector('.up').value = (cost || 0).toFixed(2);
+    tr.querySelector('.qty').value = 1;
+    calcRow(tr.querySelector('.qty'));
+    if (isLastRow(tr.querySelector('.item-wrap .cell'))) {
+        addRow();
+    }
+}
+
+function refreshMatRows() {
+    document.querySelectorAll('#items_tb tr[data-rmid]').forEach(function(tr){
+        var m = materials.find(function(x){ return x.id === parseInt(tr.dataset.rmid); });
+        if (m) setMatStats(parseInt(tr.id.replace('rr-','')), m);
+    });
+}
+
+function loadMaterials() {
+    return fetch('/api/raw-materials').then(function(r){ return r.json(); }).then(function(d){
+        materials = d || [];
+        refreshMatRows();
+    });
 }
 
 function acCreate(rid, name) {
@@ -740,13 +827,20 @@ function loadInvoice(id) {
         showSupBalance(inv.supplier_id ? (suppliers.find(function(x){ return x.id === inv.supplier_id; }) || null) : null);
         document.getElementById('items_tb').innerHTML = '';
         rowId = 0;
+        var hasMat = (inv.items || []).some(function(it){ return (it.item_type || 'product') === 'raw_material'; });
+        if (hasMat) setSheetType('raw_material', true);
+        else setSheetType('product', true);
+        document.getElementById('items_tb').innerHTML = '';
+        rowId = 0;
         (inv.items || []).forEach(function(item) {
+            var isMat = (item.item_type || 'product') === 'raw_material';
             addRow({
                 item: item.item,
                 qty: item.qty,
                 unit_price: item.unit_price,
                 total: item.total,
-                pid: item.product_id
+                pid: isMat ? null : item.product_id,
+                rmid: isMat ? item.raw_material_id : null
             });
         });
         if (!inv.items || !inv.items.length) addRow();
@@ -772,14 +866,20 @@ function submitInvoice() {
         var up = parseFloat(r.querySelector('.up').value) || 0;
         var t = qty * up;
         total += t;
-        items.push({
+        var it = {
             line_number: i+1,
             item: name || 'Item '+(i+1),
-            product_id: r.dataset.pid || null,
             qty: qty,
             unit_price: up,
             total: t
-        });
+        };
+        if (r.dataset.rmid) {
+            it.item_type = 'raw_material';
+            it.raw_material_id = parseInt(r.dataset.rmid);
+        } else {
+            it.product_id = r.dataset.pid || null;
+        }
+        items.push(it);
     });
     var url = editId ? '/api/purchase-invoices/' + editId : '/api/purchase-invoices';
     var method = editId ? 'PUT' : 'POST';
@@ -811,6 +911,7 @@ function submitInvoice() {
 }
 document.getElementById('issue_date').value=new Date().toISOString().slice(0,10);
 loadProducts();
+loadMaterials();
 fetch('/api/categories').then(r=>r.json()).then(function(d){catList=d;});
 fetch('/api/commission-classes').then(r=>r.json()).then(function(d){ccList=d;});
 fetch('/api/sizes').then(r=>r.json()).then(function(d){sizeList=d;});

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JITM · Stock Adjustments</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .text-right { text-align: right; }
+        .text-muted { color: #888; font-size: 13px; }
+        .actions { display: flex; gap: 8px; align-items: center; }
+        .mc label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 12px;
+            margin-bottom: 4px;
+        }
+        .mc input, .mc select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .mc .btn { margin-top: 16px; width: 100%; }
+        .delta-pos { color: #155724; font-weight: 600; }
+        .delta-neg { color: #721c24; font-weight: 600; }
+        .delta-zero { color: #6b7280; }
+        .curr-stock { background:#f0f4ff; border:1px solid #d6dfff; color:#3b4fe2; font-weight:600; }
+    </style>
+</head>
+<body>
+    {{sidebar|safe}}
+    <div class="main">
+        <div class="topbar">
+            <h2>Stock Adjustments</h2>
+            <div class="actions">
+                {% if role == 'manager' or role == 'owner' %}
+                    <button class="btn btn-p btn-sm" onclick="showAdd()">+ New Adjustment</button>
+                {% endif %}
+                <span class="text-muted">{{name}}</span>
+            </div>
+        </div>
+        <div class="content">
+            <p style="color:#6b7280;font-size:13px;margin:0 0 12px">
+                Correct a material's stock to its physical count after damage, wastage,
+                damaged pieces or a recount. Each entry is saved to the material's ledger.
+            </p>
+            <div class="search">
+                <input id="s" placeholder="Search adjustments..." oninput="load()">
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th onclick="sortCol(0)" style="cursor:pointer;user-select:none"># <span id="si0"></span></th>
+                            <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Date <span id="si1"></span></th>
+                            <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Material <span id="si2"></span></th>
+                            <th onclick="sortCol(3)" class="text-right" style="cursor:pointer;user-select:none">Old Qty <span id="si3"></span></th>
+                            <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">New Qty <span id="si4"></span></th>
+                            <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Delta <span id="si5"></span></th>
+                            <th onclick="sortCol(6)" style="cursor:pointer;user-select:none">Reason <span id="si6"></span></th>
+                            <th onclick="sortCol(7)" style="cursor:pointer;user-select:none">Notes <span id="si7"></span></th>
+                            <th onclick="sortCol(8)" style="cursor:pointer;user-select:none">By <span id="si8"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tb"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="am">
+        <div class="mc">
+            <button class="mx" onclick="cl('am')">&times;</button>
+            <h2>New Stock Adjustment</h2>
+            <form onsubmit="save(event)">
+                <label>Material</label>
+                <select id="am_material" onchange="onMatChange()"></select>
+                <div id="am_cur" class="curr-stock" style="margin-top:8px;padding:8px 10px;border-radius:6px;font-size:13px"></div>
+                <label>Physical / New Quantity</label>
+                <input id="aq" type="number" step="0.01" min="0" oninput="onQtyInput()" required>
+                <div id="adelta" style="margin-top:8px;padding:8px 10px;border-radius:6px;font-size:13px"></div>
+                <label>Reason</label>
+                <select id="areason">
+                    <option value="Recount">Recount</option>
+                    <option value="Damage">Damage</option>
+                    <option value="Wastage">Wastage</option>
+                    <option value="Entry Error">Entry Error</option>
+                    <option value="Other">Other</option>
+                </select>
+                <label>Notes</label>
+                <input id="ano" placeholder="Optional">
+                <button class="btn btn-p" type="submit">Save Adjustment</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        var ROLE = {{role|tojson}};
+        var list = [], sortIdx = -1, sortDir = 1, mats = [];
+
+        function load() {
+            fetch('/api/material-adjustments').then(r => r.json()).then(d => {
+                list = d; render(list);
+            });
+        }
+
+        function deltaCell(d) {
+            var cls = d > 0 ? 'delta-pos' : (d < 0 ? 'delta-neg' : 'delta-zero');
+            var sign = d > 0 ? '+' : '';
+            return '<span class="' + cls + '">' + sign + d + '</span>';
+        }
+
+        function render(l) {
+            document.getElementById('tb').innerHTML = l.map(function(x, i) {
+                return '<tr>' +
+                    '<td style="color:#6b7280;font-size:12px">' + (i + 1) + '</td>' +
+                    '<td>' + (x.created_at || '').slice(0, 10) + '</td>' +
+                    '<td style="font-weight:600">' + x.material_name + '</td>' +
+                    '<td class="text-right">' + x.old_qty + '</td>' +
+                    '<td class="text-right">' + x.new_qty + '</td>' +
+                    '<td class="text-right">' + deltaCell(x.delta) + '</td>' +
+                    '<td>' + x.reason + '</td>' +
+                    '<td>' + (x.notes || '') + '</td>' +
+                    '<td>' + (x.created_by || '') + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        function sortCol(i) {
+            if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
+            for (let j = 0; j < 9; j++) document.getElementById('si' + j).textContent = '';
+            document.getElementById('si' + i).textContent = sortDir === 1 ? ' ▲' : ' ▼';
+
+            const vals = [
+                () => 0,
+                x => (x.created_at || ''),
+                x => (x.material_name || '').toLowerCase(),
+                x => x.old_qty || 0,
+                x => x.new_qty || 0,
+                x => x.delta || 0,
+                x => (x.reason || '').toLowerCase(),
+                x => (x.notes || '').toLowerCase(),
+                x => (x.created_by || '').toLowerCase()
+            ];
+
+            list.sort((a, b) => {
+                var va = vals[i](a), vb = vals[i](b);
+                return va < vb ? -sortDir : va > vb ? sortDir : 0;
+            });
+
+            var q = document.getElementById('s').value.toLowerCase();
+            render(list.filter(function(x) {
+                return !q ||
+                    (x.material_name || '').toLowerCase().includes(q) ||
+                    (x.reason || '').toLowerCase().includes(q) ||
+                    (x.notes || '').toLowerCase().includes(q) ||
+                    (x.created_by || '').toLowerCase().includes(q);
+            }));
+        }
+
+        function loadMats() {
+            fetch('/api/raw-materials').then(r => r.json()).then(d => {
+                mats = d;
+                document.getElementById('am_material').innerHTML = d.map(function(m) {
+                    return '<option value="' + m.id + '">' + m.name + ' (' + m.stock + ' ' + (m.unit || '') + ')</option>';
+                }).join('');
+                onMatChange();
+            });
+        }
+
+        function onMatChange() {
+            var id = parseInt(document.getElementById('am_material').value);
+            var m = mats.find(function(x) { return x.id === id; });
+            var el = document.getElementById('am_cur');
+            if (m) {
+                el.innerHTML = 'Current stock: <b>' + m.stock + ' ' + (m.unit || '') + '</b>';
+            } else {
+                el.innerHTML = '';
+            }
+            document.getElementById('aq').value = '';
+            document.getElementById('adelta').innerHTML = '';
+        }
+
+        function onQtyInput() {
+            var id = parseInt(document.getElementById('am_material').value);
+            var m = mats.find(function(x) { return x.id === id; });
+            var nv = parseFloat(document.getElementById('aq').value);
+            if (!m || isNaN(nv)) { document.getElementById('adelta').innerHTML = ''; return; }
+            var delta = Math.round((nv - (m.stock || 0)) * 100) / 100;
+            var cls = delta > 0 ? 'delta-pos' : (delta < 0 ? 'delta-neg' : 'delta-zero');
+            var sign = delta > 0 ? '+' : '';
+            document.getElementById('adelta').innerHTML =
+                '<span style="font-size:12px;color:#6b7280">Change:</span> <span class="' + cls + '">' + sign + delta + ' ' + (m.unit || '') + '</span>';
+        }
+
+        function showAdd() {
+            document.getElementById('am').classList.add('show');
+            onMatChange();
+        }
+
+        function save(e) {
+            e.preventDefault();
+            var rmid = parseInt(document.getElementById('am_material').value);
+            var nv = parseFloat(document.getElementById('aq').value);
+            if (isNaN(nv) || nv < 0) return alert('Enter a valid new quantity');
+
+            fetch('/api/material-adjustments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raw_material_id: rmid,
+                    new_qty: nv,
+                    reason: document.getElementById('areason').value,
+                    notes: document.getElementById('ano').value
+                })
+            })
+            .then(r => r.json())
+            .then(function(d) {
+                if (d.error) { alert(d.error); return; }
+                cl('am');
+                load();
+                loadMats();
+            });
+        }
+
+        function cl(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        load();
+        loadMats();
+    </script>
+</body>
+</html>

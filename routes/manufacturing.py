@@ -528,3 +528,180 @@ def complete_production_order(oid):
             db.execute('ROLLBACK')
             return jsonify({'error': str(e)}), 400
         return jsonify({'ok': True, 'total_cost': round(actual_total, 2)})
+
+
+@mfg_bp.route('/material-transfers')
+@login_required
+def list_material_transfers():
+    with get_db() as db:
+        rows = db.execute(
+            'SELECT mt.*, fm.name as from_name, fm.unit as from_unit, tm.name as to_name, tm.unit as to_unit '
+            'FROM material_transfers mt '
+            'JOIN raw_materials fm ON fm.id=mt.from_material_id '
+            'JOIN raw_materials tm ON tm.id=mt.to_material_id '
+            'ORDER BY mt.date DESC, mt.id DESC'
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@mfg_bp.route('/material-transfers', methods=['POST'])
+@login_required
+@manager_required
+def create_material_transfer():
+    """Move stock quantity from one raw material to another (net zero) to
+    correct misallocation drift caused by wastage/damage. Logged in restock_log."""
+    d = request.get_json() or {}
+    frm = d.get('from_material_id')
+    to = d.get('to_material_id')
+    if not frm or not to:
+        return jsonify({'error': 'From and To materials are required'}), 400
+    if frm == to:
+        return jsonify({'error': 'From and To materials must be different'}), 400
+    try:
+        qty = float(d.get('qty', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid quantity'}), 400
+    if qty <= 0:
+        return jsonify({'error': 'Quantity must be positive'}), 400
+    from datetime import date as _date
+    date = (d.get('date') or '').strip() or _date.today().isoformat()
+    note = (d.get('note') or '').strip()
+    with get_db() as db:
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            fm = db.execute('SELECT * FROM raw_materials WHERE id=?', (frm,)).fetchone()
+            tm = db.execute('SELECT * FROM raw_materials WHERE id=?', (to,)).fetchone()
+            if not fm or not tm:
+                db.execute('ROLLBACK')
+                return jsonify({'error': 'Material not found'}), 400
+            if (fm['stock'] or 0) < qty:
+                db.execute('ROLLBACK')
+                return jsonify({'error': f'Not enough stock in "{fm["name"]}" (have {fm["stock"]} {fm["unit"]})'}), 400
+            if fm['unit'] != tm['unit'] and not d.get('confirm_units'):
+                db.execute('ROLLBACK')
+                return jsonify({
+                    'error': f'Units differ: "{fm["name"]}" is {fm["unit"]} but "{tm["name"]}" is {tm["unit"]}.',
+                    'confirm_units_required': True
+                }), 400
+            cur = db.execute(
+                'INSERT INTO material_transfers (from_material_id, to_material_id, qty, date, note, created_by) VALUES (?,?,?,?,?,?)',
+                (frm, to, qty, date, note, session.get('name', ''))
+            )
+            # Deduct from source
+            new_fm = round((fm['stock'] or 0) - qty, 4)
+            db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_fm, frm))
+            db.execute(
+                'INSERT INTO restock_log (variant_id, raw_material_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?,?)',
+                (None, frm, fm['stock'] or 0, new_fm, -qty, fm['cost_per_unit'] or 0,
+                 f'Material Transfer #{cur.lastrowid}', session.get('name', ''))
+            )
+            # Add to destination
+            new_tm = round((tm['stock'] or 0) + qty, 4)
+            db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_tm, to))
+            db.execute(
+                'INSERT INTO restock_log (variant_id, raw_material_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?,?)',
+                (None, to, tm['stock'] or 0, new_tm, qty, tm['cost_per_unit'] or 0,
+                 f'Material Transfer #{cur.lastrowid}', session.get('name', ''))
+            )
+            db.execute('COMMIT')
+        except Exception as e:
+            db.execute('ROLLBACK')
+            return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'id': cur.lastrowid})
+
+
+@mfg_bp.route('/material-transfers/<int:tid>', methods=['DELETE'])
+@login_required
+@manager_required
+def delete_material_transfer(tid):
+    """Reverse a material transfer: move the quantity back."""
+    with get_db() as db:
+        t = db.execute('SELECT * FROM material_transfers WHERE id=?', (tid,)).fetchone()
+        if not t:
+            return jsonify({'error': 'Transfer not found'}), 404
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            fm = db.execute('SELECT * FROM raw_materials WHERE id=?', (t['from_material_id'],)).fetchone()
+            tm = db.execute('SELECT * FROM raw_materials WHERE id=?', (t['to_material_id'],)).fetchone()
+            if not fm or not tm:
+                db.execute('ROLLBACK')
+                return jsonify({'error': 'Material not found'}), 400
+            if (tm['stock'] or 0) < t['qty']:
+                db.execute('ROLLBACK')
+                return jsonify({'error': f'Cannot reverse: not enough stock in "{tm["name"]}"'}), 400
+            # Move back: to -> from
+            new_fm = round((fm['stock'] or 0) + t['qty'], 4)
+            db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_fm, fm['id']))
+            db.execute(
+                'INSERT INTO restock_log (variant_id, raw_material_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?,?)',
+                (None, fm['id'], fm['stock'] or 0, new_fm, t['qty'], fm['cost_per_unit'] or 0,
+                 f'Material Transfer #{t["id"]} reversed', session.get('name', ''))
+            )
+            new_tm = round((tm['stock'] or 0) - t['qty'], 4)
+            db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_tm, tm['id']))
+            db.execute(
+                'INSERT INTO restock_log (variant_id, raw_material_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?,?)',
+                (None, tm['id'], tm['stock'] or 0, new_tm, -t['qty'], tm['cost_per_unit'] or 0,
+                 f'Material Transfer #{t["id"]} reversed', session.get('name', ''))
+            )
+            db.execute('DELETE FROM material_transfers WHERE id=?', (tid,))
+            db.execute('COMMIT')
+        except Exception as e:
+            db.execute('ROLLBACK')
+            return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True})
+
+
+@mfg_bp.route('/material-adjustments')
+@login_required
+def list_material_adjustments():
+    with get_db() as db:
+        rows = db.execute(
+            'SELECT ma.*, rm.name as material_name, rm.unit '
+            'FROM material_adjustments ma JOIN raw_materials rm ON rm.id=ma.raw_material_id '
+            'ORDER BY ma.created_at DESC, ma.id DESC'
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@mfg_bp.route('/material-adjustments', methods=['POST'])
+@login_required
+@manager_required
+def create_material_adjustment():
+    """Correct a single material's stock to a physical count (recount, damage,
+    wastage, entry error). Delta is the signed difference, logged in restock_log."""
+    d = request.get_json() or {}
+    rmid = d.get('raw_material_id')
+    if not rmid:
+        return jsonify({'error': 'Material is required'}), 400
+    try:
+        new_qty = float(d.get('new_qty', 0))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid quantity'}), 400
+    if new_qty < 0:
+        return jsonify({'error': 'Quantity cannot be negative'}), 400
+    reason = (d.get('reason') or 'Other').strip()
+    notes = (d.get('notes') or '').strip()
+    with get_db() as db:
+        rm = db.execute('SELECT * FROM raw_materials WHERE id=?', (rmid,)).fetchone()
+        if not rm:
+            return jsonify({'error': 'Material not found'}), 404
+        old_qty = rm['stock'] or 0
+        delta = round(new_qty - old_qty, 4)
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            db.execute('UPDATE raw_materials SET stock=? WHERE id=?', (new_qty, rmid))
+            cur = db.execute(
+                'INSERT INTO material_adjustments (raw_material_id, old_qty, new_qty, delta, reason, notes, created_by) VALUES (?,?,?,?,?,?,?)',
+                (rmid, old_qty, new_qty, delta, reason, notes, session.get('name', ''))
+            )
+            db.execute(
+                'INSERT INTO restock_log (variant_id, raw_material_id, old_stock, new_stock, qty_added, cost, note, staff_name) VALUES (?,?,?,?,?,?,?,?)',
+                (None, rmid, old_qty, new_qty, delta, rm['cost_per_unit'] or 0,
+                 f'Adjustment ({reason})', session.get('name', ''))
+            )
+            db.execute('COMMIT')
+        except Exception as e:
+            db.execute('ROLLBACK')
+            return jsonify({'error': str(e)}), 400
+    return jsonify({'ok': True, 'id': cur.lastrowid, 'delta': delta, 'new_qty': new_qty})

@@ -405,6 +405,29 @@ def init_db():
                 unit_cost REAL NOT NULL DEFAULT 0,
                 total REAL NOT NULL DEFAULT 0
             );
+
+            CREATE TABLE IF NOT EXISTS material_adjustments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                raw_material_id INTEGER NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
+                old_qty REAL NOT NULL DEFAULT 0,
+                new_qty REAL NOT NULL DEFAULT 0,
+                delta REAL NOT NULL DEFAULT 0,
+                reason TEXT NOT NULL DEFAULT 'Other',
+                notes TEXT DEFAULT '',
+                created_by TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS material_transfers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_material_id INTEGER NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
+                to_material_id INTEGER NOT NULL REFERENCES raw_materials(id) ON DELETE CASCADE,
+                qty REAL NOT NULL DEFAULT 0,
+                date TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+                note TEXT DEFAULT '',
+                created_by TEXT DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
         ''')
 
         # migrations

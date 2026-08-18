@@ -170,6 +170,8 @@ def render_sidebar(active_page):
             {'url': '/manufacturing/bom', 'label': 'Recipes (BOM)'},
             {'url': '/manufacturing/recipe-profiles', 'label': 'Recipe Profiles'},
             {'url': '/manufacturing/production-orders', 'label': 'Production Orders'},
+            {'url': '/manufacturing/material-transfers', 'label': 'Material Transfers'},
+            {'url': '/manufacturing/stock-adjustments', 'label': 'Stock Adjustments'},
         ]},
         {'label': 'Cash And Bank Accounts', 'permission': 'accounts', 'subs': [
             {'url': '/accounts', 'label': 'All Accounts'},
@@ -818,6 +820,22 @@ def manufacturing_recipe_profiles():
 def manufacturing_production_orders():
     """Display the production orders list."""
     return render_page('production_orders.html', '/manufacturing/production-orders')
+
+
+@app.route('/manufacturing/material-transfers', strict_slashes=False)
+@login_required
+@permission_required('inventory')
+def manufacturing_material_transfers():
+    """Display the inter-material transfer list."""
+    return render_page('material_transfers.html', '/manufacturing/material-transfers')
+
+
+@app.route('/manufacturing/stock-adjustments', strict_slashes=False)
+@login_required
+@permission_required('inventory')
+def manufacturing_stock_adjustments():
+    """Display the raw material stock adjustment history."""
+    return render_page('material_adjustments.html', '/manufacturing/stock-adjustments')
 
 
 @app.route('/inventory/barcode', strict_slashes=False)

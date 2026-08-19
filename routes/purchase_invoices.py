@@ -66,7 +66,13 @@ def apply_raw_material_stock_change(db, raw_material_id, quantity, cost, referen
     old_cost = float(material['cost_per_unit'] or 0)
     new_stock = old_stock + quantity
     if new_stock > 0:
-        new_cost = round((old_stock * old_cost + float(quantity) * float(cost)) / new_stock, 2)
+        if old_stock < 0:
+            # Negative stock (owed/shortfall units): average over the absolute
+            # quantity so the recorded cost of the shortfall is absorbed into
+            # the new per-unit cost instead of dragging it down.
+            new_cost = round((abs(old_stock) * old_cost + float(quantity) * float(cost)) / (abs(old_stock) + float(quantity)), 2)
+        else:
+            new_cost = round((old_stock * old_cost + float(quantity) * float(cost)) / new_stock, 2)
     else:
         new_cost = 0
     db.execute('UPDATE raw_materials SET stock=?, cost_per_unit=? WHERE id=?', (new_stock, new_cost, raw_material_id))

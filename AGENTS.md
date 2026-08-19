@@ -2,6 +2,7 @@
 
 ## Stack
 - Flask (Python 3), SQLite, Jinja2 templates, vanilla CSS/JS
+- Packaging: PyInstaller (`build.bat`, `installer.iss`) — `debug_mode` is off when frozen (`sys.frozen`)
 
 ## Currency
 - Pakistani Rupee: `Rs` symbol, all prices display as `Rs X.XX`
@@ -11,26 +12,51 @@
 - Card background: `#fcfbf8`, border: `1px solid #e2e1de`, radius: `10px`
 - Accent blue: `#3b4fe2`
 - Sidebar: dark `#1a1c2e`
+- Money formatting: `Rs {:,.2f}` in Python, `'Rs ' + n.toLocaleString('en-PK', {...})` in JS
+
+## Roles & Permissions
+- Roles: `owner`, `manager`, `staff` (plus `admin` legacy). Default login: admin / admin123
+- Sidebar items are permission-gated: each `menu_items` entry in `app.py` has a `permission` key
+- Decorators in `routes/auth.py`: `login_required`, `manager_required`, `permission_required(permission)`
+- Managers and owners implicitly have all permissions; staff need a `permissions` JSON array column on `users`
 
 ## Database (`database.py`)
 - `init_db()` is idempotent (uses `IF NOT EXISTS`)
 - Column migrations: use `ALTER TABLE ADD COLUMN` wrapped in try/except
-- Tables: users, products, variants, sales, sale_items, payments, customers, khata, restock_log, suppliers, supplier_khata, expenses, settings, commission_classes, categories
+- Core (POS) tables: users, products, variants, sales, sale_items, payments, customers, khata, restock_log, suppliers, supplier_khata, expenses, settings, commission_classes, categories
+- Added later: sizes, accounts, account_transfers, transactions, purchase_invoices, purchase_invoice_items, purchase_returns, purchase_return_items, employees, attendance
+- Manufacturing tables: raw_materials, bom, recipe_profiles, recipe_profile_items, production_orders, production_order_items, material_adjustments, material_transfers
 - `products.category` is TEXT (freeform), `categories` table is a reference list for dropdowns
 - `products.commission_class` is TEXT, `commission_classes` table is a reference list
 
 ## Flask Structure
-- Blueprints under `routes/` (auth, products, pos, customers, khata, dashboard, suppliers, settings, summary, categories)
-- `app.py` has `sidebar(active)` function and route stubs; register new blueprints here
-- `page(template, active)` renders template with role, name, sidebar
+- Blueprints under `routes/`: auth, products, pos, customers, khata, dashboard, suppliers, settings, summary, categories, sizes, purchase_invoices, purchase_returns, manufacturing, accounts, transactions, ledger, payroll, reports, data_management
+- `app.py` (941 lines): `render_sidebar(active_page)` builds the permission-filtered nav menu; `render_page(template, active, **kwargs)` renders template with role, name, sidebar — register new blueprints at the top (lines ~102–120)
+- `app.py` also holds the page route stubs (`/pos`, `/inventory`, `/sales-invoices`, ...) plus `view_sales_invoice` / `view_purchase_invoice` which build the render context DB calls
+- Business logic lives in `routes/`; templates contain zero Python logic
 
 ## API Conventions
-- `/api/accounts` — GET (list), POST (create), PUT `/api/accounts/<id>`, DELETE `/api/accounts/<id>`
+- `/api/accounts` — GET (list), POST (create), PUT `/api/accounts/<id>`, DELETE `/api/accounts/<id>`; `/api/account-transfers` — GET, POST, PUT, DELETE
 - `/api/products` — GET (list + search by `?q=`), POST (create), PUT `/api/products/<id>`
 - `/api/variants` — POST (create), PUT `/api/variants/<id>`, PUT `/api/variants/<id>/stock`
-- `/api/categories` — GET, POST, DELETE `/api/categories/<id>`
-- `/api/commission-classes` — GET, POST, DELETE `/api/commission-classes/<id>`
-- RESTful JSON, auth via session (login_required, manager_required decorators)
+- `/api/categories`, `/api/commission-classes`, `/api/sizes` — GET, POST, DELETE `/api/<plural>/<id>`
+- `/api/purchase-invoices` — GET, POST; `/api/purchase-invoices/<id>` — GET, PUT; `/api/purchase-returns` — GET, POST; `/api/purchase-returns/<id>` — GET, PUT
+- `/api/transactions` — POST (apply payment), PUT, DELETE; payment recording updates invoice status via `update_sale_due(db, sale_id)` in `routes/transactions.py:42`
+- `/api/ledger/<entity_type>/<entity_id>` — GET ledger of a customer/supplier/account
+- `/api/employees` — GET, POST, PUT; payroll vouchers served from `app.py` routes (`/payroll/voucher/<eid>`, `/payroll/print/<eid>`, `/payroll/print-all`)
+- `/api/reports/supplier-balances` — GET
+- Data management (`/api/data/...` under `routes/data_management.py`): entities, template download, export, backup, db-path
+- RESTful JSON, auth via session decorators (login_required, manager_required, permission_required)
+
+## Manufacturing Module (`routes/manufacturing.py`)
+- Raw materials — `/api/raw-materials`; rolling average cost; restocking works like products but flagged as raw material
+- Recipes (BOM) — `/api/bom`; BOM lines tie a finished variant to raw material quantities
+- Recipe Profiles — `/api/recipe-profiles` (+ `/api/recipe-profiles/<pid>/items` nested CRUD, `/api/recipe-profiles/<pid>/apply` consumes materials into inventory/purchase draft)
+- Production Orders — `/api/production-orders`, `/api/production-orders/<oid>/complete` (complete allowed with negative raw stock after confirmation), `/api/production-orders/<oid>` PUT
+- Material Transfers — `/api/material-transfers` (inter-material transfers, DELETE to reverse)
+- Stock Adjustments — `/api/material-adjustments`
+- Pagination applied to manufacturing pages
+- Raw material value included in Summary assets; ledger page (`/ledger/<entity_type>/<entity_id>`) tracks production usage
 
 ## Inventory Product Form
 - No "Has Variants" checkbox — default variant auto-created with stock=0
@@ -77,7 +103,7 @@
 - **Partial** — partially paid credit sales (0 < paid < total)
 - **Overpaid** — customer paid more than total (paid > total)
 - **returned** / **exchanged** — POS terminal returns/exchanges (separate flow)
-- Status is set at creation based on payment method; updated by `update_sale_due()` in `routes/transactions.py:42` when payments are applied
+- Status is set at creation based on payment method; updated by `update_sale_due(db, sale_id)` in `routes/transactions.py:42` when payments are applied
 - `statusCell(s)` in templates renders colored badges with due amount info
 
 ## Default Login
@@ -86,7 +112,7 @@
 ## Run
 ```bash
 python3 app.py
-# Development server on http://0.0.0.0:5000
+# Development server on http://0.0.0.0:5000 (debug on unless packaged/frozen)
 ```
 
 ## Git Workflow

@@ -703,7 +703,9 @@ ALL_TABLES = [
     'purchase_invoices', 'purchase_invoice_items', 'purchase_returns',
     'purchase_return_items', 'sales', 'sale_items', 'payments',
     'restock_log', 'account_transfers', 'transactions', 'expenses',
-    'settings', 'attendance',
+    'settings', 'attendance', 'raw_materials', 'bom', 'recipe_profiles',
+    'recipe_profile_items', 'production_orders', 'production_order_items',
+    'material_adjustments', 'material_transfers',
 ]
 
 _CLEAR_ALL_ORDER = [
@@ -718,6 +720,14 @@ _CLEAR_ALL_ORDER = [
     'purchase_invoices',
     'account_transfers',
     'transactions',
+    'production_order_items',
+    'production_orders',
+    'bom',
+    'recipe_profile_items',
+    'recipe_profiles',
+    'material_transfers',
+    'material_adjustments',
+    'raw_materials',
     'variants',
     'products',
     'employees',
@@ -750,7 +760,7 @@ def _clear_all():
 @manager_required
 def backup_data():
     backup = {
-        'version': 1,
+        'version': 2,
         'created_at': datetime.now().isoformat(),
         'tables': {},
     }

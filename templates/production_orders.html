@@ -44,7 +44,7 @@
     </div>
     <div class="modal" id="pm">
         <div class="mc" style="max-width:560px"><button class="mx" onclick="cl('pm')">&times;</button>
-            <h2>New Production Order</h2>
+            <h2 id="pmTitle">New Production Order</h2>
             <form onsubmit="saveOrder(event)">
                 <div class="form-row">
                     <div><label>Product / Variant</label><select id="poProd"></select></div>
@@ -74,7 +74,7 @@
     <script type="application/json" id="sv">{{role|tojson}}</script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
-        var all = [], sortIdx = -1, sortDir = 1, prodOptions = [], prodLoaded = false, lines = [], action = null, actionId = null, currentPage = 1, totalPages = 1, perPage = 50, showAll = false, allowNegative = false;
+        var all = [], sortIdx = -1, sortDir = 1, prodOptions = [], prodLoaded = false, lines = [], action = null, actionId = null, currentPage = 1, totalPages = 1, perPage = 50, showAll = false, allowNegative = false, editId = null;
         load();
         loadProducts();
         function load() {
@@ -145,9 +145,9 @@
                 const prods = (o.items || []).map(x => x.product_name + ' <span style="color:#6b7280">&times;' + x.quantity + '</span>').join('<br>');
                 const tc = +o.total_cost || 0;
                 const actions = o.status == 'pending' && (ROLE == 'manager' || ROLE == 'owner')
-                    ? '<button class="btn btn-xs btn-p" onclick="confirmComplete(' + o.id + ')">Complete</button> <button class="btn btn-xs btn-d" onclick="confirmCancel(' + o.id + ',\'' + o.order_no.replace(/'/g, "\\'") + '\')">Cancel</button>'
+                    ? '<button class="btn btn-xs btn-ghost" onclick="editOrder(' + o.id + ')">Edit</button> <button class="btn btn-xs btn-p" onclick="confirmComplete(' + o.id + ')">Complete</button> <button class="btn btn-xs btn-d" onclick="confirmCancel(' + o.id + ',\'' + o.order_no.replace(/'/g, "\\'") + '\')">Cancel</button>'
                     : '<span style="color:#9ca3af;font-size:12px">' + (o.status == 'completed' ? 'Cost: Rs ' + tc.toFixed(2) : '&ndash;') + '</span>';
-                return '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600">' + o.order_no + '</td><td>' + statusBadge(o.status) + '</td><td style="font-size:12px">' + (prods || '-') + '</td><td class="text-right">' + (+o.total_qty || 0) + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (o.created_at || '').slice(0, 16) + '</td><td style="font-size:12px;color:#6b7280">' + ((o.completed_at || '').slice(0, 16) || '-') + '</td><td>' + actions + '</td></tr>';
+                return '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600"><a href="/manufacturing/production-orders/' + o.id + '" style="color:#3b4fe2;text-decoration:none">' + o.order_no + '</a></td><td>' + statusBadge(o.status) + '</td><td style="font-size:12px">' + (prods || '-') + '</td><td class="text-right">' + (+o.total_qty || 0) + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (o.created_at || '').slice(0, 16) + '</td><td style="font-size:12px;color:#6b7280">' + ((o.completed_at || '').slice(0, 16) || '-') + '</td><td>' + actions + '</td></tr>';
             }).join('');
             var totQty = 0, totCost = 0;
             l.forEach(function (o) { totQty += o.total_qty || 0; totCost += o.total_cost || 0; });
@@ -155,11 +155,28 @@
             renderPagination();
         }
         function showCreate() {
-            lines = [];
-            renderLines();
+            editId = null;
+            document.getElementById('pmTitle').textContent = 'New Production Order';
             document.getElementById('poNotes').value = '';
             document.getElementById('poQty').value = '1';
             document.getElementById('poProd').value = '';
+            document.querySelector('#pm button[type=submit]').textContent = 'Create Order';
+            lines = [];
+            renderLines();
+            loadProducts();
+            document.getElementById('pm').classList.add('show');
+        }
+        function editOrder(id) {
+            const o = all.find(x => x.id === id);
+            if (!o) { alert('Order not found — refresh the page'); return; }
+            editId = id;
+            document.getElementById('pmTitle').textContent = 'Edit ' + o.order_no;
+            document.getElementById('poNotes').value = o.notes || '';
+            lines = (o.items || []).map(x => ({ variant_id: x.variant_id, quantity: x.quantity, name: x.product_name, sku: x.variant_sku, size: x.size, color: x.color }));
+            renderLines();
+            document.getElementById('poQty').value = '1';
+            document.getElementById('poProd').value = '';
+            document.querySelector('#pm button[type=submit]').textContent = 'Save Changes';
             loadProducts();
             document.getElementById('pm').classList.add('show');
         }
@@ -189,13 +206,15 @@
             if (e) e.preventDefault();
             if (!lines.length) { alert('Add at least one line'); return; }
             const btn = document.querySelector('#pm button[type=submit]');
-            btn.disabled = true; btn.textContent = 'Creating...';
-            fetch('/api/production-orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: lines, notes: document.getElementById('poNotes').value }) })
+            const origTxt = btn.textContent;
+            btn.disabled = true; btn.textContent = (editId ? 'Saving...' : 'Creating...');
+            const url = editId ? '/api/production-orders/' + editId : '/api/production-orders';
+            fetch(url, { method: editId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: lines, notes: document.getElementById('poNotes').value }) })
                 .then(r => r.json()).then(d => {
-                    btn.disabled = false; btn.textContent = 'Create Order';
+                    btn.disabled = false; btn.textContent = origTxt;
                     if (d.error) { alert(d.error); return; }
-                    cl('pm'); load();
-                }).catch(() => { btn.disabled = false; btn.textContent = 'Create Order'; });
+                    cl('pm'); editId = null; load();
+                }).catch(() => { btn.disabled = false; btn.textContent = origTxt; });
         }
         function confirmComplete(id) {
             action = 'complete'; actionId = id;

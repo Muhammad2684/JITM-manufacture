@@ -416,15 +416,46 @@ def create_production_order():
 def update_production_order(oid):
     d = request.get_json() or {}
     status = d.get('status', '')
-    if status != 'cancelled':
+    if status and status != 'cancelled':
         return jsonify({'error': 'Invalid status'}), 400
     with get_db() as db:
         po = db.execute('SELECT * FROM production_orders WHERE id=?', (oid,)).fetchone()
         if not po:
             return jsonify({'error': 'Order not found'}), 404
         if po['status'] != 'pending':
-            return jsonify({'error': 'Only pending orders can be cancelled'}), 400
-        db.execute('UPDATE production_orders SET status=? WHERE id=?', (status, oid))
+            return jsonify({'error': f'Only pending orders can be edited (order is {po["status"]})'}), 400
+        if status == 'cancelled':
+            db.execute('UPDATE production_orders SET status=? WHERE id=?', (status, oid))
+            return jsonify({'ok': True})
+        items = d.get('items')
+        if items is None and 'notes' not in d:
+            return jsonify({'error': 'No changes provided'}), 400
+        if items is not None:
+            if not items:
+                return jsonify({'error': 'Add at least one product line'}), 400
+            db.execute('DELETE FROM production_order_items WHERE production_order_id=?', (oid,))
+            total_cost = 0
+            for it in items:
+                vid = it.get('variant_id')
+                try:
+                    qty = float(it.get('quantity', 0))
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'Invalid quantity'}), 400
+                if not vid or qty <= 0:
+                    return jsonify({'error': 'Each line needs a product and quantity'}), 400
+                v = db.execute('SELECT id, product_id FROM variants WHERE id=?', (vid,)).fetchone()
+                if not v:
+                    return jsonify({'error': 'Variant not found: ' + str(vid)}), 400
+                unit_cost = material_cost_per_unit(db, vid)
+                line_total = round(unit_cost * qty, 2)
+                total_cost += line_total
+                db.execute(
+                    'INSERT INTO production_order_items (production_order_id, product_id, variant_id, quantity, unit_cost, total) VALUES (?,?,?,?,?,?)',
+                    (oid, v['product_id'], vid, qty, unit_cost, line_total)
+                )
+            db.execute('UPDATE production_orders SET total_cost=? WHERE id=?', (round(total_cost, 2), oid))
+        if 'notes' in d:
+            db.execute('UPDATE production_orders SET notes=? WHERE id=?', ((d.get('notes') or '').strip(), oid))
         return jsonify({'ok': True})
 
 

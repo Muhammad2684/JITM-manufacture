@@ -822,6 +822,83 @@ def manufacturing_production_orders():
     return render_page('production_orders.html', '/manufacturing/production-orders')
 
 
+@app.route('/manufacturing/production-orders/<int:order_id>', strict_slashes=False)
+@login_required
+@permission_required('inventory')
+def view_production_order(order_id):
+    """Display a detailed view of a production order (invoice-style)."""
+    from markupsafe import escape
+    from database import get_db
+    with get_db() as db:
+        po = db.execute('SELECT * FROM production_orders WHERE id=?', (order_id,)).fetchone()
+        if not po:
+            return 'Not found', 404
+        po = dict(po)
+        po_items = db.execute(
+            'SELECT i.*, p.name as product_name, v.sku as variant_sku, v.size, v.color '
+            'FROM production_order_items i JOIN products p ON p.id=i.product_id '
+            'LEFT JOIN variants v ON v.id=i.variant_id '
+            'WHERE i.production_order_id=? ORDER BY i.id', (order_id,)
+        ).fetchall()
+
+        format_amount = lambda n: 'Rs {:,.2f}'.format(n or 0)
+
+        item_rows = []
+        for raw_item in po_items:
+            item = dict(raw_item)
+            desc = item['product_name'] or ''
+            if item.get('variant_sku'):
+                desc += ' (' + item['variant_sku']
+                if item.get('size') or item.get('color'):
+                    desc += ' · ' + '/'.join(x for x in [item.get('size'), item.get('color')] if x)
+                desc += ')'
+            item_rows.append([str(escape(desc)), item['quantity'], format_amount(item['unit_cost']), format_amount(item['total'])])
+
+        totals = [('Total Cost', format_amount(po['total_cost']), True)]
+
+        status_class = ''
+        status_label = po.get('status', '')
+        if status_label == 'completed':
+            status_class = 'paid'
+        elif status_label == 'cancelled':
+            status_class = 'unpaid'
+        elif status_label == 'pending':
+            status_class = 'partial'
+
+        details = [
+            ('Created', po.get('created_at') or ''),
+            ('Completed', po.get('completed_at') or ''),
+            ('Order No', po['order_no']),
+        ]
+
+        party_name = 'Pending'
+        if po['status'] == 'completed':
+            party_name = 'Completed Production'
+        elif po['status'] == 'cancelled':
+            party_name = 'Cancelled'
+
+        return render_template('view_invoice.html',
+            role=session.get('role'), name=session.get('name'), sidebar=render_sidebar('/manufacturing/production-orders'),
+            title='Production Order',
+            head_sub='Production Order',
+            inv_type_label='Production Order',
+            inv_number=po['order_no'],
+            party_label='Status',
+            party_name=party_name,
+            party_phone='',
+            party_extra='',
+            details=details,
+            item_cols=['Product', 'Qty', 'Unit Cost', 'Total'],
+            items=item_rows,
+            totals=totals,
+            notes=po.get('notes', ''),
+            status_class=status_class,
+            status_label=status_label.title(),
+            paid_info='',
+            back_url='/manufacturing/production-orders',
+        )
+
+
 @app.route('/manufacturing/material-transfers', strict_slashes=False)
 @login_required
 @permission_required('inventory')

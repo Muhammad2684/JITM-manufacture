@@ -31,8 +31,7 @@
                             <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Total Qty <span id="si4"></span></th>
                             <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Total Cost <span id="si5"></span></th>
                             <th onclick="sortCol(6)" style="cursor:pointer;user-select:none">Created <span id="si6"></span></th>
-                            <th onclick="sortCol(7)" style="cursor:pointer;user-select:none">Completed <span id="si7"></span></th>
-                            <th></th>
+                            <th class="text-right"></th>
                         </tr>
                     </thead>
                     <tbody id="tb"></tbody>
@@ -116,7 +115,7 @@
         }
         function sortCol(i) {
             if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
-            for (let j = 0; j < 8; j++) document.getElementById('si' + j).textContent = '';
+            for (let j = 0; j < 7; j++) document.getElementById('si' + j).textContent = '';
             document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
             const vals = [
                 () => 0,
@@ -126,7 +125,6 @@
                 o => o.total_qty || 0,
                 o => o.total_cost || 0,
                 o => o.created_at || '',
-                o => o.completed_at || '',
             ];
             all.sort((a, b) => { const va = vals[i](a), vb = vals[i](b); return va < vb ? -sortDir : va > vb ? sortDir : 0; });
             render(all);
@@ -145,13 +143,13 @@
                 const prods = (o.items || []).map(x => x.product_name + ' <span style="color:#6b7280">&times;' + x.quantity + '</span>').join('<br>');
                 const tc = +o.total_cost || 0;
                 const actions = o.status == 'pending' && (ROLE == 'manager' || ROLE == 'owner')
-                    ? '<button class="btn btn-xs btn-ghost" onclick="editOrder(' + o.id + ')">Edit</button> <button class="btn btn-xs btn-p" onclick="confirmComplete(' + o.id + ')">Complete</button> <button class="btn btn-xs btn-d" onclick="confirmCancel(' + o.id + ',\'' + o.order_no.replace(/'/g, "\\'") + '\')">Cancel</button>'
+                    ? '<span style="display:inline-flex;gap:6px;justify-content:flex-end;white-space:nowrap"><button class="btn btn-xs btn-ghost" onclick="editOrder(' + o.id + ')">Edit</button><button class="btn btn-xs btn-p" onclick="confirmComplete(' + o.id + ')">Complete</button><button class="btn btn-xs btn-d" onclick="confirmCancel(' + o.id + ',\'' + o.order_no.replace(/'/g, "\\'") + '\')">Cancel</button></span>'
                     : '<span style="color:#9ca3af;font-size:12px">' + (o.status == 'completed' ? 'Cost: Rs ' + tc.toFixed(2) : '&ndash;') + '</span>';
-                return '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600"><a href="/manufacturing/production-orders/' + o.id + '" style="color:#3b4fe2;text-decoration:none">' + o.order_no + '</a></td><td>' + statusBadge(o.status) + '</td><td style="font-size:12px">' + (prods || '-') + '</td><td class="text-right">' + (+o.total_qty || 0) + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (o.created_at || '').slice(0, 16) + '</td><td style="font-size:12px;color:#6b7280">' + ((o.completed_at || '').slice(0, 16) || '-') + '</td><td>' + actions + '</td></tr>';
+                return '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600"><a href="/manufacturing/production-orders/' + o.id + '" style="color:#3b4fe2;text-decoration:none">' + o.order_no + '</a></td><td>' + statusBadge(o.status) + '</td><td style="font-size:12px">' + (prods || '-') + '</td><td class="text-right">' + (+o.total_qty || 0) + '</td><td class="text-right">Rs ' + tc.toFixed(2) + '</td><td style="font-size:12px;color:#6b7280">' + (o.created_at || '').slice(0, 16) + '</td><td class="text-right" style="white-space:nowrap">' + actions + '</td></tr>';
             }).join('');
             var totQty = 0, totCost = 0;
             l.forEach(function (o) { totQty += o.total_qty || 0; totCost += o.total_cost || 0; });
-            document.getElementById('tf').innerHTML = '<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">' + totQty + '</td><td class="text-right" style="padding:6px 8px">Rs ' + totCost.toFixed(2) + '</td><td></td><td></td><td></td></tr>';
+            document.getElementById('tf').innerHTML = '<tr><td colspan="4" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">' + totQty + '</td><td class="text-right" style="padding:6px 8px">Rs ' + totCost.toFixed(2) + '</td><td></td><td></td></tr>';
             renderPagination();
         }
         function showCreate() {

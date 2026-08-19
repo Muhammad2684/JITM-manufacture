@@ -83,7 +83,8 @@ def get_customer_entries(db, customer_id, entity):
                 'reference': s['receipt'] or '',
                 'debit': 0,
                 'credit': abs(s['total']),
-                'type': 'sale_return'
+                'type': 'sale_return',
+                'link': '/sales-invoices/' + str(s['id'])
             })
         else:
             entries.append({
@@ -92,7 +93,8 @@ def get_customer_entries(db, customer_id, entity):
                 'reference': s['receipt'] or '',
                 'debit': s['total'],
                 'credit': 0,
-                'type': 'sale'
+                'type': 'sale',
+                'link': '/sales-invoices/' + str(s['id'])
             })
 
     receipts = db.execute(
@@ -111,7 +113,8 @@ def get_customer_entries(db, customer_id, entity):
             'reference': label,
             'debit': 0,
             'credit': r['amount'],
-            'type': 'receipt'
+            'type': 'receipt',
+            'link': ('/sales-invoices/' + str(r['reference_id'])) if r['reference_type'] == 'sale' and r['reference_id'] else ''
         })
 
     refunds = db.execute(
@@ -130,7 +133,8 @@ def get_customer_entries(db, customer_id, entity):
             'reference': label,
             'debit': r['amount'],
             'credit': 0,
-            'type': 'payment'
+            'type': 'payment',
+            'link': ('/sales-invoices/' + str(r['reference_id'])) if r['reference_type'] == 'sale' and r['reference_id'] else ''
         })
 
     entries.sort(key=lambda e: e['date'])
@@ -175,7 +179,8 @@ def get_supplier_entries(db, supplier_id, entity):
             'reference': inv['invoice_no'] or '',
             'debit': inv['invoice_amount'],
             'credit': 0,
-            'type': 'purchase'
+            'type': 'purchase',
+            'link': '/purchase-invoices/' + str(inv['id'])
         })
 
     payments = db.execute(
@@ -194,7 +199,8 @@ def get_supplier_entries(db, supplier_id, entity):
             'reference': label,
             'debit': 0,
             'credit': p['amount'],
-            'type': 'payment'
+            'type': 'payment',
+            'link': ('/purchase-invoices/' + str(p['reference_id'])) if p['reference_type'] == 'purchase' and p['reference_id'] else ''
         })
 
     receipts_back = db.execute(
@@ -267,7 +273,8 @@ def get_account_entries(db, account_id, entity):
             'reference': label,
             'debit': r['amount'],
             'credit': 0,
-            'type': 'receipt'
+            'type': 'receipt',
+            'link': ('/sales-invoices/' + str(r['reference_id'])) if r['reference_type'] == 'sale' and r['reference_id'] else ''
         })
 
     payments = db.execute(
@@ -305,7 +312,8 @@ def get_account_entries(db, account_id, entity):
                 'reference': label,
                 'debit': 0,
                 'credit': p['amount'],
-                'type': 'sale_return'
+                'type': 'sale_return',
+                'link': ('/sales-invoices/' + str(p['reference_id'])) if p['reference_type'] == 'sale' and p['reference_id'] else ''
             })
         else:
             desc = p['description'] or 'Payment'
@@ -320,7 +328,8 @@ def get_account_entries(db, account_id, entity):
                 'reference': label,
                 'debit': 0,
                 'credit': p['amount'],
-                'type': 'payment'
+                'type': 'payment',
+                'link': ('/purchase-invoices/' + str(p['reference_id'])) if p['reference_type'] == 'purchase' and p['reference_id'] else ('/sales-invoices/' + str(p['reference_id'])) if p['reference_type'] == 'sale' and p['reference_id'] else ''
             })
 
     transfers_in = db.execute(
@@ -377,9 +386,32 @@ def get_account_entries(db, account_id, entity):
     return entries
 
 
+def _note_links(db):
+    """Map invoice_no and order_no to their detail-page links for restock notes."""
+    pi_ids = {r['invoice_no']: r['id'] for r in db.execute('SELECT id, invoice_no FROM purchase_invoices').fetchall()}
+    po_ids = {r['order_no']: r['id'] for r in db.execute('SELECT id, order_no FROM production_orders').fetchall()}
+    return pi_ids, po_ids
+
+
+def _link_from_note(note, pi_ids, po_ids):
+    """Return a detail-page link for restock_log notes like 'PI #INV-1' or 'Production Order #PO-00001'."""
+    if not note:
+        return ''
+    if note.startswith('PI #'):
+        no = note[4:].strip()
+        if no in pi_ids:
+            return f'/purchase-invoices/{pi_ids[no]}'
+    if note.startswith('Production Order #'):
+        no = note[len('Production Order #'):].strip()
+        if no in po_ids:
+            return f'/manufacturing/production-orders/{po_ids[no]}'
+    return ''
+
+
 def get_raw_material_entries(db, raw_material_id, entity):
     """Ledger for a raw material: purchases, reversals, and production usage from restock_log."""
     entries = []
+    pi_ids, po_ids = _note_links(db)
 
     rows = db.execute(
         'SELECT qty_added, cost, note, staff_name, created_at FROM restock_log '
@@ -415,7 +447,8 @@ def get_raw_material_entries(db, raw_material_id, entity):
             'qty': abs(qty_added),
             'debit': value if qty_added > 0 else 0,
             'credit': value if qty_added < 0 else 0,
-            'type': etype
+            'type': etype,
+            'link': _link_from_note(r['note'], pi_ids, po_ids)
         })
 
     entries.sort(key=lambda e: e['date'])
@@ -450,10 +483,11 @@ def get_raw_material_entries(db, raw_material_id, entity):
 
 def get_product_entries(db, product_id, entity):
     entries = []
+    pi_ids, po_ids = _note_links(db)
 
     sales = db.execute(
         'SELECT si.id, si.quantity, si.price, si.total, si.cost_price, si.is_return, si.sku, '
-        's.receipt, s.created_at, s.customer_name '
+        's.receipt, s.created_at, s.customer_name, s.id as sale_id '
         'FROM sale_items si JOIN sales s ON s.id=si.sale_id '
         'WHERE si.product_id=? ORDER BY s.created_at',
         (product_id,)
@@ -477,7 +511,8 @@ def get_product_entries(db, product_id, entity):
             'qty': abs(s['quantity']),
             'debit': cost_value if s['is_return'] else 0,
             'credit': 0 if s['is_return'] else cost_value,
-            'type': 'sale_return' if s['is_return'] else 'sale'
+            'type': 'sale_return' if s['is_return'] else 'sale',
+            'link': '/sales-invoices/' + str(s['sale_id'])
         })
 
     restocks = db.execute(
@@ -501,7 +536,8 @@ def get_product_entries(db, product_id, entity):
             'qty': abs(r['qty_added']),
             'debit': total_cost if not is_return else 0,
             'credit': total_cost if is_return else 0,
-            'type': 'purchase_return' if is_return else 'restock'
+            'type': 'purchase_return' if is_return else 'restock',
+            'link': _link_from_note(r['note'], pi_ids, po_ids)
         })
 
     entries.sort(key=lambda e: e['date'])

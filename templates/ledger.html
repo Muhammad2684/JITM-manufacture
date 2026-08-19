@@ -191,7 +191,7 @@
                     '<td style="color:#6b7280;font-size:12px">' + ((currentPage - 1) * perPage + i + 1) + '</td>' +
                     '<td>' + (e.date || '') + '</td>' +
                     '<td><span class="bdg ' + tClass + '">' + e.description + '</span></td>' +
-                    '<td>' + (e.reference || '') + '</td>' +
+                    '<td>' + (e.reference ? (e.link ? '<a href="' + e.link + '" style="color:#3b4fe2;text-decoration:none">' + e.reference + '</a>' : e.reference) : '') + '</td>' +
                     qtyCol +
                     '<td class="text-right">' + (e.debit > 0 ? 'Rs ' + e.debit.toFixed(2) : '') + '</td>' +
                     '<td class="text-right">' + (e.credit > 0 ? 'Rs ' + e.credit.toFixed(2) : '') + '</td>' +

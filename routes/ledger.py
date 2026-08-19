@@ -161,6 +161,9 @@ def get_customer_entries(db, customer_id, entity):
         balance += e['debit'] - e['credit']
         e['balance'] = round(balance, 2)
 
+    # Show most recent entries first
+    entries.reverse()
+
     return entries
 
 
@@ -235,6 +238,9 @@ def get_supplier_entries(db, supplier_id, entity):
             'balance': bal,
             'type': 'opening'
         })
+
+    # Show most recent entries first
+    entries.reverse()
 
     return entries
 
@@ -383,6 +389,9 @@ def get_account_entries(db, account_id, entity):
         balance += e['debit'] - e['credit']
         e['balance'] = round(balance, 2)
 
+    # Show most recent entries first
+    entries.reverse()
+
     return entries
 
 
@@ -478,6 +487,9 @@ def get_raw_material_entries(db, raw_material_id, entity):
         balance += e['debit'] - e['credit']
         e['balance'] = round(balance, 2)
 
+    # Show most recent entries first
+    entries.reverse()
+
     return entries
 
 
@@ -545,5 +557,8 @@ def get_product_entries(db, product_id, entity):
     for e in entries:
         balance += e['debit'] - e['credit']
         e['balance'] = round(balance, 2)
+
+    # Show most recent entries first
+    entries.reverse()
 
     return entries

@@ -29,6 +29,11 @@
 - `products.category` is TEXT (freeform), `categories` table is a reference list for dropdowns
 - `products.commission_class` is TEXT, `commission_classes` table is a reference list
 
+## Backup & Restore (routes/data_management.py)
+- Every new table added to the database MUST be added to `ALL_TABLES` (backup) and `_CLEAR_ALL_ORDER` (clear order) in `routes/data_management.py`, otherwise new data is silently lost on backup/restore
+- `_CLEAR_ALL_ORDER` must clear child/referencing tables before their parents (FK-safe), leave `_INSERT_ORDER = list(reversed(_CLEAR_ALL_ORDER))` untouched — it derives automatically
+- When adding a new feature to this repo, updating Backup & Restore is part of the feature commit
+
 ## Flask Structure
 - Blueprints under `routes/`: auth, products, pos, customers, khata, dashboard, suppliers, settings, summary, categories, sizes, purchase_invoices, purchase_returns, manufacturing, accounts, transactions, ledger, payroll, reports, data_management
 - `app.py` (941 lines): `render_sidebar(active_page)` builds the permission-filtered nav menu; `render_page(template, active, **kwargs)` renders template with role, name, sidebar — register new blueprints at the top (lines ~102–120)

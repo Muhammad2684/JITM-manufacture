@@ -98,7 +98,11 @@ def parse_upload(file):
                 d[h] = str(val).strip() if val is not None else ''
             rows.append(d)
     elif filename.endswith('.csv'):
-        content = file.read().decode('utf-8-sig')
+        try:
+            content = file.read().decode('utf-8-sig')
+        except UnicodeDecodeError:
+            file.seek(0)
+            content = file.read().decode('utf-8', errors='replace')
         reader = csv.DictReader(io.StringIO(content))
         if not reader.fieldnames:
             return None, 'Empty or invalid CSV'

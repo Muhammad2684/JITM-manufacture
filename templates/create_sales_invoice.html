@@ -64,7 +64,7 @@
             <div class="ci-entity">
                 <div style="margin-bottom:12px"><label>Customer</label><select id="customer_id"><option value="">-- Walk-in / No Customer --</option></select></div>
                 <div class="pay-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
-                    <div><label>Payment Method</label><select id="payment_method" onchange="toggleDueDate()"><option value="cash">Cash</option><option value="card">Card</option><option value="credit">Credit</option></select></div>
+                    <div><label>Payment Method</label><select id="payment_method" onchange="toggleDueDate()"><option value="cash">Cash</option><option value="card">Card</option><option value="credit">Credit</option><option value="split">Split</option><option value="jb">Bank (Jibraan)</option><option value="ahd">Bank (Ahmed)</option><option value="z">Bank (Zahid)</option></select></div>
                     <div id="account_wrap"><label>Receive to Account</label><select id="account_id"><option value="">-- Select Account --</option></select></div>
                     <div><label>Notes</label><input type="text" id="notes" placeholder="Optional notes"></div>
                     <div id="due_date_wrap" style="display:none"><label>Due Date</label><input type="date" id="due_date"><input type="number" id="due_by" min="0" placeholder="Due by (days)" style="margin-top:6px;width:100%" oninput="recalcDueDate('sale_date','due_date','due_by')"></div>
@@ -172,7 +172,7 @@ function recalcDueDate(issueId, dueId, byId) {
 }
 
 function loadAccounts() {
-    fetch('/api/accounts').then(function(r){return r.json();}).then(function(d){
+    return fetch('/api/accounts').then(function(r){return r.json();}).then(function(d){
         accounts = d.items || d;
         var sel = document.getElementById('account_id');
         sel.innerHTML = '<option value="">-- Select Account --</option>' + accounts.map(function(a){return '<option value="'+a.id+'">'+a.name+' ('+a.type+')</option>';}).join('');
@@ -180,14 +180,14 @@ function loadAccounts() {
 }
 
 function loadCustomers() {
-    fetch('/api/customers').then(r=>r.json()).then(d=>{
+    return fetch('/api/customers').then(r=>r.json()).then(d=>{
         customers = d.items || d;
         var custData = customers;
         document.getElementById('customer_id').innerHTML='<option value="">-- Walk-in / No Customer --</option>'+custData.map(c=>'<option value="'+c.id+'">'+c.name+'</option>').join('');
     });
 }
 function loadProducts() {
-    fetch('/api/products?per_page=100000').then(r=>r.json()).then(d=>{
+    return fetch('/api/products?per_page=100000').then(r=>r.json()).then(d=>{
         products = d.items || d;
         products.forEach(function(p){
             var stock = (p.variants||[]).reduce(function(s,v){return s+(v.stock||0);},0);
@@ -737,7 +737,14 @@ function loadSale(id) {
         document.getElementById('receipt_no').style.background = '#f9fafb';
         document.getElementById('sale_date').value = (s.created_at || '').slice(0, 10);
         document.getElementById('notes').value = s.notes || '';
-        document.getElementById('payment_method').value = s.payment || 'cash';
+        var pmSelect = document.getElementById('payment_method');
+        if (s.payment && !Array.prototype.some.call(pmSelect.options, function (o) { return o.value === s.payment; })) {
+            var opt = document.createElement('option');
+            opt.value = s.payment;
+            opt.textContent = s.payment;
+            pmSelect.appendChild(opt);
+        }
+        pmSelect.value = s.payment || 'cash';
         toggleDueDate();
         if (s.payment === 'credit' && s.due_date) {
             document.getElementById('due_date').value = s.due_date;
@@ -766,20 +773,21 @@ function loadSale(id) {
 
 document.getElementById('sale_date').value = new Date().toISOString().slice(0,10);
 document.getElementById('receipt_no').value = generateReceipt();
-loadCustomers();
-loadProducts();
-loadAccounts();
+var params = new URLSearchParams(window.location.search);
+var editIdParam = params.get('id');
 fetch('/api/categories').then(r=>r.json()).then(function(d){catList=d;});
 fetch('/api/commission-classes').then(r=>r.json()).then(function(d){ccList=d;});
 fetch('/api/sizes').then(r=>r.json()).then(function(d){sizeList=d;});
-var params = new URLSearchParams(window.location.search);
-var editIdParam = params.get('id');
 if (editIdParam) {
-    setTimeout(function(){ loadSale(parseInt(editIdParam)); }, 200);
+    Promise.all([loadCustomers(), loadProducts(), loadAccounts()])
+        .then(function(){ loadSale(parseInt(editIdParam)); })
+        .catch(function(){ loadSale(parseInt(editIdParam)); });
 } else {
+    loadCustomers();
+    loadProducts();
+    loadAccounts();
     addRow();
 }
-addRow();
 </script>
 </body>
 </html>

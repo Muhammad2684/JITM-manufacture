@@ -568,7 +568,10 @@ def update_sales_invoice(sale_id):
                     db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
                 db.execute('UPDATE customers SET credit = credit + ? WHERE id=?', (total, customer_id))
         
-        new_paid = total if payment_method != 'credit' else old_sale.get('paid', 0)
+        if payment_method in ('credit', 'split'):
+            new_paid = old_sale.get('paid', 0)
+        else:
+            new_paid = total
         status = compute_sale_status(new_paid, total)
         
         db.execute(
@@ -588,11 +591,25 @@ def update_sales_invoice(sale_id):
         
         reverse_sale_transactions(db, sale_id)
         
-        db.execute('DELETE FROM payments WHERE sale_id=?', (sale_id,))
-        db.execute(
-            'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
-            (sale_id, payment_method, total)
-        )
+        if payment_method == 'credit':
+            existing_credit = db.execute(
+                "SELECT id FROM payments WHERE sale_id=? AND method='credit'", (sale_id,)
+            ).fetchone()
+            if existing_credit:
+                db.execute(
+                    "UPDATE payments SET amount=? WHERE sale_id=? AND method='credit'", (total, sale_id)
+                )
+            else:
+                db.execute(
+                    'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
+                    (sale_id, 'credit', total)
+                )
+        elif payment_method != 'split':
+            db.execute('DELETE FROM payments WHERE sale_id=?', (sale_id,))
+            db.execute(
+                'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
+                (sale_id, payment_method, total)
+            )
         
         if account_id and payment_method != 'credit':
             account = db.execute('SELECT * FROM accounts WHERE id=?', (account_id,)).fetchone()

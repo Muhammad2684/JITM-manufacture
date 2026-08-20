@@ -29,6 +29,8 @@
                             <th onclick="sortCol(1)" style="cursor:pointer;user-select:none">Name <span id="si1"></span></th>
                             <th onclick="sortCol(2)" style="cursor:pointer;user-select:none">Description <span id="si2"></span></th>
                             <th onclick="sortCol(3)" class="text-right" style="cursor:pointer;user-select:none">Materials <span id="si3"></span></th>
+                            <th onclick="sortCol(4)" class="text-right" style="cursor:pointer;user-select:none">Total Cost <span id="si4"></span></th>
+                            <th onclick="sortCol(5)" class="text-right" style="cursor:pointer;user-select:none">Applied To <span id="si5"></span></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -124,13 +126,15 @@
         }
         function sortCol(i) {
             if (sortIdx === i) { sortDir *= -1; } else { sortIdx = i; sortDir = 1; }
-            for (let j = 0; j < 4; j++) document.getElementById('si' + j).textContent = '';
+            for (let j = 0; j < 6; j++) document.getElementById('si' + j).textContent = '';
             document.getElementById('si' + i).textContent = sortDir === 1 ? ' \u25B2' : ' \u25BC';
             const vals = [
                 () => 0,
                 p => (p.name || '').toLowerCase(),
                 p => (p.description || '').toLowerCase(),
                 p => p.material_count || 0,
+                p => p.total_cost || 0,
+                p => p.applied_count || 0,
             ];
             all.sort((a, b) => { const va = vals[i](a), vb = vals[i](b); return va < vb ? -sortDir : va > vb ? sortDir : 0; });
             render(all);
@@ -141,12 +145,12 @@
             const start = (currentPage - 1) * perPage;
             const page = l.slice(start, start + perPage);
             document.getElementById('tb').innerHTML = page.map((p, i) =>
-                '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600">' + p.name + '</td><td style="font-size:12px;color:#6b7280">' + (p.description || '-') + '</td><td class="text-right">' + (p.material_count || 0) + '</td>' +
+                '<tr><td style="color:#6b7280;font-size:12px">' + (start + i + 1) + '</td><td style="font-weight:600">' + p.name + '</td><td style="font-size:12px;color:#6b7280">' + (p.description || '-') + '</td><td class="text-right">' + (p.material_count || 0) + '</td><td class="text-right">Rs ' + (+p.total_cost || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td><td class="text-right">' + (p.applied_count || 0) + '</td>' +
                 '<td>' + (ROLE == 'manager' || ROLE == 'owner' ? '<button class="btn btn-xs btn-ghost" onclick="view(' + p.id + ')">View</button> <button class="btn btn-xs" onclick="edit(' + p.id + ')">Edit</button> <button class="btn btn-xs btn-d" onclick="confirmDelete(' + p.id + ',\'' + p.name.replace(/'/g, "\\'") + '\')">Delete</button>' : '<button class="btn btn-xs btn-ghost" onclick="view(' + p.id + ')">View</button>') + '</td></tr>'
             ).join('');
-            var tot = 0;
-            l.forEach(function (p) { tot += p.material_count || 0; });
-            document.getElementById('tf').innerHTML = '<tr><td colspan="3" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">' + tot + ' material rows</td><td></td></tr>';
+            var totM = 0, totC = 0, totA = 0;
+            l.forEach(function (p) { totM += p.material_count || 0; totC += +p.total_cost || 0; totA += p.applied_count || 0; });
+            document.getElementById('tf').innerHTML = '<tr><td colspan="3" class="text-right" style="padding:6px 8px">Total</td><td class="text-right" style="padding:6px 8px">' + totM + ' material rows</td><td class="text-right" style="padding:6px 8px">Rs ' + totC.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td><td class="text-right" style="padding:6px 8px">' + totA + '</td><td></td></tr>';
             renderPagination();
         }
         function showAdd() {

@@ -170,7 +170,10 @@ def delete_bom(bid):
 def list_recipe_profiles():
     q = request.args.get('q', '')
     with get_db() as db:
-        base = ('SELECT rp.*, (SELECT COUNT(*) FROM recipe_profile_items rpi WHERE rpi.profile_id=rp.id) as material_count '
+        base = ('SELECT rp.*, '
+                '(SELECT COUNT(*) FROM recipe_profile_items rpi WHERE rpi.profile_id=rp.id) as material_count, '
+                '(SELECT COALESCE(SUM(rpi.qty_required * r.cost_per_unit), 0) FROM recipe_profile_items rpi JOIN raw_materials r ON r.id=rpi.raw_material_id WHERE rpi.profile_id=rp.id) as total_cost, '
+                '(SELECT COUNT(DISTINCT variant_id) FROM bom WHERE bom.profile_id=rp.id) as applied_count '
                 'FROM recipe_profiles rp ')
         if q:
             rows = db.execute(
@@ -315,12 +318,12 @@ def apply_recipe_profile(pid):
                     (vid, it['raw_material_id'])
                 ).fetchone()
                 if existing:
-                    db.execute('UPDATE bom SET qty_per_unit=? WHERE id=?',
-                               (it['qty_required'], existing['id']))
+                    db.execute('UPDATE bom SET qty_per_unit=?, profile_id=? WHERE id=?',
+                               (it['qty_required'], pid, existing['id']))
                 else:
                     db.execute(
-                        'INSERT INTO bom (variant_id, raw_material_id, qty_per_unit) VALUES (?,?,?)',
-                        (vid, it['raw_material_id'], it['qty_required'])
+                        'INSERT INTO bom (variant_id, raw_material_id, qty_per_unit, profile_id) VALUES (?,?,?,?)',
+                        (vid, it['raw_material_id'], it['qty_required'], pid)
                     )
             applied += 1
         return jsonify({'ok': True, 'applied_variants': applied})

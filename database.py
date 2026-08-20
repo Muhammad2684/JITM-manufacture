@@ -752,6 +752,12 @@ def init_db():
         except Exception:
             pass
 
+        # Track which recipe profile a BOM row came from (for "applied to" counts)
+        try:
+            db.execute('ALTER TABLE bom ADD COLUMN profile_id INTEGER REFERENCES recipe_profiles(id) ON DELETE SET NULL')
+        except Exception:
+            pass
+
         # Rebuild restock_log to also track raw materials: nullable variant_id,
         # raw_material_id column, and REAL stock columns (raw materials use kg/m).
         try:

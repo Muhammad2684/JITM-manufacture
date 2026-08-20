@@ -478,7 +478,6 @@ def update_sales_invoice(sale_id):
         old_sale = dict(old_sale)
         
         old_items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale_id,)).fetchall()
-        due_date = request_data.get('due_date') or old_sale.get('due_date')
         
         for old_item in old_items:
             if old_item['variant_id'] and old_item['is_return'] == 0:
@@ -547,6 +546,11 @@ def update_sales_invoice(sale_id):
         notes = request_data.get('notes', old_sale.get('notes', ''))
         customer_name = old_sale.get('customer_name', '')
         
+        if payment_method == 'credit':
+            due_date = request_data.get('due_date') or old_sale.get('due_date')
+        else:
+            due_date = None
+        
         if customer_id:
             customer = db.execute('SELECT name FROM customers WHERE id=?', (customer_id,)).fetchone()
             if customer:
@@ -554,21 +558,19 @@ def update_sales_invoice(sale_id):
         
         total = round(subtotal, 2)
         
-        if old_sale.get('customer_id') and old_sale['customer_id'] == customer_id:
+        if old_sale.get('customer_id'):
             db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
-        elif old_sale.get('customer_id'):
-            db.execute('UPDATE customers SET total_spent = total_spent - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
-        
         if customer_id:
             db.execute('UPDATE customers SET total_spent = total_spent + ? WHERE id=?', (total, customer_id))
-            if payment_method == 'credit':
-                if old_sale.get('customer_id') and old_sale['customer_id'] == customer_id and old_sale.get('payment') == 'credit':
-                    db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
-                elif old_sale.get('customer_id') and old_sale.get('payment') == 'credit':
-                    db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
-                db.execute('UPDATE customers SET credit = credit + ? WHERE id=?', (total, customer_id))
         
-        if payment_method in ('credit', 'split'):
+        if old_sale.get('payment') == 'credit' and old_sale.get('customer_id'):
+            db.execute('UPDATE customers SET credit = credit - ? WHERE id=?', (old_sale['total'], old_sale['customer_id']))
+        if payment_method == 'credit' and customer_id:
+            db.execute('UPDATE customers SET credit = credit + ? WHERE id=?', (total, customer_id))
+        
+        if payment_method == 'credit':
+            new_paid = old_sale.get('paid', 0) if old_sale.get('payment') == 'credit' else 0
+        elif payment_method == 'split':
             new_paid = old_sale.get('paid', 0)
         else:
             new_paid = total
@@ -592,18 +594,11 @@ def update_sales_invoice(sale_id):
         reverse_sale_transactions(db, sale_id)
         
         if payment_method == 'credit':
-            existing_credit = db.execute(
-                "SELECT id FROM payments WHERE sale_id=? AND method='credit'", (sale_id,)
-            ).fetchone()
-            if existing_credit:
-                db.execute(
-                    "UPDATE payments SET amount=? WHERE sale_id=? AND method='credit'", (total, sale_id)
-                )
-            else:
-                db.execute(
-                    'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
-                    (sale_id, 'credit', total)
-                )
+            db.execute('DELETE FROM payments WHERE sale_id=?', (sale_id,))
+            db.execute(
+                'INSERT INTO payments (sale_id, method, amount) VALUES (?,?,?)',
+                (sale_id, 'credit', total)
+            )
         elif payment_method != 'split':
             db.execute('DELETE FROM payments WHERE sale_id=?', (sale_id,))
             db.execute(

@@ -1115,6 +1115,71 @@ input[type="checkbox"] {
   font-weight: 500;
 }
 
+/* ─── Searchable Dropdown ─── */
+.dd {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.dd-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  color: #1e293b;
+  outline: none;
+}
+
+.dd-input:focus {
+  border-color: #3b4fe2;
+  box-shadow: 0 0 0 2px rgba(59, 79, 226, 0.12);
+}
+
+.dd-list {
+  display: none;
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  right: 0;
+  z-index: 999;
+  max-height: 210px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e2e1de;
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+}
+
+.dd-item {
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dd-item:hover,
+.dd-item.active {
+  background: #eef1ff;
+  color: #3b4fe2;
+}
+
+.dd-item.dd-ph {
+  color: #9ca3af;
+}
+
+.dd-empty {
+  padding: 10px;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+}
+
 /* ─── Misc ─── */
 .empty {
   text-align: center;

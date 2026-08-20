@@ -56,7 +56,7 @@
             <h2 id="emTitle">Profile</h2>
             <p id="emDesc" style="font-size:12px;color:#6b7280;margin:0 0 8px"></p>
             <div class="form-row">
-                <div><label>Raw Material</label><select id="brm"></select></div>
+                <div><label>Raw Material</label><select class="dd" id="brm"></select></div>
                 <div><label>Qty</label><input id="bqty" type="number" step="0.01" min="0.01" value="1"></div>
             </div>
             <button type="button" class="btn btn-sm btn-p" onclick="addItem()" style="margin-bottom:6px">+ Add Material</button>
@@ -93,6 +93,7 @@
         </div>
     </div>
     <script type="application/json" id="sv">{{role|tojson}}</script>
+    <script src="/static/dd.js"></script>
     <script>
         var ROLE = JSON.parse(document.getElementById('sv').textContent);
         var all = [], sortIdx = -1, sortDir = 1, currentPage = 1, totalPages = 1, perPage = 50, showAll = false;

@@ -126,9 +126,9 @@
                 <label>Date</label>
                 <input id="ad" type="date">
                 <label>From Account</label>
-                <select id="afa"></select>
+                <select class="dd" id="afa"></select>
                 <label>To Account</label>
-                <select id="ata"></select>
+                <select class="dd" id="ata"></select>
                 <label>Amount (Rs)</label>
                 <input id="aam" type="number" step="0.01" min="0" required>
                 <label>Note</label>
@@ -146,9 +146,9 @@
                 <label>Date</label>
                 <input id="ed" type="date">
                 <label>From Account</label>
-                <select id="efa"></select>
+                <select class="dd" id="efa"></select>
                 <label>To Account</label>
-                <select id="eta"></select>
+                <select class="dd" id="eta"></select>
                 <label>Amount (Rs)</label>
                 <input id="eam" type="number" step="0.01" min="0" required>
                 <label>Note</label>
@@ -158,6 +158,7 @@
         </div>
     </div>
     
+    <script src="/static/dd.js"></script>
     <script>
         var list = [], sortIdx = -1, sortDir = 1, editId = null, accts = [];
         var currentPage = 1, totalPages = 1, perPage = 50, showAll = false;

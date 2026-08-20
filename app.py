@@ -663,6 +663,7 @@ def view_sales_invoice(sale_id):
             status_label=status_label,
             paid_info=paid_info,
             back_url='/sales-invoices',
+            export_csv_url='/api/sales-invoices/{0}/export.csv'.format(sale_id),
         )
 
 

@@ -1,9 +1,11 @@
+import csv
 import json
 import random
 import time
-from flask import Blueprint, request, jsonify, session
+from io import StringIO
+from flask import Blueprint, request, jsonify, session, Response
 from database import get_db
-from routes.auth import login_required, manager_required
+from routes.auth import login_required, manager_required, permission_required
 
 pos_bp = Blueprint('pos', __name__, url_prefix='/api')
 
@@ -673,6 +675,34 @@ def delete_sales_invoice(sale_id):
         db.execute('DELETE FROM sales WHERE id=?', (sale_id,))
         
         return jsonify({'ok': True})
+
+
+@pos_bp.route('/sales-invoices/<int:sale_id>/export.csv', methods=['GET'])
+@login_required
+@permission_required('sales')
+def export_sales_invoice_csv(sale_id):
+    """Export a sale invoice's SKUs and quantities as a CSV file download."""
+    with get_db() as db:
+        sale = db.execute('SELECT receipt FROM sales WHERE id=?', (sale_id,)).fetchone()
+        if not sale:
+            return jsonify({'error': 'Sale not found'}), 404
+        sale_items = db.execute(
+            'SELECT sku, quantity FROM sale_items WHERE sale_id=? ORDER BY id',
+            (sale_id,)
+        ).fetchall()
+
+    csv_buffer = StringIO()
+    csv_writer = csv.writer(csv_buffer)
+    csv_writer.writerow(['SKU', 'Quantity'])
+    for sale_item in sale_items:
+        csv_writer.writerow([sale_item['sku'], abs(sale_item['quantity'])])
+
+    filename = 'sale_{0}.csv'.format(sale['receipt'] or sale_id)
+    return Response(
+        csv_buffer.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename="{0}"'.format(filename)}
+    )
 
 
 @pos_bp.route('/sales')

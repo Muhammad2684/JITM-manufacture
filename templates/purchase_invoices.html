@@ -34,6 +34,7 @@
             border-radius: 4px;
             font-weight: 600;
         }
+        .party-field { display: none; }
     </style>
 </head>
 <body>
@@ -149,6 +150,44 @@
             </form>
         </div>
     </div>
+
+    <div class="modal" id="paym">
+        <div class="mc">
+            <button class="mx" onclick="cl('paym')">&times;</button>
+            <h2>Pay Purchase Invoice</h2>
+            <form onsubmit="paySave(event)">
+                <label>Date</label>
+                <input id="payd" type="date">
+                <label>Account</label>
+                <select class="dd" id="paya"></select>
+                <label>Paid To</label>
+                <select id="paypt" onchange="payToggleParty()">
+                    <option value="supplier">Supplier</option>
+                    <option value="expense">Expenses</option>
+                    <option value="other">Other</option>
+                </select>
+                <div id="payparty_select" class="party-field">
+                    <label>Supplier</label>
+                    <select class="dd" id="payparty" onchange="loadPayInvoices()"></select>
+                </div>
+                <div id="payinv_select" class="party-field">
+                    <label>Invoice</label>
+                    <select class="dd" id="payinv"><option value="">-- Auto-apply to oldest --</option></select>
+                </div>
+                <div id="payexpense_select" class="party-field">
+                    <label>Expense Category</label>
+                    <select class="dd" id="payexp"></select>
+                </div>
+                <div id="paydesc_field" class="party-field">
+                    <label>Description</label>
+                    <input id="paydesc">
+                </div>
+                <label>Amount (Rs)</label>
+                <input id="payam" type="number" step="0.01" min="0" required>
+                <button class="btn btn-p" type="submit">Save Payment</button>
+            </form>
+        </div>
+    </div>
     
     <script>
         var piList = [], sortIdx = -1, sortDir = 1, editId = null, suppliers = [], currentPage = 1, totalPages = 1, perPage = 50, showAll = false;
@@ -256,6 +295,8 @@
                 '<td>' + dueInfo(p) + '</td>' +
                 '<td>' +
                 '<button class="btn btn-xs btn-ghost" onclick="viewPI(' + p.id + ')">View</button>' +
+                (p.balance_due > 0 && p.supplier_id && ({{role|tojson}} == 'manager' || {{role|tojson}} == 'owner') ?
+                    '<button class="btn btn-xs btn-ghost" onclick="payPI(' + p.id + ',' + p.supplier_id + ')">Pay</button>' : '') +
                 '<button class="btn btn-xs btn-ghost" onclick="window.open(\'/inventory/barcode?invoice_id=' + p.id + '\',\'_blank\')">Barcodes</button>' +
                 ({{role|tojson}} == 'manager' || {{role|tojson}} == 'owner' ? 
                     '<button class="btn btn-xs btn-ghost" onclick="window.open(\'/purchase-invoices/create?id=' + p.id + '\',\'_blank\')">Edit</button>' +
@@ -490,7 +531,130 @@
             window.location = '/purchase-invoices/' + id;
         }
         
+        function payPI(id, supplierId) {
+            payOpen(id, supplierId);
+        }
+        
+        var payAccts = [], paySuppliers = [], payExpCats = [], paySelInvoiceId = null;
+        
+        function loadPayAccounts() {
+            fetch('/api/accounts?per_page=10000').then(r => r.json()).then(function(d) {
+                payAccts = d.items || d;
+                document.getElementById('paya').innerHTML = payAccts.map(function(a) {
+                    return '<option value="' + a.id + '">' + a.name + ' (' + a.type + ')</option>';
+                }).join('');
+            });
+        }
+        function loadPaySuppliers() {
+            fetch('/api/suppliers?per_page=10000').then(r => r.json()).then(function(d) {
+                paySuppliers = d.items || d;
+            });
+        }
+        function loadPayExpenseCategories() {
+            if (payExpCats.length) return;
+            fetch('/api/expense-categories').then(r => r.json()).then(function(d) {
+                payExpCats = d || [];
+                document.getElementById('payexp').innerHTML = payExpCats.map(function(c) {
+                    return '<option value="' + c.name + '">' + c.name + ' (Rs ' + c.total.toFixed(2) + ')</option>';
+                }).join('');
+            });
+        }
+        function getPayPartyId(value) {
+            if (!value) return null;
+            var parts = value.split('_');
+            return { type: parts[0] === 'c' ? 'customer' : 'supplier', id: parseInt(parts[1], 10) };
+        }
+        function payToggleParty() {
+            var value = document.getElementById('paypt').value;
+            var partyField = document.getElementById('payparty_select');
+            var invField = document.getElementById('payinv_select');
+            var expField = document.getElementById('payexpense_select');
+            var descField = document.getElementById('paydesc_field');
+            partyField.style.display = 'none';
+            invField.style.display = 'none';
+            expField.style.display = 'none';
+            descField.style.display = 'none';
+            if (value === 'other') {
+                descField.style.display = 'block';
+            } else if (value === 'expense') {
+                expField.style.display = 'block';
+                loadPayExpenseCategories();
+            } else {
+                partyField.style.display = 'block';
+                invField.style.display = 'block';
+                loadPayInvoices();
+            }
+        }
+        function loadPayInvoices() {
+            var partyValue = document.getElementById('payparty').value;
+            if (!partyValue) { document.getElementById('payinv_select').style.display = 'none'; return; }
+            var party = getPayPartyId(partyValue);
+            if (party.type !== 'supplier') return;
+            document.getElementById('payinv_select').style.display = 'block';
+            fetch('/api/suppliers/' + party.id + '/invoices').then(r => r.json()).then(function(invoices) {
+                var sel = document.getElementById('payinv');
+                sel.innerHTML = '<option value="">-- Auto-apply to oldest --</option>' + invoices.map(function(inv) {
+                    var label = inv.invoice_no || inv.receipt;
+                    var amount = inv.balance_due || inv.outstanding || 0;
+                    return '<option value="p_' + inv.id + '">' + label + ' (Rs ' + amount.toFixed(2) + ')</option>';
+                }).join('');
+                if (paySelInvoiceId) sel.value = 'p_' + paySelInvoiceId;
+            });
+        }
+        function payOpen(invoiceId, supplierId) {
+            paySelInvoiceId = invoiceId;
+            document.getElementById('paym').classList.add('show');
+            document.getElementById('payd').value = new Date().toISOString().slice(0, 10);
+            document.getElementById('paya').value = payAccts.length ? payAccts[0].id : '';
+            document.getElementById('paypt').value = 'supplier';
+            var partySel = document.getElementById('payparty');
+            partySel.innerHTML = paySuppliers.map(function(s) {
+                return '<option value="s_' + s.id + '">' + s.name + '</option>';
+            }).join('');
+            partySel.value = 's_' + supplierId;
+            document.getElementById('paydesc').value = '';
+            document.getElementById('payam').value = '';
+            payToggleParty();
+        }
+        function paySave(event) {
+            event.preventDefault();
+            var amount = parseFloat(document.getElementById('payam').value);
+            if (!amount || amount <= 0) return alert('Amount must be positive');
+            var partyValue = document.getElementById('paypt').value;
+            var data = {
+                type: 'payment',
+                account_id: parseInt(document.getElementById('paya').value, 10) || 0,
+                amount: amount,
+                date: document.getElementById('payd').value || new Date().toISOString().slice(0, 10),
+                description: document.getElementById('paydesc').value,
+                party_type: partyValue
+            };
+            if (partyValue === 'supplier') {
+                var party = getPayPartyId(document.getElementById('payparty').value);
+                if (party) { data.party_type = 'supplier'; data.party_id = party.id; }
+                var invoiceValue = document.getElementById('payinv').value;
+                if (invoiceValue) { data.reference_type = 'purchase'; data.reference_id = parseInt(invoiceValue.split('_')[1], 10); }
+            } else if (partyValue === 'expense') {
+                var expenseValue = document.getElementById('payexp').value;
+                if (!expenseValue) return alert('Select an expense category');
+                data.expense_category = expenseValue;
+            }
+            fetch('/api/transactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(function(res) {
+                if (res.error) { alert(res.error); return; }
+                cl('paym');
+                load();
+            });
+        }
+        
         load();
+        loadPayAccounts();
+        loadPaySuppliers();
         
         function cl(id) {
             document.getElementById(id).classList.remove('show');

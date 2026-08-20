@@ -130,7 +130,7 @@
                 <label>Date</label>
                 <input id="ad" type="date">
                 <label>Account</label>
-                <select id="aa"></select>
+                <select class="dd" id="aa"></select>
                 <label>Received From</label>
                 <select id="apt" onchange="toggleParty()">
                     <option value="customer">Customer</option>
@@ -139,11 +139,11 @@
                 </select>
                 <div id="party_select" class="party-field">
                     <label>Customer</label>
-                    <select id="aparty" onchange="loadInvoices()"></select>
+                    <select class="dd" id="aparty" onchange="loadInvoices()"></select>
                 </div>
                 <div id="inv_select" class="party-field">
                     <label>Invoice</label>
-                    <select id="ainv">
+                    <select class="dd" id="ainv">
                         <option value="">-- Auto-apply to oldest --</option>
                     </select>
                 </div>
@@ -166,7 +166,7 @@
                 <label>Date</label>
                 <input id="ed" type="date">
                 <label>Account</label>
-                <select id="ea"></select>
+                <select class="dd" id="ea"></select>
                 <label>Received From</label>
                 <select id="ept" onchange="togglePartyE()">
                     <option value="customer">Customer</option>
@@ -175,11 +175,11 @@
                 </select>
                 <div id="eparty_select" class="party-field">
                     <label>Customer / Supplier</label>
-                    <select id="eparty" onchange="loadInvoicesE()"></select>
+                    <select class="dd" id="eparty" onchange="loadInvoicesE()"></select>
                 </div>
                 <div id="einv_select" class="party-field">
                     <label>Invoice</label>
-                    <select id="einv">
+                    <select class="dd" id="einv">
                         <option value="">-- Auto-apply to oldest --</option>
                     </select>
                 </div>
@@ -194,6 +194,7 @@
         </div>
     </div>
     
+    <script src="/static/dd.js"></script>
     <script>
         var list = [], sortIdx = -1, sortDir = 1, editId = null, accts = [], customers = [], suppliers = [], readyN = 0;
         var currentPage = 1, totalPages = 1, perPage = 50, showAll = false;

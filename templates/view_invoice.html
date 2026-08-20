@@ -217,7 +217,7 @@
             <div class="inv-wrap" id="inv">
                 <div class="inv-head">
                     <div>
-                        <h2>Nafees Nomolood</h2>
+                        <h2>AH Traders</h2>
                         <div class="sub">{{ head_sub }}</div>
                     </div>
                     <div>
@@ -303,6 +303,9 @@
                 
                 <div class="inv-actions">
                     <a class="btn btn-sm" href="{{ back_url }}">Back</a>
+                    {% if export_csv_url %}
+                        <a class="btn btn-sm btn-print" href="{{ export_csv_url }}">Export</a>
+                    {% endif %}
                     <button class="btn btn-p btn-sm" onclick="window.print()">Print</button>
                 </div>
             </div>

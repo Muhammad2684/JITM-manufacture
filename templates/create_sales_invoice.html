@@ -65,7 +65,7 @@
                 <div style="margin-bottom:12px"><label>Customer</label><select id="customer_id"><option value="">-- Walk-in / No Customer --</option></select></div>
                 <div class="pay-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
                     <div><label>Payment Method</label><select id="payment_method" onchange="toggleDueDate()"><option value="cash">Cash</option><option value="card">Card</option><option value="credit">Credit</option><option value="split">Split</option><option value="jb">Bank (Jibraan)</option><option value="ahd">Bank (Ahmed)</option><option value="z">Bank (Zahid)</option></select></div>
-                    <div id="account_wrap"><label>Receive to Account</label><select id="account_id"><option value="">-- Select Account --</option></select></div>
+                    <div id="account_wrap"><label>Receive to Account *</label><select id="account_id" onchange="clearAcctErr()"><option value="">-- Select Account --</option></select><div id="acct_err" style="display:none;font-size:11px;color:#dc2626;margin-top:4px">Please select the receiving account.</div></div>
                     <div><label>Notes</label><input type="text" id="notes" placeholder="Optional notes"></div>
                     <div id="due_date_wrap" style="display:none"><label>Due Date</label><input type="date" id="due_date"><input type="number" id="due_by" min="0" placeholder="Due by (days)" style="margin-top:6px;width:100%" oninput="recalcDueDate('sale_date','due_date','due_by')"></div>
                 </div>
@@ -159,6 +159,12 @@ function toggleDueDate() {
     var pm = document.getElementById('payment_method').value;
     document.getElementById('due_date_wrap').style.display = pm === 'credit' ? '' : 'none';
     document.getElementById('account_wrap').style.display = pm === 'credit' ? 'none' : '';
+    clearAcctErr();
+}
+
+function clearAcctErr() {
+    var el = document.getElementById('acct_err');
+    if (el) el.style.display = 'none';
 }
 
 function recalcDueDate(issueId, dueId, byId) {
@@ -698,6 +704,12 @@ function submitInvoice() {
     var account_id = document.getElementById('account_id').value || null;
     var notes = document.getElementById('notes').value;
     var due_date = payment === 'credit' ? document.getElementById('due_date').value : null;
+    if (payment !== 'credit' && !account_id) {
+        document.getElementById('acct_err').style.display = '';
+        document.getElementById('account_id').focus();
+        return;
+    }
+    clearAcctErr();
     var btn = document.getElementById('submit-btn');
     btn.disabled = true;
     btn.textContent = editId ? 'Updating...' : 'Creating...';

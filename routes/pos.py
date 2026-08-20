@@ -335,6 +335,9 @@ def create_sales_invoice():
     notes = request_data.get('notes', '')
     due_date = request_data.get('due_date') or None
     
+    if payment_method != 'credit' and not account_id:
+        return jsonify({'error': 'Receive to Account is required for this payment method'}), 400
+    
     with get_db() as db:
         db.execute('BEGIN IMMEDIATE')
         
@@ -476,6 +479,9 @@ def update_sales_invoice(sale_id):
         if not old_sale:
             return jsonify({'error': 'Sale not found'}), 404
         old_sale = dict(old_sale)
+        
+        if (request_data.get('payment') or old_sale.get('payment')) != 'credit' and not request_data.get('account_id'):
+            return jsonify({'error': 'Receive to Account is required for this payment method'}), 400
         
         old_items = db.execute('SELECT * FROM sale_items WHERE sale_id=?', (sale_id,)).fetchall()
         

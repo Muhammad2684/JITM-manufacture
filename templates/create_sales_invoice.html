@@ -217,7 +217,7 @@ function addRow(data) {
     html += '<td class="del-cell"><button onclick="delRow(this)">&times;</button></td>';
     html += '</tr>';
     document.getElementById('items_tb').insertAdjacentHTML('beforeend', html);
-    if (pid) updateStockWarning(rid_from_tr('rr-'+rowId));
+    if (pid) updateStockWarning(document.getElementById('rr-' + rowId));
     calcGrand();
 }
 

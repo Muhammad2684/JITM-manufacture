@@ -26,6 +26,7 @@
 - Core (POS) tables: users, products, variants, sales, sale_items, payments, customers, khata, restock_log, suppliers, supplier_khata, expenses, settings, commission_classes, categories
 - Added later: sizes, accounts, account_transfers, transactions, purchase_invoices, purchase_invoice_items, purchase_returns, purchase_return_items, employees, attendance
 - Manufacturing tables: raw_materials, bom, recipe_profiles, recipe_profile_items, production_orders, production_order_items, material_adjustments, material_transfers
+- `bom.profile_id` (nullable, `ON DELETE SET NULL`) links BOM rows to the recipe profile they were applied from; stamped by `/api/recipe-profiles/<pid>/apply` (also on overwritten rows). Rows applied before this column existed have NULL → applied counts show 0 for them
 - `products.category` is TEXT (freeform), `categories` table is a reference list for dropdowns
 - `products.commission_class` is TEXT, `commission_classes` table is a reference list
 
@@ -56,7 +57,7 @@
 ## Manufacturing Module (`routes/manufacturing.py`)
 - Raw materials — `/api/raw-materials`; rolling average cost; restocking works like products but flagged as raw material
 - Recipes (BOM) — `/api/bom`; BOM lines tie a finished variant to raw material quantities
-- Recipe Profiles — `/api/recipe-profiles` (+ `/api/recipe-profiles/<pid>/items` nested CRUD, `/api/recipe-profiles/<pid>/apply` consumes materials into inventory/purchase draft)
+- Recipe Profiles — `/api/recipe-profiles` (+ `/api/recipe-profiles/<pid>/items` nested CRUD, `/api/recipe-profiles/<pid>/apply` copies materials into each selected product's BOM, overwriting same-material rows). List returns `material_count`, `total_cost` (SUM qty×cost_per_unit at current material costs), `applied_count` (DISTINCT variants with `bom.profile_id` set)
 - Production Orders — `/api/production-orders`, `/api/production-orders/<oid>/complete` (complete allowed with negative raw stock after confirmation), `/api/production-orders/<oid>` PUT
 - Material Transfers — `/api/material-transfers` (inter-material transfers, DELETE to reverse)
 - Stock Adjustments — `/api/material-adjustments`
@@ -100,7 +101,15 @@
 - All listing tables with numeric columns must include a `<tfoot id="tf">` after `<tbody>` for totals
 - In `render()`, after populating `#tb`, compute sums from the current (filtered/sorted) list and set `#tf` innerHTML
 - The totals row spans columns with `colspan` for labels, shows summed values in bold in the relevant `<td>`s
-- Applied to: Inventory (Stock, Total Cost), Suppliers (Balance), Customers (Account Receivable), Purchase Invoices (Invoice Amount, Balance Due), Sales Invoices (Total)
+- Applied to: Inventory (Stock, Total Cost), Suppliers (Balance), Customers (Account Receivable), Purchase Invoices (Invoice Amount, Balance Due), Sales Invoices (Total), Recipe Profiles (Materials, Total Cost, Applied To)
+
+## Payments & Receipts Pages (`/accounts/payments`, `/accounts/receipts`)
+- `/api/customers/<id>/invoices` returns ONLY outstanding sales (`status IN ('Unpaid','Partial') AND total>paid`); `/api/suppliers/<id>/invoices` ONLY `balance_due>0` — a referenced invoice that is now fully paid is NOT in the dropdown
+- Edit modals therefore preserve the reference client-side: `loadInvoicesE(selInv, selLabel)` appends a selected `(Paid)` option when the current reference isn't in the fetched list, so save keeps `reference_type`/`reference_id` instead of silently re-cascading to the oldest open invoice
+- Stale-response guard: `invGen` generation counter — a newer `loadInvoicesE()` call invalidates older in-flight responses
+- `whenReady(fn)` defers edit-modal population until accts/customers/suppliers fetches complete; gated on a `readyN` completion counter (never on array `.length` — empty collections would deadlock), with a ~6s fail-safe (tries cap)
+- Expense category value restored via `editExpVal`, applied when the expense fetch completes — no `setTimeout` guessing
+- `load()` uses `Array.isArray(d.items) ? d.items : []` so a bad API response can't blank the table
 
 ## Sales Invoice Statuses
 - **Paid** — cash/card sales fully paid (paid = total)
